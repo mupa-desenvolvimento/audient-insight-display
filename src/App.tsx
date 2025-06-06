@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,6 +12,7 @@ import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import Player from "./pages/Player";
 import Index from "./pages/Index";
+import DevicePlayer from "./pages/DevicePlayer";
 
 const queryClient = new QueryClient();
 
@@ -25,6 +25,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/player" element={<Player />} />
+          <Route path="/device/:deviceId" element={<DevicePlayer />} />
           <Route
             path="/admin/*"
             element={

@@ -4,53 +4,63 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Monitor, Plus, Settings, MapPin } from "lucide-react";
+import { Monitor, Plus, Settings, MapPin, Copy, ExternalLink, Camera } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const mockDevices = [
   {
     id: 1,
+    uniqueId: "tv-001-sp-shopping",
     name: "TV Lobby Principal",
     location: "São Paulo - Shopping Center",
     status: "online",
     lastSeen: "Agora",
     resolution: "1920x1080",
     playlist: "Promoções Verão",
-    audience: 234
+    audience: 234,
+    cameraEnabled: true
   },
   {
     id: 2,
+    uniqueId: "totem-002-rj-airport",
     name: "Totem Entrada",
     location: "Rio de Janeiro - Aeroporto",
     status: "online",
     lastSeen: "2 min atrás",
     resolution: "1080x1920",
     playlist: "Institucional",
-    audience: 156
+    audience: 156,
+    cameraEnabled: true
   },
   {
     id: 3,
+    uniqueId: "display-003-bsb-mall",
     name: "Display Praça Alimentação",
     location: "Brasília - Mall Norte",
     status: "offline",
     lastSeen: "30 min atrás",
     resolution: "3840x2160",
     playlist: "Menu Digital",
-    audience: 89
+    audience: 89,
+    cameraEnabled: false
   },
   {
     id: 4,
+    uniqueId: "monitor-004-sp-office",
     name: "Monitor Recepção",
     location: "São Paulo - Escritório Central",
     status: "online",
     lastSeen: "Agora",
     resolution: "2560x1440",
     playlist: "Corporativo",
-    audience: 45
+    audience: 45,
+    cameraEnabled: true
   }
 ];
 
 const Devices = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const { toast } = useToast();
 
   const filteredDevices = mockDevices.filter(device =>
     device.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -63,6 +73,20 @@ const Devices = () => {
 
   const getStatusVariant = (status: string) => {
     return status === "online" ? "default" : "destructive";
+  };
+
+  const copyDeviceLink = (uniqueId: string) => {
+    const deviceUrl = `${window.location.origin}/device/${uniqueId}`;
+    navigator.clipboard.writeText(deviceUrl);
+    toast({
+      title: "Link copiado!",
+      description: "O link do dispositivo foi copiado para a área de transferência.",
+    });
+  };
+
+  const openDevicePlayer = (uniqueId: string) => {
+    const deviceUrl = `/device/${uniqueId}`;
+    window.open(deviceUrl, '_blank');
   };
 
   return (
@@ -96,12 +120,18 @@ const Devices = () => {
                   <div className="relative">
                     <Monitor className="w-8 h-8 text-primary" />
                     <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${getStatusColor(device.status)}`}></div>
+                    {device.cameraEnabled && (
+                      <Camera className="absolute -bottom-1 -left-1 w-3 h-3 text-blue-500" />
+                    )}
                   </div>
                   <div>
                     <CardTitle className="text-lg">{device.name}</CardTitle>
                     <CardDescription className="flex items-center space-x-1">
                       <MapPin className="w-3 h-3" />
                       <span>{device.location}</span>
+                    </CardDescription>
+                    <CardDescription className="text-xs font-mono text-muted-foreground mt-1">
+                      ID: {device.uniqueId}
                     </CardDescription>
                   </div>
                 </div>
@@ -134,8 +164,40 @@ const Devices = () => {
               </div>
               
               <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Câmera IA</span>
+                <Badge variant={device.cameraEnabled ? "default" : "secondary"}>
+                  {device.cameraEnabled ? "Ativa" : "Inativa"}
+                </Badge>
+              </div>
+              
+              <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Público Hoje</span>
                 <span className="text-sm font-bold text-primary">{device.audience} pessoas</span>
+              </div>
+
+              <div className="border-t pt-3">
+                <div className="text-xs text-muted-foreground mb-2">Link do Dispositivo:</div>
+                <div className="flex items-center space-x-2">
+                  <code className="flex-1 text-xs bg-muted p-2 rounded text-ellipsis overflow-hidden">
+                    /device/{device.uniqueId}
+                  </code>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => copyDeviceLink(device.uniqueId)}
+                    className="h-8 w-8 p-0"
+                  >
+                    <Copy className="w-3 h-3" />
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => openDevicePlayer(device.uniqueId)}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                  </Button>
+                </div>
               </div>
               
               <div className="flex space-x-2 pt-2">
