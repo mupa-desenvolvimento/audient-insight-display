@@ -1,5 +1,5 @@
 
-import { Monitor, BarChart3, Image, Settings, Grid2x2, Database } from "lucide-react";
+import { Monitor, BarChart3, Image, Settings, Grid2x2, Database, Camera } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import {
   Sidebar,
@@ -28,6 +28,11 @@ const menuItems = [
     title: "Mídias",
     url: "/admin/media",
     icon: Image,
+  },
+  {
+    title: "Câmera",
+    url: "/admin/camera",
+    icon: Camera,
   },
   {
     title: "Analytics",

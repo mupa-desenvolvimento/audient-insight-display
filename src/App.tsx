@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,6 +14,7 @@ import Settings from "./pages/Settings";
 import Player from "./pages/Player";
 import Index from "./pages/Index";
 import DevicePlayer from "./pages/DevicePlayer";
+import Camera from "./pages/Camera";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +28,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/player" element={<Player />} />
           <Route path="/device/:deviceId" element={<DevicePlayer />} />
+          <Route path="/camera" element={<Camera />} />
           <Route
             path="/admin/*"
             element={
@@ -38,6 +41,7 @@ const App = () => (
                       <Route path="media" element={<Media />} />
                       <Route path="analytics" element={<Analytics />} />
                       <Route path="settings" element={<Settings />} />
+                      <Route path="camera" element={<Camera />} />
                     </Routes>
                   </AppLayout>
                 </div>
