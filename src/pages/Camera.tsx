@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Camera, Users, Play, Square, Settings, Eye } from "lucide-react";
+import { Camera as CameraIcon, Users, Play, Square, Settings, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface DetectedPerson {
@@ -211,7 +211,7 @@ const Camera = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Status da Câmera</CardTitle>
-            <Camera className="h-4 w-4 text-muted-foreground" />
+            <CameraIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -231,7 +231,7 @@ const Camera = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <Camera className="w-5 h-5" />
+              <CameraIcon className="w-5 h-5" />
               <span>Feed da Câmera</span>
             </CardTitle>
           </CardHeader>
@@ -240,7 +240,7 @@ const Camera = () => {
               {cameraError ? (
                 <div className="h-64 flex items-center justify-center text-white">
                   <div className="text-center">
-                    <Camera className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <CameraIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
                     <p>{cameraError}</p>
                   </div>
                 </div>
