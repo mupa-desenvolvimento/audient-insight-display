@@ -28,10 +28,10 @@ const getAgeGroup = (age: number): '0-12' | '13-18' | '19-25' | '26-35' | '36-50
 };
 
 const getGender = (genderProbability: number): 'masculino' | 'feminino' | 'indefinido' => {
-  // face-api.js: valores altos (próximo a 1) = masculino, valores baixos (próximo a 0) = feminino
-  // Invertendo a lógica baseado no comportamento observado
-  if (genderProbability > 0.6) return 'masculino';
+  // face-api.js: valores próximos de 0 = feminino, valores próximos de 1 = masculino
+  // Corrigindo a lógica para a interpretação correta
   if (genderProbability < 0.4) return 'feminino';
+  if (genderProbability > 0.6) return 'masculino';
   return 'indefinido';
 };
 
