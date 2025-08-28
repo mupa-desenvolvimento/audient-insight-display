@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Camera as CameraIcon, Users, Play, Square, Settings, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFaceDetection } from "@/hooks/useFaceDetection";
+import { PeopleRegistration } from "@/components/PeopleRegistration";
 
 const Camera = () => {
   const [isStreaming, setIsStreaming] = useState(false);
@@ -240,25 +241,37 @@ const Camera = () => {
                 detectedFaces.map((face) => (
                   <div key={face.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                     <div className="flex items-center space-x-3">
-                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                      <div className={`w-3 h-3 rounded-full ${face.isRegistered ? 'bg-green-500' : 'bg-orange-500'}`}></div>
                       <div>
-                        <div className="flex items-center space-x-2">
-                          <Badge 
-                            variant="outline" 
-                            className={`${getGenderColor(face.gender)} text-white border-none`}
-                          >
-                            {face.gender}
-                          </Badge>
-                          <Badge 
-                            variant="outline"
-                            className={`${getAgeGroupColor(face.ageGroup)} text-white border-none`}
-                          >
-                            {face.age} anos
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Confiança: {(face.confidence * 100).toFixed(1)}%
-                        </p>
+                        {face.isRegistered ? (
+                          <div>
+                            <h4 className="font-medium text-primary">{face.name}</h4>
+                            <p className="text-xs text-muted-foreground">CPF: {face.cpf}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Confiança: {(face.confidence * 100).toFixed(1)}%
+                            </p>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <Badge 
+                                variant="outline" 
+                                className={`${getGenderColor(face.gender)} text-white border-none`}
+                              >
+                                {face.gender}
+                              </Badge>
+                              <Badge 
+                                variant="outline"
+                                className={`${getAgeGroupColor(face.ageGroup)} text-white border-none`}
+                              >
+                                {face.age} anos
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Pessoa não cadastrada - Confiança: {(face.confidence * 100).toFixed(1)}%
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="text-right">
@@ -273,6 +286,9 @@ const Camera = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Seção de Cadastro de Pessoas */}
+      <PeopleRegistration videoRef={videoRef} isStreaming={isStreaming} />
     </div>
   );
 };

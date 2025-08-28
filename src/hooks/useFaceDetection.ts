@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as faceapi from 'face-api.js';
+import { usePeopleRegistry } from './usePeopleRegistry';
 
 interface DetectedFace {
   id: string;
+  personId?: string;
+  name?: string;
+  cpf?: string;
   timestamp: Date;
   gender: 'masculino' | 'feminino' | 'indefinido';
   ageGroup: '0-12' | '13-18' | '19-25' | '26-35' | '36-50' | '51+';
@@ -10,6 +14,7 @@ interface DetectedFace {
   position: { x: number; y: number; width: number; height: number };
   age: number;
   genderProbability: number;
+  isRegistered: boolean;
 }
 
 const getAgeGroup = (age: number): '0-12' | '13-18' | '19-25' | '26-35' | '36-50' | '51+' => {
@@ -38,6 +43,9 @@ export const useFaceDetection = (
   const [detectedFaces, setDetectedFaces] = useState<DetectedFace[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastDetectedPersonsRef = useRef<Set<string>>(new Set());
+  
+  const { identifyPerson } = usePeopleRegistry();
 
   // Load face-api.js models
   useEffect(() => {
@@ -96,6 +104,9 @@ export const useFaceDetection = (
         .withAgeAndGender();
 
       if (detections.length > 0) {
+        // Identificar pessoas cadastradas
+        const identifiedPerson = await identifyPerson(video);
+        
         const newFaces: DetectedFace[] = detections.map((detection, index) => {
           const box = detection.detection.box;
           const age = Math.round(detection.age);
@@ -103,15 +114,35 @@ export const useFaceDetection = (
           const gender = getGender(genderProbability);
           const ageGroup = getAgeGroup(age);
 
+          // Usar dados da pessoa identificada se disponível
+          const isRegistered = identifiedPerson && !identifiedPerson.isNewPerson;
+          const faceId = isRegistered ? identifiedPerson.id : `unknown_${Date.now()}_${index}`;
+          
+          // Evitar detectar a mesma pessoa repetidamente
+          if (isRegistered && lastDetectedPersonsRef.current.has(identifiedPerson.id)) {
+            return null;
+          }
+
+          if (isRegistered) {
+            lastDetectedPersonsRef.current.add(identifiedPerson.id);
+            // Limpar após 5 segundos para permitir nova detecção
+            setTimeout(() => {
+              lastDetectedPersonsRef.current.delete(identifiedPerson.id);
+            }, 5000);
+          }
+
           // Debug log para verificar os valores
-          console.log(`Face detectada: idade=${age}, genderProb=${genderProbability.toFixed(3)}, género=${gender}`);
+          console.log(`Face detectada: ${isRegistered ? identifiedPerson.name : 'desconhecida'}, idade=${age}, genderProb=${genderProbability.toFixed(3)}, género=${gender}`);
 
           return {
-            id: `face_${Date.now()}_${index}`,
+            id: faceId,
+            personId: isRegistered ? identifiedPerson.id : undefined,
+            name: isRegistered ? identifiedPerson.name : undefined,
+            cpf: isRegistered ? identifiedPerson.cpf : undefined,
             timestamp: new Date(),
             gender,
             ageGroup,
-            confidence: detection.detection.score,
+            confidence: isRegistered ? identifiedPerson.confidence : detection.detection.score,
             position: {
               x: box.x,
               y: box.y,
@@ -119,33 +150,35 @@ export const useFaceDetection = (
               height: box.height
             },
             age,
-            genderProbability
+            genderProbability,
+            isRegistered: isRegistered || false
           };
-        });
+        }).filter(Boolean) as DetectedFace[];
 
-        setDetectedFaces(prev => {
-          const combined = [...newFaces, ...prev];
-          return combined.slice(0, 20); // Keep only the 20 most recent
-        });
+        if (newFaces.length > 0) {
+          setDetectedFaces(prev => {
+            const combined = [...newFaces, ...prev];
+            return combined.slice(0, 20); // Keep only the 20 most recent
+          });
+        }
 
         // Draw detections on canvas
-        ctx.strokeStyle = '#00ff00';
-        ctx.lineWidth = 2;
-        ctx.font = '14px Arial';
-        ctx.fillStyle = '#00ff00';
-
-        detections.forEach((detection, index) => {
-          const box = detection.detection.box;
-          const age = Math.round(detection.age);
-          const gender = getGender(detection.genderProbability);
+        newFaces.forEach((face) => {
+          const { position, isRegistered, name, gender, age } = face;
+          
+          // Cor diferente para pessoas cadastradas
+          ctx.strokeStyle = isRegistered ? '#00ff00' : '#ff6600';
+          ctx.lineWidth = 2;
+          ctx.font = '14px Arial';
+          ctx.fillStyle = isRegistered ? '#00ff00' : '#ff6600';
           
           // Draw bounding box
-          ctx.strokeRect(box.x, box.y, box.width, box.height);
+          ctx.strokeRect(position.x, position.y, position.width, position.height);
           
           // Draw label
-          const label = `${gender} | ${age} anos`;
-          const labelY = box.y > 20 ? box.y - 5 : box.y + box.height + 20;
-          ctx.fillText(label, box.x, labelY);
+          const label = isRegistered ? name : `${gender} | ${age} anos`;
+          const labelY = position.y > 20 ? position.y - 5 : position.y + position.height + 20;
+          ctx.fillText(label, position.x, labelY);
         });
       }
     } catch (error) {
