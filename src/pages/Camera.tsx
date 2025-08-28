@@ -7,6 +7,7 @@ import { Camera as CameraIcon, Users, Play, Square, Settings, Eye } from "lucide
 import { useToast } from "@/hooks/use-toast";
 import { useFaceDetection } from "@/hooks/useFaceDetection";
 import { PeopleRegistration } from "@/components/PeopleRegistration";
+import { DetectionHistory } from "@/components/DetectionHistory";
 
 const Camera = () => {
   const [isStreaming, setIsStreaming] = useState(false);
@@ -289,6 +290,9 @@ const Camera = () => {
 
       {/* Seção de Cadastro de Pessoas */}
       <PeopleRegistration videoRef={videoRef} isStreaming={isStreaming} />
+      
+      {/* Histórico de Detecções */}
+      <DetectionHistory />
     </div>
   );
 };

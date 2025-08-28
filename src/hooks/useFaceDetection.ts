@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as faceapi from 'face-api.js';
 import { usePeopleRegistry } from './usePeopleRegistry';
+import { useDetectionLog } from './useDetectionLog';
 
 interface DetectedFace {
   id: string;
@@ -46,6 +47,7 @@ export const useFaceDetection = (
   const lastDetectedPersonsRef = useRef<Set<string>>(new Set());
   
   const { identifyPerson } = usePeopleRegistry();
+  const { logDetection } = useDetectionLog();
 
   // Load face-api.js models
   useEffect(() => {
@@ -124,6 +126,14 @@ export const useFaceDetection = (
           }
 
           if (isRegistered) {
+            // Registrar a detecção no log
+            logDetection(
+              identifiedPerson.id,
+              identifiedPerson.name,
+              identifiedPerson.cpf,
+              identifiedPerson.confidence
+            );
+            
             lastDetectedPersonsRef.current.add(identifiedPerson.id);
             // Limpar após 5 segundos para permitir nova detecção
             setTimeout(() => {
