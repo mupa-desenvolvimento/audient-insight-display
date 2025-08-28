@@ -27,11 +27,13 @@ const getAgeGroup = (age: number): '0-12' | '13-18' | '19-25' | '26-35' | '36-50
   return '51+';
 };
 
-const getGender = (genderProbability: number): 'masculino' | 'feminino' | 'indefinido' => {
-  // face-api.js: valores próximos de 0 = feminino, valores próximos de 1 = masculino
-  // Corrigindo a lógica para a interpretação correta
-  if (genderProbability < 0.4) return 'feminino';
-  if (genderProbability > 0.6) return 'masculino';
+const getGender = (gender: string, genderProbability: number): 'masculino' | 'feminino' | 'indefinido' => {
+  // face-api.js retorna 'male' ou 'female' na propriedade gender
+  // e genderProbability indica a confiança dessa predição
+  console.log('Gender detection:', { gender, genderProbability });
+  
+  if (gender === 'female') return 'feminino';
+  if (gender === 'male') return 'masculino';
   return 'indefinido';
 };
 
@@ -113,7 +115,8 @@ export const useFaceDetection = (
           const box = detection.detection.box;
           const age = Math.round(detection.age);
           const genderProbability = detection.genderProbability;
-          const gender = getGender(genderProbability);
+          const genderString = detection.gender; // Obter a string de gênero
+          const gender = getGender(genderString, genderProbability);
           const ageGroup = getAgeGroup(age);
 
           // Usar dados da pessoa identificada se disponível

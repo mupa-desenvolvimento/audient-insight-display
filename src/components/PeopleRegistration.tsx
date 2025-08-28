@@ -49,9 +49,11 @@ export const PeopleRegistration = ({ videoRef, isStreaming }: PeopleRegistration
 
         if (detections) {
           const { age, gender, genderProbability } = detections;
-          // Corrigindo a lógica: valores baixos = feminino, valores altos = masculino
-          const detectedGender = genderProbability < 0.4 ? 'feminino' : 
-                                genderProbability > 0.6 ? 'masculino' : 'indefinido';
+          // Usando a propriedade gender que retorna 'male' ou 'female'
+          const detectedGender = gender === 'female' ? 'feminino' : 
+                                gender === 'male' ? 'masculino' : 'indefinido';
+          
+          console.log('Registration gender detection:', { gender, genderProbability, detectedGender });
           
           setFaceInfo({
             age: Math.round(age),
