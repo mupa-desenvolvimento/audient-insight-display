@@ -48,7 +48,7 @@ export const useFaceDetection = (
   const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastDetectedPersonsRef = useRef<Set<string>>(new Set());
   
-  const { identifyPerson } = usePeopleRegistry();
+  const { registeredPeople } = usePeopleRegistry();
   const { logDetection } = useDetectionLog();
 
   // Load face-api.js models
@@ -102,96 +102,133 @@ export const useFaceDetection = (
       // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Detect faces with age and gender
+      // Detect faces with age, gender and descriptors
       const detections = await faceapi
         .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceDescriptors()
         .withAgeAndGender();
 
       if (detections.length > 0) {
-        // Identificar pessoas cadastradas
-        const identifiedPerson = await identifyPerson(video);
+        console.log(`Detectando ${detections.length} face(s)`);
         
-        const newFaces: DetectedFace[] = detections.map((detection, index) => {
-          const box = detection.detection.box;
-          const age = Math.round(detection.age);
-          const genderProbability = detection.genderProbability;
-          const genderString = detection.gender; // Obter a string de gênero
-          const gender = getGender(genderString, genderProbability);
-          const ageGroup = getAgeGroup(age);
+        const newFaces: DetectedFace[] = await Promise.all(
+          detections.map(async (detection, index) => {
+            const box = detection.detection.box;
+            const age = Math.round(detection.age);
+            const genderProbability = detection.genderProbability;
+            const genderString = detection.gender;
+            const gender = getGender(genderString, genderProbability);
+            const ageGroup = getAgeGroup(age);
 
-          // Usar dados da pessoa identificada se disponível
-          const isRegistered = identifiedPerson && !identifiedPerson.isNewPerson;
-          const faceId = isRegistered ? identifiedPerson.id : `unknown_${Date.now()}_${index}`;
-          
-          // Evitar detectar a mesma pessoa repetidamente
-          if (isRegistered && lastDetectedPersonsRef.current.has(identifiedPerson.id)) {
-            return null;
-          }
+            // Identificar esta face específica usando seu descriptor
+            let identifiedPerson = null;
+            if (detection.descriptor) {
+              // Verificar se esta face corresponde a alguma pessoa cadastrada
+              for (const person of registeredPeople) {
+                try {
+                  const distance = faceapi.euclideanDistance(detection.descriptor, person.faceDescriptor);
+                  if (distance < 0.6) { // Threshold para considerar como mesma pessoa
+                    identifiedPerson = {
+                      id: person.id,
+                      name: person.name,
+                      cpf: person.cpf,
+                      confidence: 1 - distance,
+                      isNewPerson: false
+                    };
+                    break;
+                  }
+                } catch (error) {
+                  console.error('Erro ao comparar face descriptor:', error);
+                }
+              }
+            }
 
-          if (isRegistered) {
-            // Registrar a detecção no log
-            logDetection(
-              identifiedPerson.id,
-              identifiedPerson.name,
-              identifiedPerson.cpf,
-              identifiedPerson.confidence
-            );
+            const isRegistered = identifiedPerson && !identifiedPerson.isNewPerson;
+            const faceId = isRegistered ? identifiedPerson.id : `unknown_${Date.now()}_${index}`;
             
-            lastDetectedPersonsRef.current.add(identifiedPerson.id);
-            // Limpar após 5 segundos para permitir nova detecção
-            setTimeout(() => {
-              lastDetectedPersonsRef.current.delete(identifiedPerson.id);
-            }, 5000);
-          }
+            // Evitar log repetido da mesma pessoa
+            if (isRegistered && !lastDetectedPersonsRef.current.has(identifiedPerson.id)) {
+              // Registrar a detecção no log
+              logDetection(
+                identifiedPerson.id,
+                identifiedPerson.name,
+                identifiedPerson.cpf,
+                identifiedPerson.confidence
+              );
+              
+              lastDetectedPersonsRef.current.add(identifiedPerson.id);
+              // Limpar após 5 segundos para permitir nova detecção
+              setTimeout(() => {
+                lastDetectedPersonsRef.current.delete(identifiedPerson.id);
+              }, 5000);
+            }
 
-          // Debug log para verificar os valores
-          console.log(`Face detectada: ${isRegistered ? identifiedPerson.name : 'desconhecida'}, idade=${age}, genderProb=${genderProbability.toFixed(3)}, género=${gender}`);
+            // Debug log
+            console.log(`Face ${index + 1}: ${isRegistered ? identifiedPerson.name : 'desconhecida'}, idade=${age}, género=${gender}`);
 
-          return {
-            id: faceId,
-            personId: isRegistered ? identifiedPerson.id : undefined,
-            name: isRegistered ? identifiedPerson.name : undefined,
-            cpf: isRegistered ? identifiedPerson.cpf : undefined,
-            timestamp: new Date(),
-            gender,
-            ageGroup,
-            confidence: isRegistered ? identifiedPerson.confidence : detection.detection.score,
-            position: {
-              x: box.x,
-              y: box.y,
-              width: box.width,
-              height: box.height
-            },
-            age,
-            genderProbability,
-            isRegistered: isRegistered || false
-          };
-        }).filter(Boolean) as DetectedFace[];
+            return {
+              id: faceId,
+              personId: isRegistered ? identifiedPerson.id : undefined,
+              name: isRegistered ? identifiedPerson.name : undefined,
+              cpf: isRegistered ? identifiedPerson.cpf : undefined,
+              timestamp: new Date(),
+              gender,
+              ageGroup,
+              confidence: isRegistered ? identifiedPerson.confidence : detection.detection.score,
+              position: {
+                x: box.x,
+                y: box.y,
+                width: box.width,
+                height: box.height
+              },
+              age,
+              genderProbability,
+              isRegistered: isRegistered || false
+            };
+          })
+        );
 
         if (newFaces.length > 0) {
           setDetectedFaces(prev => {
             const combined = [...newFaces, ...prev];
-            return combined.slice(0, 20); // Keep only the 20 most recent
+            return combined.slice(0, 50); // Aumentei para 50 para suportar mais faces
           });
         }
 
         // Draw detections on canvas
-        newFaces.forEach((face) => {
+        newFaces.forEach((face, index) => {
           const { position, isRegistered, name, gender, age } = face;
           
-          // Cor diferente para pessoas cadastradas
-          ctx.strokeStyle = isRegistered ? '#00ff00' : '#ff6600';
-          ctx.lineWidth = 2;
-          ctx.font = '14px Arial';
-          ctx.fillStyle = isRegistered ? '#00ff00' : '#ff6600';
+          // Cores diferentes para cada face
+          const colors = ['#00ff00', '#ff6600', '#0066ff', '#ff0066', '#66ff00', '#ff6600'];
+          const color = isRegistered ? '#00ff00' : colors[index % colors.length];
+          
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 3;
+          ctx.font = '16px Arial';
+          ctx.fillStyle = color;
           
           // Draw bounding box
           ctx.strokeRect(position.x, position.y, position.width, position.height);
           
-          // Draw label
+          // Draw label with background
           const label = isRegistered ? name : `${gender} | ${age} anos`;
-          const labelY = position.y > 20 ? position.y - 5 : position.y + position.height + 20;
+          const labelY = position.y > 25 ? position.y - 8 : position.y + position.height + 25;
+          
+          // Background for text
+          const textWidth = ctx.measureText(label).width;
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+          ctx.fillRect(position.x - 2, labelY - 18, textWidth + 4, 22);
+          
+          // Text
+          ctx.fillStyle = color;
           ctx.fillText(label, position.x, labelY);
+          
+          // Número da face no canto superior esquerdo
+          ctx.fillStyle = color;
+          ctx.font = 'bold 14px Arial';
+          ctx.fillText(`#${index + 1}`, position.x + 5, position.y + 18);
         });
       }
     } catch (error) {
