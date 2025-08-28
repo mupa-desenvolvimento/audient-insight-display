@@ -115,6 +115,13 @@ const Camera = () => {
           <p className="text-muted-foreground">Sistema de detecção de pessoas em tempo real</p>
         </div>
         <div className="flex space-x-2">
+          <Button 
+            variant="outline"
+            onClick={() => window.open("/camera-fullscreen", "_blank")}
+          >
+            <CameraIcon className="w-4 h-4 mr-2" />
+            Tela Cheia
+          </Button>
           <Button variant="outline">
             <Settings className="w-4 h-4 mr-2" />
             Configurar
