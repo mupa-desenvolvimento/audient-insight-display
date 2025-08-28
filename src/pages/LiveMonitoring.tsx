@@ -233,8 +233,8 @@ const LiveMonitoring = () => {
                   <p>Nenhuma face cadastrada detectada</p>
                 </div>
               ) : (
-                registeredFaces.map((face) => (
-                  <div key={face.id} className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
+                registeredFaces.map((face, index) => (
+                  <div key={`registered-${face.id}-${index}`} className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
                     <div className="flex items-center space-x-3">
                       <div className="w-3 h-3 rounded-full bg-green-500"></div>
                       <div>
@@ -276,8 +276,8 @@ const LiveMonitoring = () => {
                   <p>Nenhuma face não cadastrada detectada</p>
                 </div>
               ) : (
-                unregisteredFaces.map((face) => (
-                  <div key={face.id} className="flex items-center justify-between p-3 bg-orange-50 dark:bg-orange-950 rounded-lg border border-orange-200 dark:border-orange-800">
+                unregisteredFaces.map((face, index) => (
+                  <div key={`unregistered-${face.id}-${index}`} className="flex items-center justify-between p-3 bg-orange-50 dark:bg-orange-950 rounded-lg border border-orange-200 dark:border-orange-800">
                     <div className="flex items-center space-x-3">
                       <div className="w-3 h-3 rounded-full bg-orange-500"></div>
                       <div>
