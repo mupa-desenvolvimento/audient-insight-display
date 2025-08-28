@@ -1,8 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Camera as CameraIcon, Play, Square, Users, UserCheck, UserX, Settings, ArrowLeft } from "lucide-react";
+import { Camera as CameraIcon, Play, Square, Users, UserCheck, UserX, Settings, ArrowLeft, Maximize } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFaceDetection } from "@/hooks/useFaceDetection";
 import { usePeopleRegistry } from "@/hooks/usePeopleRegistry";
@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 const CameraFullscreen = () => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -26,6 +27,38 @@ const CameraFullscreen = () => {
     detectedFaces, 
     totalDetected 
   } = useFaceDetection(videoRef, canvasRef, isStreaming);
+
+  // Entrar em modo fullscreen
+  const enterFullscreen = async () => {
+    try {
+      if (document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen();
+        setIsFullscreen(true);
+        toast({
+          title: "Modo tela cheia",
+          description: "Pressione ESC para sair",
+        });
+      }
+    } catch (error) {
+      console.error("Erro ao entrar em fullscreen:", error);
+    }
+  };
+
+  // Monitorar mudanças no estado fullscreen
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    
+    // Entrar automaticamente em fullscreen ao carregar a página
+    enterFullscreen();
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
 
   // Inicializar câmera
   const startCamera = async () => {
