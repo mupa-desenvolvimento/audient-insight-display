@@ -1,25 +1,14 @@
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Camera as CameraIcon, Users, Play, Square, Settings, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-interface DetectedPerson {
-  id: string;
-  timestamp: Date;
-  gender: 'masculino' | 'feminino' | 'indefinido';
-  ageGroup: '0-12' | '13-18' | '19-25' | '26-35' | '36-50' | '51+';
-  confidence: number;
-  position: { x: number; y: number; width: number; height: number };
-}
+import { useFaceDetection } from "@/hooks/useFaceDetection";
 
 const Camera = () => {
   const [isStreaming, setIsStreaming] = useState(false);
-  const [detectedPeople, setDetectedPeople] = useState<DetectedPerson[]>([]);
-  const [currentCount, setCurrentCount] = useState(0);
-  const [totalToday, setTotalToday] = useState(0);
   const [cameraError, setCameraError] = useState<string | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -27,9 +16,25 @@ const Camera = () => {
   const streamRef = useRef<MediaStream | null>(null);
   
   const { toast } = useToast();
+  
+  const { 
+    isModelsLoaded, 
+    isLoading, 
+    detectedFaces, 
+    totalDetected 
+  } = useFaceDetection(videoRef, canvasRef, isStreaming);
 
   // Inicializar câmera
   const startCamera = async () => {
+    if (!isModelsLoaded) {
+      toast({
+        title: "Modelos carregando",
+        description: "Aguarde o carregamento dos modelos de IA",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setCameraError(null);
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -80,60 +85,6 @@ const Camera = () => {
     });
   };
 
-  // Simulação de detecção (em produção seria substituído por IA real)
-  const simulateDetection = () => {
-    if (!isStreaming) return;
-
-    const genders = ['masculino', 'feminino', 'indefinido'] as const;
-    const ageGroups = ['0-12', '13-18', '19-25', '26-35', '36-50', '51+'] as const;
-    
-    // Simular detecção aleatória
-    if (Math.random() > 0.7) {
-      const newPerson: DetectedPerson = {
-        id: `person_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        timestamp: new Date(),
-        gender: genders[Math.floor(Math.random() * genders.length)],
-        ageGroup: ageGroups[Math.floor(Math.random() * ageGroups.length)],
-        confidence: 0.75 + Math.random() * 0.2,
-        position: {
-          x: Math.random() * 500,
-          y: Math.random() * 400,
-          width: 80 + Math.random() * 40,
-          height: 100 + Math.random() * 50
-        }
-      };
-
-      setDetectedPeople(prev => {
-        const updated = [newPerson, ...prev].slice(0, 20); // Manter apenas os 20 mais recentes
-        return updated;
-      });
-      
-      setCurrentCount(prev => prev + 1);
-      setTotalToday(prev => prev + 1);
-    }
-  };
-
-  // Limpeza de pessoas antigas (simulação de saída de cena)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setDetectedPeople(prev => 
-        prev.filter(person => 
-          Date.now() - person.timestamp.getTime() < 10000 // Remove após 10 segundos
-        )
-      );
-      
-      setCurrentCount(prev => Math.max(0, prev - Math.floor(Math.random() * 2)));
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // Simulação de detecção
-  useEffect(() => {
-    const interval = setInterval(simulateDetection, 2000);
-    return () => clearInterval(interval);
-  }, [isStreaming]);
-
   const getGenderColor = (gender: string) => {
     switch (gender) {
       case 'masculino': return 'bg-blue-500';
@@ -167,9 +118,13 @@ const Camera = () => {
             Configurar
           </Button>
           {!isStreaming ? (
-            <Button onClick={startCamera} className="gradient-primary text-white">
+            <Button 
+              onClick={startCamera} 
+              className="gradient-primary text-white"
+              disabled={isLoading || !isModelsLoaded}
+            >
               <Play className="w-4 h-4 mr-2" />
-              Iniciar Câmera
+              {isLoading ? "Carregando IA..." : "Iniciar Câmera"}
             </Button>
           ) : (
             <Button variant="destructive" onClick={stopCamera}>
@@ -188,9 +143,9 @@ const Camera = () => {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">{currentCount}</div>
+            <div className="text-2xl font-bold text-primary">{detectedFaces.length}</div>
             <p className="text-xs text-muted-foreground">
-              Na tela agora
+              Faces detectadas agora
             </p>
           </CardContent>
         </Card>
@@ -201,9 +156,9 @@ const Camera = () => {
             <Eye className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">{totalToday}</div>
+            <div className="text-2xl font-bold text-primary">{totalDetected}</div>
             <p className="text-xs text-muted-foreground">
-              Pessoas detectadas
+              Total de detecções
             </p>
           </CardContent>
         </Card>
@@ -220,7 +175,8 @@ const Camera = () => {
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground">
-              {isStreaming ? "Detectando pessoas" : "Câmera desligada"}
+              {isLoading ? "Carregando modelos IA..." : 
+               isStreaming ? "Detectando faces" : "Câmera desligada"}
             </p>
           </CardContent>
         </Card>
@@ -255,27 +211,8 @@ const Camera = () => {
                   />
                   <canvas
                     ref={canvasRef}
-                    className="absolute top-0 left-0 w-full h-full"
-                    style={{ display: 'none' }}
+                    className="absolute top-0 left-0 w-full h-full pointer-events-none"
                   />
-                  
-                  {/* Overlay de detecções */}
-                  {isStreaming && detectedPeople.slice(0, 5).map((person) => (
-                    <div
-                      key={person.id}
-                      className="absolute border-2 border-green-400 bg-green-400/20"
-                      style={{
-                        left: `${(person.position.x / 640) * 100}%`,
-                        top: `${(person.position.y / 480) * 100}%`,
-                        width: `${(person.position.width / 640) * 100}%`,
-                        height: `${(person.position.height / 480) * 100}%`
-                      }}
-                    >
-                      <div className="absolute -top-6 left-0 bg-green-400 text-black text-xs px-1 rounded">
-                        {person.gender} | {person.ageGroup}
-                      </div>
-                    </div>
-                  ))}
                 </>
               )}
             </div>
@@ -288,45 +225,45 @@ const Camera = () => {
             <CardTitle className="flex items-center space-x-2">
               <Users className="w-5 h-5" />
               <span>Pessoas Detectadas</span>
-              <Badge variant="outline">{detectedPeople.length}</Badge>
+              <Badge variant="outline">{detectedFaces.length}</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3 max-h-64 overflow-y-auto">
-              {detectedPeople.length === 0 ? (
+              {detectedFaces.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>Nenhuma pessoa detectada</p>
-                  <p className="text-sm">Inicie a câmera para começar</p>
+                  <p>Nenhuma face detectada</p>
+                  <p className="text-sm">{isLoading ? "Carregando modelos..." : "Inicie a câmera para começar"}</p>
                 </div>
               ) : (
-                detectedPeople.map((person) => (
-                  <div key={person.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                detectedFaces.map((face) => (
+                  <div key={face.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                     <div className="flex items-center space-x-3">
                       <div className="w-3 h-3 rounded-full bg-green-500"></div>
                       <div>
                         <div className="flex items-center space-x-2">
                           <Badge 
                             variant="outline" 
-                            className={`${getGenderColor(person.gender)} text-white border-none`}
+                            className={`${getGenderColor(face.gender)} text-white border-none`}
                           >
-                            {person.gender}
+                            {face.gender}
                           </Badge>
                           <Badge 
                             variant="outline"
-                            className={`${getAgeGroupColor(person.ageGroup)} text-white border-none`}
+                            className={`${getAgeGroupColor(face.ageGroup)} text-white border-none`}
                           >
-                            {person.ageGroup}
+                            {face.age} anos
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          Confiança: {(person.confidence * 100).toFixed(1)}%
+                          Confiança: {(face.confidence * 100).toFixed(1)}%
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-muted-foreground">
-                        {person.timestamp.toLocaleTimeString()}
+                        {face.timestamp.toLocaleTimeString()}
                       </p>
                     </div>
                   </div>
