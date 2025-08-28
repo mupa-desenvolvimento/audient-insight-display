@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { UserPlus, Users, Trash2, Calendar, Eye } from 'lucide-react';
+import { UserPlus, Users, Trash2, Calendar, Eye, User, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { usePeopleRegistry } from '@/hooks/usePeopleRegistry';
+import * as faceapi from 'face-api.js';
 
 interface PeopleRegistrationProps {
   videoRef: React.RefObject<HTMLVideoElement>;
@@ -17,6 +18,8 @@ interface PeopleRegistrationProps {
 export const PeopleRegistration = ({ videoRef, isStreaming }: PeopleRegistrationProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '', cpf: '' });
+  const [faceInfo, setFaceInfo] = useState<{ age: number; gender: string; confidence: number } | null>(null);
+  const [isDetecting, setIsDetecting] = useState(false);
   const { toast } = useToast();
   
   const { 
@@ -27,6 +30,46 @@ export const PeopleRegistration = ({ videoRef, isStreaming }: PeopleRegistration
     clearRegistry,
     totalRegistered 
   } = usePeopleRegistry();
+
+  // Detectar face quando o diálogo estiver aberto
+  useEffect(() => {
+    if (!isDialogOpen || !isStreaming || !videoRef.current) {
+      setFaceInfo(null);
+      return;
+    }
+
+    const detectFace = async () => {
+      if (!videoRef.current || isDetecting) return;
+      
+      setIsDetecting(true);
+      try {
+        const detections = await faceapi
+          .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+          .withAgeAndGender();
+
+        if (detections) {
+          const { age, gender, genderProbability } = detections;
+          const detectedGender = genderProbability > 0.6 ? 'masculino' : 
+                                genderProbability < 0.4 ? 'feminino' : 'indefinido';
+          
+          setFaceInfo({
+            age: Math.round(age),
+            gender: detectedGender,
+            confidence: Math.max(genderProbability, 1 - genderProbability)
+          });
+        } else {
+          setFaceInfo(null);
+        }
+      } catch (error) {
+        console.error('Erro na detecção facial:', error);
+      } finally {
+        setIsDetecting(false);
+      }
+    };
+
+    const interval = setInterval(detectFace, 1000); // Detectar a cada segundo
+    return () => clearInterval(interval);
+  }, [isDialogOpen, isStreaming, isDetecting]);
 
   const handleRegister = async () => {
     if (!videoRef.current || !isStreaming) {
@@ -114,9 +157,49 @@ export const PeopleRegistration = ({ videoRef, isStreaming }: PeopleRegistration
                     maxLength={14}
                   />
                 </div>
+
+                {/* Informações da face detectada */}
+                {faceInfo ? (
+                  <div className="bg-green-50 dark:bg-green-950 p-4 rounded-lg border border-green-200 dark:border-green-800">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <User className="w-4 h-4 text-green-600" />
+                      <span className="text-sm font-medium text-green-800 dark:text-green-200">Face detectada</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="text-center">
+                        <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
+                          {faceInfo.gender}
+                        </Badge>
+                        <p className="text-xs text-muted-foreground mt-1">Gênero</p>
+                      </div>
+                      <div className="text-center">
+                        <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-200">
+                          {faceInfo.age} anos
+                        </Badge>
+                        <p className="text-xs text-muted-foreground mt-1">Idade aprox.</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-green-600 dark:text-green-400 mt-2 text-center">
+                      Confiança: {(faceInfo.confidence * 100).toFixed(1)}%
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-orange-50 dark:bg-orange-950 p-4 rounded-lg border border-orange-200 dark:border-orange-800">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Clock className="w-4 h-4 text-orange-600" />
+                      <span className="text-sm font-medium text-orange-800 dark:text-orange-200">
+                        {isDetecting ? 'Detectando face...' : 'Nenhuma face detectada'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-orange-600 dark:text-orange-400">
+                      📸 Posicione-se de frente para a câmera para ver suas informações
+                    </p>
+                  </div>
+                )}
+
                 <div className="bg-muted p-3 rounded-lg">
                   <p className="text-sm text-muted-foreground">
-                    📸 Posicione-se de frente para a câmera antes de confirmar o cadastro.
+                    💡 As informações de idade e gênero são estimativas baseadas na análise facial
                   </p>
                 </div>
                 <div className="flex space-x-2">
