@@ -15,6 +15,7 @@ import Player from "./pages/Player";
 import Index from "./pages/Index";
 import DevicePlayer from "./pages/DevicePlayer";
 import Camera from "./pages/Camera";
+import LiveMonitoring from "./pages/LiveMonitoring";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,7 @@ const App = () => (
                       <Route path="analytics" element={<Analytics />} />
                       <Route path="settings" element={<Settings />} />
                       <Route path="camera" element={<Camera />} />
+                      <Route path="monitoring" element={<LiveMonitoring />} />
                     </Routes>
                   </AppLayout>
                 </div>
