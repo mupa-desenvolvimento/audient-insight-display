@@ -28,35 +28,65 @@ const CameraFullscreen = () => {
     totalDetected 
   } = useFaceDetection(videoRef, canvasRef, isStreaming);
 
-  // Entrar em modo fullscreen
+  // Entrar em modo fullscreen com suporte amplo
   const enterFullscreen = async () => {
     try {
-      if (document.documentElement.requestFullscreen) {
-        await document.documentElement.requestFullscreen();
-        setIsFullscreen(true);
-        toast({
-          title: "Modo tela cheia",
-          description: "Pressione ESC para sair",
-        });
+      const elem = document.documentElement;
+      
+      if (elem.requestFullscreen) {
+        await elem.requestFullscreen();
+      } else if ((elem as any).webkitRequestFullscreen) {
+        await (elem as any).webkitRequestFullscreen();
+      } else if ((elem as any).mozRequestFullScreen) {
+        await (elem as any).mozRequestFullScreen();
+      } else if ((elem as any).msRequestFullscreen) {
+        await (elem as any).msRequestFullscreen();
       }
+      
+      setIsFullscreen(true);
+      toast({
+        title: "Modo tela cheia",
+        description: "Pressione ESC para sair",
+      });
     } catch (error) {
       console.error("Erro ao entrar em fullscreen:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível entrar em tela cheia",
+        variant: "destructive",
+      });
     }
   };
 
   // Monitorar mudanças no estado fullscreen
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const isFullscreenNow = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+      setIsFullscreen(isFullscreenNow);
     };
 
+    // Adicionar todos os listeners de fullscreen
     document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
     
-    // Entrar automaticamente em fullscreen ao carregar a página
-    enterFullscreen();
+    // Tentar entrar em fullscreen após um pequeno delay
+    const timer = setTimeout(() => {
+      enterFullscreen();
+    }, 100);
 
     return () => {
+      clearTimeout(timer);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
     };
   }, []);
 
@@ -125,7 +155,14 @@ const CameraFullscreen = () => {
   const unregisteredFaces = detectedFaces.filter(face => !face.isRegistered);
 
   return (
-    <div className="fixed inset-0 bg-black overflow-hidden">
+    <div className="fixed inset-0 bg-black overflow-hidden" style={{
+      width: '100vw',
+      height: '100vh',
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      zIndex: 9999
+    }}>
       {/* Controles no canto superior esquerdo */}
       <div className="absolute top-4 left-4 z-50 flex space-x-2">
         <Button
