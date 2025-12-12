@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import * as faceapi from 'face-api.js';
 import { usePeopleRegistry } from './usePeopleRegistry';
 import { useDetectionLog } from './useDetectionLog';
+import { useAttentionHistory } from './useAttentionHistory';
 
 interface DetectedFace {
   id: string;
@@ -25,7 +26,11 @@ interface TrackedFace {
   firstSeenAt: Date;
   lastSeenAt: Date;
   personId?: string;
+  personName?: string;
   isRegistered: boolean;
+  gender: 'masculino' | 'feminino' | 'indefinido';
+  ageGroup: string;
+  age: number;
 }
 
 const getAgeGroup = (age: number): '0-12' | '13-18' | '19-25' | '26-35' | '36-50' | '51+' => {
@@ -62,6 +67,7 @@ export const useFaceDetection = (
   
   const { registeredPeople } = usePeopleRegistry();
   const { logDetection } = useDetectionLog();
+  const { addAttentionRecord } = useAttentionHistory();
 
   // Load face-api.js models
   useEffect(() => {
@@ -112,7 +118,11 @@ export const useFaceDetection = (
     trackId: string,
     descriptor: Float32Array,
     personId?: string,
-    isRegistered: boolean = false
+    personName?: string,
+    isRegistered: boolean = false,
+    gender: 'masculino' | 'feminino' | 'indefinido' = 'indefinido',
+    ageGroup: string = '',
+    age: number = 0
   ) => {
     const now = new Date();
     const existing = trackedFacesRef.current.get(trackId);
@@ -126,7 +136,11 @@ export const useFaceDetection = (
         firstSeenAt: now,
         lastSeenAt: now,
         personId,
-        isRegistered
+        personName,
+        isRegistered,
+        gender,
+        ageGroup,
+        age
       });
     }
   }, []);
@@ -142,7 +156,7 @@ export const useFaceDetection = (
     return { duration, firstSeenAt: tracked.firstSeenAt };
   }, []);
 
-  // Clean up old tracked faces
+  // Clean up old tracked faces and save attention history
   useEffect(() => {
     const cleanupInterval = setInterval(() => {
       const now = Date.now();
@@ -150,7 +164,23 @@ export const useFaceDetection = (
       
       for (const [trackId, tracked] of trackedFaces.entries()) {
         if (now - tracked.lastSeenAt.getTime() > FACE_TIMEOUT_MS) {
-          console.log(`Removing tracked face ${trackId} - duration: ${((tracked.lastSeenAt.getTime() - tracked.firstSeenAt.getTime()) / 1000).toFixed(1)}s`);
+          const duration = (tracked.lastSeenAt.getTime() - tracked.firstSeenAt.getTime()) / 1000;
+          console.log(`Removing tracked face ${trackId} - duration: ${duration.toFixed(1)}s`);
+          
+          // Save to attention history
+          addAttentionRecord(
+            trackId,
+            tracked.personId,
+            tracked.personName,
+            tracked.isRegistered,
+            tracked.gender,
+            tracked.ageGroup,
+            tracked.age,
+            tracked.firstSeenAt,
+            tracked.lastSeenAt,
+            duration
+          );
+          
           trackedFaces.delete(trackId);
         }
       }
@@ -229,10 +259,10 @@ export const useFaceDetection = (
               
               if (existingTrackId) {
                 trackId = existingTrackId;
-                updateTrackedFace(trackId, detection.descriptor, isRegistered ? identifiedPerson?.id : undefined, isRegistered || false);
+                updateTrackedFace(trackId, detection.descriptor, isRegistered ? identifiedPerson?.id : undefined, isRegistered ? identifiedPerson?.name : undefined, isRegistered || false, gender, ageGroup, age);
               } else {
                 trackId = isRegistered ? identifiedPerson!.id : `track_${Date.now()}_${index}`;
-                updateTrackedFace(trackId, detection.descriptor, isRegistered ? identifiedPerson?.id : undefined, isRegistered || false);
+                updateTrackedFace(trackId, detection.descriptor, isRegistered ? identifiedPerson?.id : undefined, isRegistered ? identifiedPerson?.name : undefined, isRegistered || false, gender, ageGroup, age);
               }
             } else {
               trackId = `unknown_${Date.now()}_${index}`;
@@ -333,7 +363,7 @@ export const useFaceDetection = (
     } catch (error) {
       console.error('Error during face detection:', error);
     }
-  }, [videoRef, canvasRef, isModelsLoaded, isActive, registeredPeople, logDetection, findMatchingTrackedFace, updateTrackedFace, getLookingDuration]);
+  }, [videoRef, canvasRef, isModelsLoaded, isActive, registeredPeople, logDetection, findMatchingTrackedFace, updateTrackedFace, getLookingDuration, addAttentionRecord]);
 
   // Start/stop detection based on isActive
   useEffect(() => {
