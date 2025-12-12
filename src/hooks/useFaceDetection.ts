@@ -4,33 +4,38 @@ import { usePeopleRegistry } from './usePeopleRegistry';
 import { useDetectionLog } from './useDetectionLog';
 import { useAttentionHistory } from './useAttentionHistory';
 
-interface DetectedFace {
-  id: string;
+// Face currently being tracked (looking at camera now)
+export interface ActiveFace {
+  trackId: string;
   personId?: string;
   name?: string;
   cpf?: string;
-  timestamp: Date;
   gender: 'masculino' | 'feminino' | 'indefinido';
   ageGroup: '0-12' | '13-18' | '19-25' | '26-35' | '36-50' | '51+';
+  age: number;
+  ageEstimates: number[]; // Store multiple age readings for averaging
   confidence: number;
   position: { x: number; y: number; width: number; height: number };
-  age: number;
-  genderProbability: number;
   isRegistered: boolean;
-  lookingDuration: number; // Duration in seconds
   firstSeenAt: Date;
+  lastSeenAt: Date;
+  lookingDuration: number;
 }
 
-interface TrackedFace {
+interface TrackedFaceData {
   descriptor: Float32Array;
   firstSeenAt: Date;
   lastSeenAt: Date;
   personId?: string;
   personName?: string;
+  personCpf?: string;
   isRegistered: boolean;
   gender: 'masculino' | 'feminino' | 'indefinido';
-  ageGroup: string;
-  age: number;
+  ageGroup: '0-12' | '13-18' | '19-25' | '26-35' | '36-50' | '51+';
+  ageEstimates: number[];
+  confidence: number;
+  position: { x: number; y: number; width: number; height: number };
+  loggedToHistory: boolean;
 }
 
 const getAgeGroup = (age: number): '0-12' | '13-18' | '19-25' | '26-35' | '36-50' | '51+' => {
@@ -43,15 +48,32 @@ const getAgeGroup = (age: number): '0-12' | '13-18' | '19-25' | '26-35' | '36-50
 };
 
 const getGender = (gender: string, genderProbability: number): 'masculino' | 'feminino' | 'indefinido' => {
-  console.log('Gender detection:', { gender, genderProbability });
-  
+  // Only classify if confidence is above 70%
+  if (genderProbability < 0.7) return 'indefinido';
   if (gender === 'female') return 'feminino';
   if (gender === 'male') return 'masculino';
   return 'indefinido';
 };
 
-const FACE_MATCH_THRESHOLD = 0.5; // Threshold for matching same face across frames
-const FACE_TIMEOUT_MS = 3000; // Remove tracked face after 3 seconds of not being seen
+// Calculate average age from estimates, removing outliers
+const calculateAverageAge = (estimates: number[]): number => {
+  if (estimates.length === 0) return 0;
+  if (estimates.length === 1) return Math.round(estimates[0]);
+  
+  // Sort and remove top/bottom 20% as outliers if we have enough samples
+  const sorted = [...estimates].sort((a, b) => a - b);
+  const trimCount = Math.floor(sorted.length * 0.2);
+  const trimmed = sorted.slice(trimCount, sorted.length - trimCount);
+  
+  if (trimmed.length === 0) return Math.round(sorted[Math.floor(sorted.length / 2)]);
+  
+  const sum = trimmed.reduce((acc, val) => acc + val, 0);
+  return Math.round(sum / trimmed.length);
+};
+
+const FACE_MATCH_THRESHOLD = 0.45; // Stricter threshold for better matching
+const FACE_TIMEOUT_MS = 2000; // Remove tracked face after 2 seconds of not being seen
+const DETECTION_INTERVAL_MS = 500; // Faster detection for smoother tracking
 
 export const useFaceDetection = (
   videoRef: React.RefObject<HTMLVideoElement>,
@@ -59,17 +81,19 @@ export const useFaceDetection = (
   isActive: boolean
 ) => {
   const [isModelsLoaded, setIsModelsLoaded] = useState(false);
-  const [detectedFaces, setDetectedFaces] = useState<DetectedFace[]>([]);
+  const [activeFaces, setActiveFaces] = useState<ActiveFace[]>([]); // Currently looking
   const [isLoading, setIsLoading] = useState(false);
+  const [totalSessionsToday, setTotalSessionsToday] = useState(0);
+  
   const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastDetectedPersonsRef = useRef<Set<string>>(new Set());
-  const trackedFacesRef = useRef<Map<string, TrackedFace>>(new Map());
+  const trackedFacesRef = useRef<Map<string, TrackedFaceData>>(new Map());
   
   const { registeredPeople } = usePeopleRegistry();
   const { logDetection } = useDetectionLog();
   const { addAttentionRecord } = useAttentionHistory();
 
-  // Load face-api.js models
+  // Load face-api.js models - use SSD MobileNet for better accuracy
   useEffect(() => {
     const loadModels = async () => {
       try {
@@ -78,14 +102,14 @@ export const useFaceDetection = (
         const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
         
         await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+          faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL), // Better accuracy than TinyFace
           faceapi.nets.ageGenderNet.loadFromUri(MODEL_URL),
           faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
           faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
         ]);
         
         setIsModelsLoaded(true);
-        console.log('Face-api.js models loaded successfully');
+        console.log('Face-api.js models loaded successfully (SSD MobileNet)');
       } catch (error) {
         console.error('Error loading face-api.js models:', error);
       } finally {
@@ -99,61 +123,54 @@ export const useFaceDetection = (
   // Find matching tracked face by descriptor
   const findMatchingTrackedFace = useCallback((descriptor: Float32Array): string | null => {
     const trackedFaces = trackedFacesRef.current;
+    let bestMatch: { trackId: string; distance: number } | null = null;
     
     for (const [trackId, tracked] of trackedFaces.entries()) {
       try {
         const distance = faceapi.euclideanDistance(descriptor, tracked.descriptor);
         if (distance < FACE_MATCH_THRESHOLD) {
-          return trackId;
+          if (!bestMatch || distance < bestMatch.distance) {
+            bestMatch = { trackId, distance };
+          }
         }
       } catch (error) {
         console.error('Error comparing face descriptors:', error);
       }
     }
-    return null;
+    return bestMatch?.trackId || null;
   }, []);
 
-  // Update or create tracked face
-  const updateTrackedFace = useCallback((
-    trackId: string,
-    descriptor: Float32Array,
-    personId?: string,
-    personName?: string,
-    isRegistered: boolean = false,
-    gender: 'masculino' | 'feminino' | 'indefinido' = 'indefinido',
-    ageGroup: string = '',
-    age: number = 0
-  ) => {
-    const now = new Date();
-    const existing = trackedFacesRef.current.get(trackId);
+  // Update active faces state from tracked faces
+  const updateActiveFacesState = useCallback(() => {
+    const now = Date.now();
+    const active: ActiveFace[] = [];
     
-    if (existing) {
-      existing.lastSeenAt = now;
-      existing.descriptor = descriptor;
-    } else {
-      trackedFacesRef.current.set(trackId, {
-        descriptor,
-        firstSeenAt: now,
-        lastSeenAt: now,
-        personId,
-        personName,
-        isRegistered,
-        gender,
-        ageGroup,
-        age
-      });
-    }
-  }, []);
-
-  // Get looking duration for a tracked face
-  const getLookingDuration = useCallback((trackId: string): { duration: number; firstSeenAt: Date } => {
-    const tracked = trackedFacesRef.current.get(trackId);
-    if (!tracked) {
-      return { duration: 0, firstSeenAt: new Date() };
-    }
+    trackedFacesRef.current.forEach((tracked, trackId) => {
+      // Only include faces seen in the last FACE_TIMEOUT_MS
+      if (now - tracked.lastSeenAt.getTime() <= FACE_TIMEOUT_MS) {
+        const avgAge = calculateAverageAge(tracked.ageEstimates);
+        const duration = (tracked.lastSeenAt.getTime() - tracked.firstSeenAt.getTime()) / 1000;
+        
+        active.push({
+          trackId,
+          personId: tracked.personId,
+          name: tracked.personName,
+          cpf: tracked.personCpf,
+          gender: tracked.gender,
+          ageGroup: getAgeGroup(avgAge),
+          age: avgAge,
+          ageEstimates: tracked.ageEstimates,
+          confidence: tracked.confidence,
+          position: tracked.position,
+          isRegistered: tracked.isRegistered,
+          firstSeenAt: tracked.firstSeenAt,
+          lastSeenAt: tracked.lastSeenAt,
+          lookingDuration: duration
+        });
+      }
+    });
     
-    const duration = (tracked.lastSeenAt.getTime() - tracked.firstSeenAt.getTime()) / 1000;
-    return { duration, firstSeenAt: tracked.firstSeenAt };
+    setActiveFaces(active);
   }, []);
 
   // Clean up old tracked faces and save attention history
@@ -165,29 +182,36 @@ export const useFaceDetection = (
       for (const [trackId, tracked] of trackedFaces.entries()) {
         if (now - tracked.lastSeenAt.getTime() > FACE_TIMEOUT_MS) {
           const duration = (tracked.lastSeenAt.getTime() - tracked.firstSeenAt.getTime()) / 1000;
-          console.log(`Removing tracked face ${trackId} - duration: ${duration.toFixed(1)}s`);
+          const avgAge = calculateAverageAge(tracked.ageEstimates);
           
-          // Save to attention history
-          addAttentionRecord(
-            trackId,
-            tracked.personId,
-            tracked.personName,
-            tracked.isRegistered,
-            tracked.gender,
-            tracked.ageGroup,
-            tracked.age,
-            tracked.firstSeenAt,
-            tracked.lastSeenAt,
-            duration
-          );
+          console.log(`Face saiu do frame: ${tracked.personName || 'Desconhecido'} - duração: ${duration.toFixed(1)}s, idade média: ${avgAge}`);
+          
+          // Save to attention history only if duration >= 1 second
+          if (duration >= 1) {
+            addAttentionRecord(
+              trackId,
+              tracked.personId,
+              tracked.personName,
+              tracked.isRegistered,
+              tracked.gender,
+              tracked.ageGroup,
+              avgAge,
+              tracked.firstSeenAt,
+              tracked.lastSeenAt,
+              duration
+            );
+            setTotalSessionsToday(prev => prev + 1);
+          }
           
           trackedFaces.delete(trackId);
         }
       }
-    }, 1000);
+      
+      updateActiveFacesState();
+    }, 500);
 
     return () => clearInterval(cleanupInterval);
-  }, []);
+  }, [addAttentionRecord, updateActiveFacesState]);
 
   const detectFaces = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current || !isModelsLoaded || !isActive) {
@@ -210,165 +234,167 @@ export const useFaceDetection = (
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+      // Use SSD MobileNet with higher confidence threshold
       const detections = await faceapi
-        .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+        .detectAllFaces(video, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }))
         .withFaceLandmarks()
         .withFaceDescriptors()
         .withAgeAndGender();
 
-      if (detections.length > 0) {
-        console.log(`Detectando ${detections.length} face(s)`);
+      const now = new Date();
+      const currentTrackIds = new Set<string>();
+
+      for (let index = 0; index < detections.length; index++) {
+        const detection = detections[index];
+        const box = detection.detection.box;
+        const rawAge = detection.age;
+        const genderProbability = detection.genderProbability;
+        const genderString = detection.gender;
+        const gender = getGender(genderString, genderProbability);
+        const detectionConfidence = detection.detection.score;
+
+        // Find or create tracked face
+        let trackId: string | null = null;
+        let existingTracked: TrackedFaceData | undefined;
         
-        const newFaces: DetectedFace[] = await Promise.all(
-          detections.map(async (detection, index) => {
-            const box = detection.detection.box;
-            const age = Math.round(detection.age);
-            const genderProbability = detection.genderProbability;
-            const genderString = detection.gender;
-            const gender = getGender(genderString, genderProbability);
-            const ageGroup = getAgeGroup(age);
+        if (detection.descriptor) {
+          trackId = findMatchingTrackedFace(detection.descriptor);
+          
+          if (trackId) {
+            existingTracked = trackedFacesRef.current.get(trackId);
+          }
+        }
 
-            // Identify registered person
-            let identifiedPerson = null;
-            if (detection.descriptor) {
-              for (const person of registeredPeople) {
-                try {
-                  const distance = faceapi.euclideanDistance(detection.descriptor, person.faceDescriptor);
-                  if (distance < 0.6) {
-                    identifiedPerson = {
-                      id: person.id,
-                      name: person.name,
-                      cpf: person.cpf,
-                      confidence: 1 - distance,
-                      isNewPerson: false
-                    };
-                    break;
-                  }
-                } catch (error) {
-                  console.error('Erro ao comparar face descriptor:', error);
-                }
+        // Identify registered person
+        let identifiedPerson: { id: string; name: string; cpf: string; confidence: number } | null = null;
+        if (detection.descriptor) {
+          for (const person of registeredPeople) {
+            try {
+              const distance = faceapi.euclideanDistance(detection.descriptor, person.faceDescriptor);
+              if (distance < 0.55) { // Stricter threshold
+                identifiedPerson = {
+                  id: person.id,
+                  name: person.name,
+                  cpf: person.cpf,
+                  confidence: 1 - distance
+                };
+                break;
               }
+            } catch (error) {
+              console.error('Erro ao comparar face descriptor:', error);
             }
+          }
+        }
 
-            const isRegistered = identifiedPerson && !identifiedPerson.isNewPerson;
-            
-            // Track face across frames
-            let trackId: string;
-            if (detection.descriptor) {
-              const existingTrackId = findMatchingTrackedFace(detection.descriptor);
-              
-              if (existingTrackId) {
-                trackId = existingTrackId;
-                updateTrackedFace(trackId, detection.descriptor, isRegistered ? identifiedPerson?.id : undefined, isRegistered ? identifiedPerson?.name : undefined, isRegistered || false, gender, ageGroup, age);
-              } else {
-                trackId = isRegistered ? identifiedPerson!.id : `track_${Date.now()}_${index}`;
-                updateTrackedFace(trackId, detection.descriptor, isRegistered ? identifiedPerson?.id : undefined, isRegistered ? identifiedPerson?.name : undefined, isRegistered || false, gender, ageGroup, age);
-              }
-            } else {
-              trackId = `unknown_${Date.now()}_${index}`;
-            }
-
-            const { duration, firstSeenAt } = getLookingDuration(trackId);
-            
-            // Log registered person detection
-            if (isRegistered && !lastDetectedPersonsRef.current.has(identifiedPerson!.id)) {
-              logDetection(
-                identifiedPerson!.id,
-                identifiedPerson!.name,
-                identifiedPerson!.cpf,
-                identifiedPerson!.confidence
-              );
-              
-              lastDetectedPersonsRef.current.add(identifiedPerson!.id);
-              setTimeout(() => {
-                lastDetectedPersonsRef.current.delete(identifiedPerson!.id);
-              }, 5000);
-            }
-
-            console.log(`Face ${index + 1}: ${isRegistered ? identifiedPerson!.name : 'desconhecida'}, olhando há ${duration.toFixed(1)}s`);
-
-            return {
-              id: trackId,
-              personId: isRegistered ? identifiedPerson!.id : undefined,
-              name: isRegistered ? identifiedPerson!.name : undefined,
-              cpf: isRegistered ? identifiedPerson!.cpf : undefined,
-              timestamp: new Date(),
-              gender,
-              ageGroup,
-              confidence: isRegistered ? identifiedPerson!.confidence : detection.detection.score,
-              position: {
-                x: box.x,
-                y: box.y,
-                width: box.width,
-                height: box.height
-              },
-              age,
-              genderProbability,
-              isRegistered: isRegistered || false,
-              lookingDuration: duration,
-              firstSeenAt
-            };
-          })
-        );
-
-        if (newFaces.length > 0) {
-          setDetectedFaces(prev => {
-            const combined = [...newFaces, ...prev];
-            return combined.slice(0, 50);
+        const isRegistered = !!identifiedPerson;
+        
+        if (trackId && existingTracked) {
+          // Update existing tracked face
+          existingTracked.lastSeenAt = now;
+          existingTracked.descriptor = detection.descriptor;
+          existingTracked.ageEstimates.push(rawAge);
+          // Keep only last 10 age estimates
+          if (existingTracked.ageEstimates.length > 10) {
+            existingTracked.ageEstimates.shift();
+          }
+          existingTracked.confidence = detectionConfidence;
+          existingTracked.position = { x: box.x, y: box.y, width: box.width, height: box.height };
+          
+          // Update person info if now identified
+          if (identifiedPerson && !existingTracked.personId) {
+            existingTracked.personId = identifiedPerson.id;
+            existingTracked.personName = identifiedPerson.name;
+            existingTracked.personCpf = identifiedPerson.cpf;
+            existingTracked.isRegistered = true;
+          }
+        } else {
+          // Create new tracked face
+          trackId = isRegistered ? identifiedPerson!.id : `track_${now.getTime()}_${index}`;
+          
+          trackedFacesRef.current.set(trackId, {
+            descriptor: detection.descriptor,
+            firstSeenAt: now,
+            lastSeenAt: now,
+            personId: identifiedPerson?.id,
+            personName: identifiedPerson?.name,
+            personCpf: identifiedPerson?.cpf,
+            isRegistered,
+            gender,
+            ageGroup: getAgeGroup(rawAge),
+            ageEstimates: [rawAge],
+            confidence: detectionConfidence,
+            position: { x: box.x, y: box.y, width: box.width, height: box.height },
+            loggedToHistory: false
           });
         }
 
-        // Draw detections on canvas
-        newFaces.forEach((face, index) => {
-          const { position, isRegistered, name, gender, age, lookingDuration } = face;
+        currentTrackIds.add(trackId);
+        
+        // Log registered person detection (only once per session)
+        if (isRegistered && !lastDetectedPersonsRef.current.has(identifiedPerson!.id)) {
+          logDetection(
+            identifiedPerson!.id,
+            identifiedPerson!.name,
+            identifiedPerson!.cpf,
+            identifiedPerson!.confidence
+          );
           
-          const colors = ['#00ff00', '#ff6600', '#0066ff', '#ff0066', '#66ff00', '#ff6600'];
-          const color = isRegistered ? '#00ff00' : colors[index % colors.length];
-          
-          ctx.strokeStyle = color;
-          ctx.lineWidth = 3;
-          ctx.font = '16px Arial';
-          ctx.fillStyle = color;
-          
-          ctx.strokeRect(position.x, position.y, position.width, position.height);
-          
-          // Main label
-          const label = isRegistered ? name : `${gender} | ${age} anos`;
-          const labelY = position.y > 45 ? position.y - 28 : position.y + position.height + 25;
-          
-          const textWidth = ctx.measureText(label || '').width;
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-          ctx.fillRect(position.x - 2, labelY - 18, textWidth + 4, 22);
-          
-          ctx.fillStyle = color;
-          ctx.fillText(label || '', position.x, labelY);
-          
-          // Duration label
-          const durationLabel = `⏱ ${lookingDuration.toFixed(1)}s`;
-          const durationY = position.y > 45 ? position.y - 6 : position.y + position.height + 47;
-          const durationWidth = ctx.measureText(durationLabel).width;
-          
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-          ctx.fillRect(position.x - 2, durationY - 18, durationWidth + 4, 22);
-          
-          ctx.fillStyle = '#ffcc00';
-          ctx.fillText(durationLabel, position.x, durationY);
-          
-          // Face number
-          ctx.fillStyle = color;
-          ctx.font = 'bold 14px Arial';
-          ctx.fillText(`#${index + 1}`, position.x + 5, position.y + 18);
-        });
+          lastDetectedPersonsRef.current.add(identifiedPerson!.id);
+          setTimeout(() => {
+            lastDetectedPersonsRef.current.delete(identifiedPerson!.id);
+          }, 30000); // 30 seconds before allowing new log
+        }
+
+        // Get current data for drawing
+        const tracked = trackedFacesRef.current.get(trackId);
+        if (!tracked) continue;
+        
+        const avgAge = calculateAverageAge(tracked.ageEstimates);
+        const duration = (tracked.lastSeenAt.getTime() - tracked.firstSeenAt.getTime()) / 1000;
+
+        // Draw on canvas
+        const color = tracked.isRegistered ? '#00ff00' : '#ff6600';
+        
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(box.x, box.y, box.width, box.height);
+        
+        // Main label
+        ctx.font = 'bold 14px Arial';
+        const label = tracked.isRegistered ? tracked.personName! : `${gender} | ${avgAge} anos`;
+        const labelY = box.y > 50 ? box.y - 30 : box.y + box.height + 20;
+        
+        const textWidth = ctx.measureText(label).width;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.fillRect(box.x - 2, labelY - 14, textWidth + 8, 20);
+        
+        ctx.fillStyle = color;
+        ctx.fillText(label, box.x + 2, labelY);
+        
+        // Duration label
+        ctx.font = '12px Arial';
+        const durationLabel = `⏱ ${duration.toFixed(1)}s`;
+        const durationY = box.y > 50 ? box.y - 10 : box.y + box.height + 38;
+        const durationWidth = ctx.measureText(durationLabel).width;
+        
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.fillRect(box.x - 2, durationY - 12, durationWidth + 8, 16);
+        
+        ctx.fillStyle = '#ffcc00';
+        ctx.fillText(durationLabel, box.x + 2, durationY);
       }
+
+      updateActiveFacesState();
+      
     } catch (error) {
       console.error('Error during face detection:', error);
     }
-  }, [videoRef, canvasRef, isModelsLoaded, isActive, registeredPeople, logDetection, findMatchingTrackedFace, updateTrackedFace, getLookingDuration, addAttentionRecord]);
+  }, [videoRef, canvasRef, isModelsLoaded, isActive, registeredPeople, logDetection, findMatchingTrackedFace, updateActiveFacesState]);
 
   // Start/stop detection based on isActive
   useEffect(() => {
     if (isActive && isModelsLoaded) {
-      detectionIntervalRef.current = setInterval(detectFaces, 1000);
+      detectionIntervalRef.current = setInterval(detectFaces, DETECTION_INTERVAL_MS);
     } else {
       if (detectionIntervalRef.current) {
         clearInterval(detectionIntervalRef.current);
@@ -383,23 +409,39 @@ export const useFaceDetection = (
     };
   }, [isActive, isModelsLoaded, detectFaces]);
 
-  // Clean up old detections
+  // Clear tracked faces when camera stops
   useEffect(() => {
-    const cleanup = setInterval(() => {
-      setDetectedFaces(prev => 
-        prev.filter(face => 
-          Date.now() - face.timestamp.getTime() < 30000
-        )
-      );
-    }, 5000);
-
-    return () => clearInterval(cleanup);
-  }, []);
+    if (!isActive) {
+      // Save all remaining tracked faces to history before clearing
+      const now = new Date();
+      trackedFacesRef.current.forEach((tracked, trackId) => {
+        const duration = (tracked.lastSeenAt.getTime() - tracked.firstSeenAt.getTime()) / 1000;
+        if (duration >= 1) {
+          const avgAge = calculateAverageAge(tracked.ageEstimates);
+          addAttentionRecord(
+            trackId,
+            tracked.personId,
+            tracked.personName,
+            tracked.isRegistered,
+            tracked.gender,
+            tracked.ageGroup,
+            avgAge,
+            tracked.firstSeenAt,
+            tracked.lastSeenAt,
+            duration
+          );
+        }
+      });
+      trackedFacesRef.current.clear();
+      setActiveFaces([]);
+    }
+  }, [isActive, addAttentionRecord]);
 
   return {
     isModelsLoaded,
     isLoading,
-    detectedFaces,
-    totalDetected: detectedFaces.length
+    activeFaces, // Currently looking at camera
+    totalLooking: activeFaces.length,
+    totalSessionsToday
   };
 };

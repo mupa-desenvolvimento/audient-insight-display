@@ -24,8 +24,9 @@ const CameraFullscreen = () => {
   const { 
     isModelsLoaded, 
     isLoading, 
-    detectedFaces, 
-    totalDetected 
+    activeFaces,
+    totalLooking,
+    totalSessionsToday
   } = useFaceDetection(videoRef, canvasRef, isStreaming);
 
   // Entrar em modo fullscreen com suporte amplo
@@ -151,8 +152,8 @@ const CameraFullscreen = () => {
     });
   };
 
-  const registeredFaces = detectedFaces.filter(face => face.isRegistered);
-  const unregisteredFaces = detectedFaces.filter(face => !face.isRegistered);
+  const registeredFaces = activeFaces.filter(face => face.isRegistered);
+  const unregisteredFaces = activeFaces.filter(face => !face.isRegistered);
 
   return (
     <div className="fixed inset-0 bg-black overflow-hidden" style={{
@@ -273,7 +274,7 @@ const CameraFullscreen = () => {
                 </div>
                 <div className="space-y-2 max-h-32 overflow-y-auto">
                   {registeredFaces.slice(0, 3).map((face, index) => (
-                    <div key={`reg-${face.id}-${index}`} className="text-xs text-white/90">
+                    <div key={`reg-${face.trackId}-${index}`} className="text-xs text-white/90">
                       <div className="font-medium text-green-300">{face.name}</div>
                       <div className="text-white/60">
                         {face.cpf} • {(face.confidence * 100).toFixed(1)}%
@@ -307,7 +308,7 @@ const CameraFullscreen = () => {
                 </div>
                 <div className="space-y-2 max-h-32 overflow-y-auto">
                   {unregisteredFaces.slice(0, 3).map((face, index) => (
-                    <div key={`unreg-${face.id}-${index}`} className="text-xs text-white/90">
+                    <div key={`unreg-${face.trackId}-${index}`} className="text-xs text-white/90">
                       <div className="flex items-center space-x-2">
                         <Badge variant="outline" className="bg-blue-500/20 text-blue-300 border-blue-500/30 text-xs">
                           {face.gender}
@@ -339,8 +340,8 @@ const CameraFullscreen = () => {
           <Card className="bg-black/60 border-white/20">
             <CardContent className="p-3">
               <div className="flex items-center justify-between text-xs text-white/80">
-                <span>Total detectado hoje:</span>
-                <span className="font-bold text-white">{totalDetected}</span>
+                <span>Sessões hoje:</span>
+                <span className="font-bold text-white">{totalSessionsToday}</span>
               </div>
               <div className="flex items-center justify-between text-xs text-white/80 mt-1">
                 <span>Status IA:</span>
