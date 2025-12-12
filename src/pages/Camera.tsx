@@ -3,7 +3,7 @@ import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Camera as CameraIcon, Users, Play, Square, Settings, Eye } from "lucide-react";
+import { Camera as CameraIcon, Users, Play, Square, Settings, Eye, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFaceDetection } from "@/hooks/useFaceDetection";
 import { PeopleRegistration } from "@/components/PeopleRegistration";
@@ -23,8 +23,9 @@ const Camera = () => {
   const { 
     isModelsLoaded, 
     isLoading, 
-    detectedFaces, 
-    totalDetected 
+    activeFaces,
+    totalLooking,
+    totalSessionsToday
   } = useFaceDetection(videoRef, canvasRef, isStreaming);
 
   // Inicializar câmera
@@ -146,29 +147,46 @@ const Camera = () => {
       </div>
 
       {/* Status Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pessoas Detectadas</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Olhando Agora</CardTitle>
+            <Eye className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">{detectedFaces.length}</div>
+            <div className="text-2xl font-bold text-green-600">{totalLooking}</div>
             <p className="text-xs text-muted-foreground">
-              Faces detectadas agora
+              Pessoas olhando para o dispositivo
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Hoje</CardTitle>
-            <Eye className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Já Olharam Hoje</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">{totalDetected}</div>
+            <div className="text-2xl font-bold text-primary">{totalSessionsToday}</div>
             <p className="text-xs text-muted-foreground">
-              Total de detecções
+              Total de sessões hoje
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Status IA</CardTitle>
+            <CameraIcon className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              <Badge variant={isModelsLoaded ? "default" : "secondary"}>
+                {isLoading ? "Carregando" : isModelsLoaded ? "Pronto" : "Erro"}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              SSD MobileNet v1
             </p>
           </CardContent>
         </Card>
@@ -185,8 +203,7 @@ const Camera = () => {
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground">
-              {isLoading ? "Carregando modelos IA..." : 
-               isStreaming ? "Detectando faces" : "Câmera desligada"}
+              {isStreaming ? "Detectando faces" : "Câmera desligada"}
             </p>
           </CardContent>
         </Card>
@@ -233,32 +250,29 @@ const Camera = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <Users className="w-5 h-5" />
-              <span>Pessoas Detectadas</span>
-              <Badge variant="outline">{detectedFaces.length}</Badge>
+              <Eye className="w-5 h-5 text-green-500" />
+              <span>Olhando Agora</span>
+              <Badge variant="outline">{activeFaces.length}</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3 max-h-64 overflow-y-auto">
-              {detectedFaces.length === 0 ? (
+              {activeFaces.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>Nenhuma face detectada</p>
+                  <p>Nenhuma pessoa olhando</p>
                   <p className="text-sm">{isLoading ? "Carregando modelos..." : "Inicie a câmera para começar"}</p>
                 </div>
               ) : (
-                detectedFaces.map((face) => (
-                  <div key={face.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                activeFaces.map((face) => (
+                  <div key={face.trackId} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                     <div className="flex items-center space-x-3">
-                      <div className={`w-3 h-3 rounded-full ${face.isRegistered ? 'bg-green-500' : 'bg-orange-500'}`}></div>
+                      <div className={`w-3 h-3 rounded-full ${face.isRegistered ? 'bg-green-500' : 'bg-orange-500'} animate-pulse`}></div>
                       <div>
                         {face.isRegistered ? (
                           <div>
                             <h4 className="font-medium text-primary">{face.name}</h4>
                             <p className="text-xs text-muted-foreground">CPF: {face.cpf}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Confiança: {(face.confidence * 100).toFixed(1)}%
-                            </p>
                           </div>
                         ) : (
                           <div>
@@ -276,16 +290,20 @@ const Camera = () => {
                                 {face.age} anos
                               </Badge>
                             </div>
-                            <p className="text-xs text-muted-foreground">
-                              Pessoa não cadastrada - Confiança: {(face.confidence * 100).toFixed(1)}%
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Pessoa não cadastrada
                             </p>
                           </div>
                         )}
                       </div>
                     </div>
                     <div className="text-right">
+                      <div className="flex items-center space-x-1 text-yellow-600">
+                        <Clock className="w-4 h-4" />
+                        <span className="font-bold">{face.lookingDuration.toFixed(1)}s</span>
+                      </div>
                       <p className="text-xs text-muted-foreground">
-                        {face.timestamp.toLocaleTimeString()}
+                        olhando
                       </p>
                     </div>
                   </div>

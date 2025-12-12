@@ -23,8 +23,9 @@ const LiveMonitoring = () => {
   const { 
     isModelsLoaded, 
     isLoading, 
-    detectedFaces, 
-    totalDetected 
+    activeFaces,
+    totalLooking,
+    totalSessionsToday
   } = useFaceDetection(videoRef, canvasRef, isStreaming);
 
   const sessionStats = getStats();
@@ -90,8 +91,8 @@ const LiveMonitoring = () => {
     });
   };
 
-  const registeredFaces = detectedFaces.filter(face => face.isRegistered);
-  const unregisteredFaces = detectedFaces.filter(face => !face.isRegistered);
+  const registeredFaces = activeFaces.filter(face => face.isRegistered);
+  const unregisteredFaces = activeFaces.filter(face => !face.isRegistered);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -234,9 +235,9 @@ const LiveMonitoring = () => {
                 </div>
               ) : (
                 registeredFaces.map((face, index) => (
-                  <div key={`registered-${face.id}-${index}`} className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
+                  <div key={`registered-${face.trackId}-${index}`} className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
                     <div className="flex items-center space-x-3">
-                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                      <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
                       <div>
                         <h4 className="font-medium text-green-800 dark:text-green-200">{face.name}</h4>
                         <p className="text-xs text-green-600 dark:text-green-400">CPF: {face.cpf}</p>
@@ -246,8 +247,11 @@ const LiveMonitoring = () => {
                       </div>
                     </div>
                     <div className="text-right">
+                      <div className="text-sm font-bold text-yellow-600">
+                        {face.lookingDuration.toFixed(1)}s
+                      </div>
                       <p className="text-xs text-green-600 dark:text-green-400">
-                        {face.timestamp.toLocaleTimeString()}
+                        olhando
                       </p>
                     </div>
                   </div>
@@ -277,9 +281,9 @@ const LiveMonitoring = () => {
                 </div>
               ) : (
                 unregisteredFaces.map((face, index) => (
-                  <div key={`unregistered-${face.id}-${index}`} className="flex items-center justify-between p-3 bg-orange-50 dark:bg-orange-950 rounded-lg border border-orange-200 dark:border-orange-800">
+                  <div key={`unregistered-${face.trackId}-${index}`} className="flex items-center justify-between p-3 bg-orange-50 dark:bg-orange-950 rounded-lg border border-orange-200 dark:border-orange-800">
                     <div className="flex items-center space-x-3">
-                      <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                      <div className="w-3 h-3 rounded-full bg-orange-500 animate-pulse"></div>
                       <div>
                         <div className="flex items-center space-x-2">
                           <Badge 
@@ -301,8 +305,11 @@ const LiveMonitoring = () => {
                       </div>
                     </div>
                     <div className="text-right">
+                      <div className="text-sm font-bold text-yellow-600">
+                        {face.lookingDuration.toFixed(1)}s
+                      </div>
                       <p className="text-xs text-orange-600 dark:text-orange-400">
-                        {face.timestamp.toLocaleTimeString()}
+                        olhando
                       </p>
                     </div>
                   </div>
