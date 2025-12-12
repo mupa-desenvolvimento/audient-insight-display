@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useFaceDetection } from "@/hooks/useFaceDetection";
 import { PeopleRegistration } from "@/components/PeopleRegistration";
 import { DetectionHistory } from "@/components/DetectionHistory";
+import AttentionHistory from "@/components/AttentionHistory";
 
 const Camera = () => {
   const [isStreaming, setIsStreaming] = useState(false);
@@ -298,8 +299,13 @@ const Camera = () => {
       {/* Seção de Cadastro de Pessoas */}
       <PeopleRegistration videoRef={videoRef} isStreaming={isStreaming} />
       
-      {/* Histórico de Detecções */}
-      <DetectionHistory />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Histórico de Detecções */}
+        <DetectionHistory />
+        
+        {/* Histórico de Atenção */}
+        <AttentionHistory />
+      </div>
     </div>
   );
 };
