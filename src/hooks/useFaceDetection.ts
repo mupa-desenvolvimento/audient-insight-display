@@ -16,6 +16,16 @@ interface DetectedFace {
   age: number;
   genderProbability: number;
   isRegistered: boolean;
+  lookingDuration: number; // Duration in seconds
+  firstSeenAt: Date;
+}
+
+interface TrackedFace {
+  descriptor: Float32Array;
+  firstSeenAt: Date;
+  lastSeenAt: Date;
+  personId?: string;
+  isRegistered: boolean;
 }
 
 const getAgeGroup = (age: number): '0-12' | '13-18' | '19-25' | '26-35' | '36-50' | '51+' => {
@@ -28,14 +38,15 @@ const getAgeGroup = (age: number): '0-12' | '13-18' | '19-25' | '26-35' | '36-50
 };
 
 const getGender = (gender: string, genderProbability: number): 'masculino' | 'feminino' | 'indefinido' => {
-  // face-api.js retorna 'male' ou 'female' na propriedade gender
-  // e genderProbability indica a confiança dessa predição
   console.log('Gender detection:', { gender, genderProbability });
   
   if (gender === 'female') return 'feminino';
   if (gender === 'male') return 'masculino';
   return 'indefinido';
 };
+
+const FACE_MATCH_THRESHOLD = 0.5; // Threshold for matching same face across frames
+const FACE_TIMEOUT_MS = 3000; // Remove tracked face after 3 seconds of not being seen
 
 export const useFaceDetection = (
   videoRef: React.RefObject<HTMLVideoElement>,
@@ -47,6 +58,7 @@ export const useFaceDetection = (
   const [isLoading, setIsLoading] = useState(false);
   const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastDetectedPersonsRef = useRef<Set<string>>(new Set());
+  const trackedFacesRef = useRef<Map<string, TrackedFace>>(new Map());
   
   const { registeredPeople } = usePeopleRegistry();
   const { logDetection } = useDetectionLog();
@@ -57,7 +69,6 @@ export const useFaceDetection = (
       try {
         setIsLoading(true);
         
-        // Load required models from CDN
         const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
         
         await Promise.all([
@@ -79,6 +90,75 @@ export const useFaceDetection = (
     loadModels();
   }, []);
 
+  // Find matching tracked face by descriptor
+  const findMatchingTrackedFace = useCallback((descriptor: Float32Array): string | null => {
+    const trackedFaces = trackedFacesRef.current;
+    
+    for (const [trackId, tracked] of trackedFaces.entries()) {
+      try {
+        const distance = faceapi.euclideanDistance(descriptor, tracked.descriptor);
+        if (distance < FACE_MATCH_THRESHOLD) {
+          return trackId;
+        }
+      } catch (error) {
+        console.error('Error comparing face descriptors:', error);
+      }
+    }
+    return null;
+  }, []);
+
+  // Update or create tracked face
+  const updateTrackedFace = useCallback((
+    trackId: string,
+    descriptor: Float32Array,
+    personId?: string,
+    isRegistered: boolean = false
+  ) => {
+    const now = new Date();
+    const existing = trackedFacesRef.current.get(trackId);
+    
+    if (existing) {
+      existing.lastSeenAt = now;
+      existing.descriptor = descriptor;
+    } else {
+      trackedFacesRef.current.set(trackId, {
+        descriptor,
+        firstSeenAt: now,
+        lastSeenAt: now,
+        personId,
+        isRegistered
+      });
+    }
+  }, []);
+
+  // Get looking duration for a tracked face
+  const getLookingDuration = useCallback((trackId: string): { duration: number; firstSeenAt: Date } => {
+    const tracked = trackedFacesRef.current.get(trackId);
+    if (!tracked) {
+      return { duration: 0, firstSeenAt: new Date() };
+    }
+    
+    const duration = (tracked.lastSeenAt.getTime() - tracked.firstSeenAt.getTime()) / 1000;
+    return { duration, firstSeenAt: tracked.firstSeenAt };
+  }, []);
+
+  // Clean up old tracked faces
+  useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+      const now = Date.now();
+      const trackedFaces = trackedFacesRef.current;
+      
+      for (const [trackId, tracked] of trackedFaces.entries()) {
+        if (now - tracked.lastSeenAt.getTime() > FACE_TIMEOUT_MS) {
+          console.log(`Removing tracked face ${trackId} - duration: ${((tracked.lastSeenAt.getTime() - tracked.firstSeenAt.getTime()) / 1000).toFixed(1)}s`);
+          trackedFaces.delete(trackId);
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(cleanupInterval);
+  }, []);
+
   const detectFaces = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current || !isModelsLoaded || !isActive) {
       return;
@@ -92,17 +172,14 @@ export const useFaceDetection = (
     }
 
     try {
-      // Resize canvas to match video dimensions
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Detect faces with age, gender and descriptors
       const detections = await faceapi
         .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
         .withFaceLandmarks()
@@ -121,14 +198,13 @@ export const useFaceDetection = (
             const gender = getGender(genderString, genderProbability);
             const ageGroup = getAgeGroup(age);
 
-            // Identificar esta face específica usando seu descriptor
+            // Identify registered person
             let identifiedPerson = null;
             if (detection.descriptor) {
-              // Verificar se esta face corresponde a alguma pessoa cadastrada
               for (const person of registeredPeople) {
                 try {
                   const distance = faceapi.euclideanDistance(detection.descriptor, person.faceDescriptor);
-                  if (distance < 0.6) { // Threshold para considerar como mesma pessoa
+                  if (distance < 0.6) {
                     identifiedPerson = {
                       id: person.id,
                       name: person.name,
@@ -145,37 +221,51 @@ export const useFaceDetection = (
             }
 
             const isRegistered = identifiedPerson && !identifiedPerson.isNewPerson;
-            const faceId = isRegistered ? identifiedPerson.id : `unknown_${Date.now()}_${index}`;
             
-            // Evitar log repetido da mesma pessoa
-            if (isRegistered && !lastDetectedPersonsRef.current.has(identifiedPerson.id)) {
-              // Registrar a detecção no log
+            // Track face across frames
+            let trackId: string;
+            if (detection.descriptor) {
+              const existingTrackId = findMatchingTrackedFace(detection.descriptor);
+              
+              if (existingTrackId) {
+                trackId = existingTrackId;
+                updateTrackedFace(trackId, detection.descriptor, isRegistered ? identifiedPerson?.id : undefined, isRegistered || false);
+              } else {
+                trackId = isRegistered ? identifiedPerson!.id : `track_${Date.now()}_${index}`;
+                updateTrackedFace(trackId, detection.descriptor, isRegistered ? identifiedPerson?.id : undefined, isRegistered || false);
+              }
+            } else {
+              trackId = `unknown_${Date.now()}_${index}`;
+            }
+
+            const { duration, firstSeenAt } = getLookingDuration(trackId);
+            
+            // Log registered person detection
+            if (isRegistered && !lastDetectedPersonsRef.current.has(identifiedPerson!.id)) {
               logDetection(
-                identifiedPerson.id,
-                identifiedPerson.name,
-                identifiedPerson.cpf,
-                identifiedPerson.confidence
+                identifiedPerson!.id,
+                identifiedPerson!.name,
+                identifiedPerson!.cpf,
+                identifiedPerson!.confidence
               );
               
-              lastDetectedPersonsRef.current.add(identifiedPerson.id);
-              // Limpar após 5 segundos para permitir nova detecção
+              lastDetectedPersonsRef.current.add(identifiedPerson!.id);
               setTimeout(() => {
-                lastDetectedPersonsRef.current.delete(identifiedPerson.id);
+                lastDetectedPersonsRef.current.delete(identifiedPerson!.id);
               }, 5000);
             }
 
-            // Debug log
-            console.log(`Face ${index + 1}: ${isRegistered ? identifiedPerson.name : 'desconhecida'}, idade=${age}, género=${gender}`);
+            console.log(`Face ${index + 1}: ${isRegistered ? identifiedPerson!.name : 'desconhecida'}, olhando há ${duration.toFixed(1)}s`);
 
             return {
-              id: faceId,
-              personId: isRegistered ? identifiedPerson.id : undefined,
-              name: isRegistered ? identifiedPerson.name : undefined,
-              cpf: isRegistered ? identifiedPerson.cpf : undefined,
+              id: trackId,
+              personId: isRegistered ? identifiedPerson!.id : undefined,
+              name: isRegistered ? identifiedPerson!.name : undefined,
+              cpf: isRegistered ? identifiedPerson!.cpf : undefined,
               timestamp: new Date(),
               gender,
               ageGroup,
-              confidence: isRegistered ? identifiedPerson.confidence : detection.detection.score,
+              confidence: isRegistered ? identifiedPerson!.confidence : detection.detection.score,
               position: {
                 x: box.x,
                 y: box.y,
@@ -184,7 +274,9 @@ export const useFaceDetection = (
               },
               age,
               genderProbability,
-              isRegistered: isRegistered || false
+              isRegistered: isRegistered || false,
+              lookingDuration: duration,
+              firstSeenAt
             };
           })
         );
@@ -192,15 +284,14 @@ export const useFaceDetection = (
         if (newFaces.length > 0) {
           setDetectedFaces(prev => {
             const combined = [...newFaces, ...prev];
-            return combined.slice(0, 50); // Aumentei para 50 para suportar mais faces
+            return combined.slice(0, 50);
           });
         }
 
         // Draw detections on canvas
         newFaces.forEach((face, index) => {
-          const { position, isRegistered, name, gender, age } = face;
+          const { position, isRegistered, name, gender, age, lookingDuration } = face;
           
-          // Cores diferentes para cada face
           const colors = ['#00ff00', '#ff6600', '#0066ff', '#ff0066', '#66ff00', '#ff6600'];
           const color = isRegistered ? '#00ff00' : colors[index % colors.length];
           
@@ -209,23 +300,31 @@ export const useFaceDetection = (
           ctx.font = '16px Arial';
           ctx.fillStyle = color;
           
-          // Draw bounding box
           ctx.strokeRect(position.x, position.y, position.width, position.height);
           
-          // Draw label with background
+          // Main label
           const label = isRegistered ? name : `${gender} | ${age} anos`;
-          const labelY = position.y > 25 ? position.y - 8 : position.y + position.height + 25;
+          const labelY = position.y > 45 ? position.y - 28 : position.y + position.height + 25;
           
-          // Background for text
-          const textWidth = ctx.measureText(label).width;
+          const textWidth = ctx.measureText(label || '').width;
           ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
           ctx.fillRect(position.x - 2, labelY - 18, textWidth + 4, 22);
           
-          // Text
           ctx.fillStyle = color;
-          ctx.fillText(label, position.x, labelY);
+          ctx.fillText(label || '', position.x, labelY);
           
-          // Número da face no canto superior esquerdo
+          // Duration label
+          const durationLabel = `⏱ ${lookingDuration.toFixed(1)}s`;
+          const durationY = position.y > 45 ? position.y - 6 : position.y + position.height + 47;
+          const durationWidth = ctx.measureText(durationLabel).width;
+          
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+          ctx.fillRect(position.x - 2, durationY - 18, durationWidth + 4, 22);
+          
+          ctx.fillStyle = '#ffcc00';
+          ctx.fillText(durationLabel, position.x, durationY);
+          
+          // Face number
           ctx.fillStyle = color;
           ctx.font = 'bold 14px Arial';
           ctx.fillText(`#${index + 1}`, position.x + 5, position.y + 18);
@@ -234,12 +333,12 @@ export const useFaceDetection = (
     } catch (error) {
       console.error('Error during face detection:', error);
     }
-  }, [videoRef, canvasRef, isModelsLoaded, isActive]);
+  }, [videoRef, canvasRef, isModelsLoaded, isActive, registeredPeople, logDetection, findMatchingTrackedFace, updateTrackedFace, getLookingDuration]);
 
   // Start/stop detection based on isActive
   useEffect(() => {
     if (isActive && isModelsLoaded) {
-      detectionIntervalRef.current = setInterval(detectFaces, 1000); // Detect every second
+      detectionIntervalRef.current = setInterval(detectFaces, 1000);
     } else {
       if (detectionIntervalRef.current) {
         clearInterval(detectionIntervalRef.current);
@@ -259,7 +358,7 @@ export const useFaceDetection = (
     const cleanup = setInterval(() => {
       setDetectedFaces(prev => 
         prev.filter(face => 
-          Date.now() - face.timestamp.getTime() < 30000 // Remove after 30 seconds
+          Date.now() - face.timestamp.getTime() < 30000
         )
       );
     }, 5000);

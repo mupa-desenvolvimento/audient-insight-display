@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Camera as CameraIcon, Play, Square, Users, UserCheck, UserX, Settings, ArrowLeft, Maximize } from "lucide-react";
+import { Camera as CameraIcon, Play, Square, Users, UserCheck, UserX, Settings, ArrowLeft, Maximize, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFaceDetection } from "@/hooks/useFaceDetection";
 import { usePeopleRegistry } from "@/hooks/usePeopleRegistry";
@@ -278,6 +278,10 @@ const CameraFullscreen = () => {
                       <div className="text-white/60">
                         {face.cpf} • {(face.confidence * 100).toFixed(1)}%
                       </div>
+                      <div className="flex items-center space-x-1 text-yellow-400 mt-1">
+                        <Clock className="w-3 h-3" />
+                        <span>Olhando há {face.lookingDuration?.toFixed(1) || '0.0'}s</span>
+                      </div>
                     </div>
                   ))}
                   {registeredFaces.length > 3 && (
@@ -314,6 +318,10 @@ const CameraFullscreen = () => {
                       </div>
                       <div className="text-white/60 mt-1">
                         Confiança: {(face.confidence * 100).toFixed(1)}%
+                      </div>
+                      <div className="flex items-center space-x-1 text-yellow-400 mt-1">
+                        <Clock className="w-3 h-3" />
+                        <span>Olhando há {face.lookingDuration?.toFixed(1) || '0.0'}s</span>
                       </div>
                     </div>
                   ))}
