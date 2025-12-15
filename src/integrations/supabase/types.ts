@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      channels: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          metadata: Json | null
+          name: string
+          priority: number
+          source: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          metadata?: Json | null
+          name: string
+          priority?: number
+          source?: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          metadata?: Json | null
+          name?: string
+          priority?: number
+          source?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cities: {
         Row: {
           created_at: string
@@ -70,6 +109,195 @@ export type Database = {
         }
         Relationships: []
       }
+      device_group_members: {
+        Row: {
+          created_at: string
+          device_id: string
+          group_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          device_id: string
+          group_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          device_id?: string
+          group_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "device_group_members_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "device_group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "device_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      device_groups: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          store_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          store_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          store_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "device_groups_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      devices: {
+        Row: {
+          camera_enabled: boolean
+          created_at: string
+          current_playlist_id: string | null
+          device_code: string
+          display_profile_id: string | null
+          id: string
+          is_active: boolean
+          last_seen_at: string | null
+          metadata: Json | null
+          name: string
+          resolution: string | null
+          status: string
+          store_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          camera_enabled?: boolean
+          created_at?: string
+          current_playlist_id?: string | null
+          device_code: string
+          display_profile_id?: string | null
+          id?: string
+          is_active?: boolean
+          last_seen_at?: string | null
+          metadata?: Json | null
+          name: string
+          resolution?: string | null
+          status?: string
+          store_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          camera_enabled?: boolean
+          created_at?: string
+          current_playlist_id?: string | null
+          device_code?: string
+          display_profile_id?: string | null
+          id?: string
+          is_active?: boolean
+          last_seen_at?: string | null
+          metadata?: Json | null
+          name?: string
+          resolution?: string | null
+          status?: string
+          store_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "devices_current_playlist_id_fkey"
+            columns: ["current_playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "devices_display_profile_id_fkey"
+            columns: ["display_profile_id"]
+            isOneToOne: false
+            referencedRelation: "display_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "devices_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      display_profiles: {
+        Row: {
+          created_at: string
+          default_layout: string | null
+          has_touch: boolean
+          id: string
+          idle_behavior: string | null
+          metadata: Json | null
+          name: string
+          offline_behavior: string | null
+          orientation: string
+          permitted_channels: string[] | null
+          resolution: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_layout?: string | null
+          has_touch?: boolean
+          id?: string
+          idle_behavior?: string | null
+          metadata?: Json | null
+          name: string
+          offline_behavior?: string | null
+          orientation?: string
+          permitted_channels?: string[] | null
+          resolution?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_layout?: string | null
+          has_touch?: boolean
+          id?: string
+          idle_behavior?: string | null
+          metadata?: Json | null
+          name?: string
+          offline_behavior?: string | null
+          orientation?: string
+          permitted_channels?: string[] | null
+          resolution?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       import_logs: {
         Row: {
           completed_at: string | null
@@ -111,6 +339,131 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      media_items: {
+        Row: {
+          created_at: string
+          duration: number | null
+          file_size: number | null
+          file_url: string | null
+          id: string
+          metadata: Json | null
+          name: string
+          resolution: string | null
+          status: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          duration?: number | null
+          file_size?: number | null
+          file_url?: string | null
+          id?: string
+          metadata?: Json | null
+          name: string
+          resolution?: string | null
+          status?: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          duration?: number | null
+          file_size?: number | null
+          file_url?: string | null
+          id?: string
+          metadata?: Json | null
+          name?: string
+          resolution?: string | null
+          status?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      playlist_items: {
+        Row: {
+          created_at: string
+          duration_override: number | null
+          id: string
+          media_id: string
+          playlist_id: string
+          position: number
+        }
+        Insert: {
+          created_at?: string
+          duration_override?: number | null
+          id?: string
+          media_id: string
+          playlist_id: string
+          position?: number
+        }
+        Update: {
+          created_at?: string
+          duration_override?: number | null
+          id?: string
+          media_id?: string
+          playlist_id?: string
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_items_media_id_fkey"
+            columns: ["media_id"]
+            isOneToOne: false
+            referencedRelation: "media_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playlist_items_playlist_id_fkey"
+            columns: ["playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playlists: {
+        Row: {
+          channel_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          schedule: Json | null
+          updated_at: string
+        }
+        Insert: {
+          channel_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          schedule?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          channel_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          schedule?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlists_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
