@@ -1,6 +1,8 @@
 
-import { Monitor, BarChart3, Image, Settings, Grid2x2, Database, Camera, Eye } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { Monitor, BarChart3, Image, Settings, Grid2x2, Database, Camera, Eye, Store, MapPin, LogOut } from "lucide-react";
+import { NavLink, useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
@@ -11,47 +13,30 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
+  SidebarFooter,
 } from "@/components/ui/sidebar";
 
 const menuItems = [
-  {
-    title: "Dashboard",
-    url: "/admin/dashboard",
-    icon: Grid2x2,
-  },
-  {
-    title: "Dispositivos",
-    url: "/admin/devices",
-    icon: Monitor,
-  },
-  {
-    title: "Mídias",
-    url: "/admin/media",
-    icon: Image,
-  },
-  {
-    title: "Câmera",
-    url: "/admin/camera",
-    icon: Camera,
-  },
-  {
-    title: "Monitoramento",
-    url: "/admin/monitoring",
-    icon: Eye,
-  },
-  {
-    title: "Analytics",
-    url: "/admin/analytics",
-    icon: BarChart3,
-  },
-  {
-    title: "Configurações",
-    url: "/admin/settings",
-    icon: Settings,
-  },
+  { title: "Dashboard", url: "/admin/dashboard", icon: Grid2x2 },
+  { title: "Lojas", url: "/admin/stores", icon: Store },
+  { title: "Regiões", url: "/admin/regions", icon: MapPin },
+  { title: "Dispositivos", url: "/admin/devices", icon: Monitor },
+  { title: "Mídias", url: "/admin/media", icon: Image },
+  { title: "Câmera", url: "/admin/camera", icon: Camera },
+  { title: "Monitoramento", url: "/admin/monitoring", icon: Eye },
+  { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },
+  { title: "Configurações", url: "/admin/settings", icon: Settings },
 ];
 
 const AppSidebar = () => {
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth');
+  };
+
   return (
     <Sidebar className="border-r border-border">
       <SidebarHeader className="p-6">
@@ -98,6 +83,17 @@ const AppSidebar = () => {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
+      <SidebarFooter className="p-4 border-t border-border">
+        <div className="flex items-center justify-between">
+          <div className="text-sm truncate">
+            <p className="font-medium truncate">{user?.email}</p>
+          </div>
+          <Button variant="ghost" size="icon" onClick={handleSignOut}>
+            <LogOut className="h-4 w-4" />
+          </Button>
+        </div>
+      </SidebarFooter>
     </Sidebar>
   );
 };
