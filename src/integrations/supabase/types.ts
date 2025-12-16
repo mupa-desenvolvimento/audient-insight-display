@@ -646,35 +646,47 @@ export type Database = {
       stores: {
         Row: {
           address: string | null
+          bairro: string | null
+          cep: string | null
           city_id: string
+          cnpj: string | null
           code: string
           created_at: string
           id: string
           is_active: boolean
           metadata: Json | null
           name: string
+          regional_responsavel: string | null
           updated_at: string
         }
         Insert: {
           address?: string | null
+          bairro?: string | null
+          cep?: string | null
           city_id: string
+          cnpj?: string | null
           code: string
           created_at?: string
           id?: string
           is_active?: boolean
           metadata?: Json | null
           name: string
+          regional_responsavel?: string | null
           updated_at?: string
         }
         Update: {
           address?: string | null
+          bairro?: string | null
+          cep?: string | null
           city_id?: string
+          cnpj?: string | null
           code?: string
           created_at?: string
           id?: string
           is_active?: boolean
           metadata?: Json | null
           name?: string
+          regional_responsavel?: string | null
           updated_at?: string
         }
         Relationships: [

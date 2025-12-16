@@ -198,6 +198,22 @@ export function useStores() {
     }
   };
 
+  const createRegion = async (region: { country_id: string; name: string; code?: string }) => {
+    try {
+      const { data, error } = await supabase
+        .from('regions')
+        .insert(region)
+        .select()
+        .single();
+
+      if (error) throw error;
+      await fetchRegions();
+      return data;
+    } catch (error) {
+      throw error;
+    }
+  };
+
   return {
     stores,
     regions,
@@ -210,5 +226,6 @@ export function useStores() {
     deleteStore,
     createState,
     createCity,
+    createRegion,
   };
 }
