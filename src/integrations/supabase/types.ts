@@ -867,6 +867,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_tenant_schema: {
+        Args: { p_schema_name: string; p_tenant_id: string }
+        Returns: undefined
+      }
+      drop_tenant_schema: {
+        Args: { p_confirm: string; p_schema_name: string; p_tenant_id: string }
+        Returns: undefined
+      }
       get_user_tenant_id: { Args: { check_user_id?: string }; Returns: string }
       has_role: {
         Args: {
@@ -885,6 +893,16 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { check_user_id?: string }; Returns: boolean }
+      list_tenant_schemas: {
+        Args: never
+        Returns: {
+          created_at: string
+          is_active: boolean
+          schema_name: string
+          tenant_id: string
+          tenant_name: string
+        }[]
+      }
     }
     Enums: {
       app_role:
