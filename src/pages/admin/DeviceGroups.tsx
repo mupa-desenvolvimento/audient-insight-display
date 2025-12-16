@@ -149,73 +149,6 @@ const DeviceGroupsPage = () => {
     (c) => !groupChannels.some((gc) => gc.channel_id === c.id)
   );
 
-  const GroupForm = ({ onSubmit, submitLabel }: { onSubmit: () => void; submitLabel: string }) => (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <Label>Nome *</Label>
-        <Input
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          placeholder="Nome do grupo"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label>Descrição</Label>
-        <Textarea
-          value={formData.description || ""}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          placeholder="Descrição do grupo"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label>Tipo de Tela</Label>
-        <Select
-          value={formData.screen_type}
-          onValueChange={(v) => setFormData({ ...formData, screen_type: v })}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SCREEN_TYPES.map((type) => (
-              <SelectItem key={type.value} value={type.value}>
-                {type.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Loja (opcional)</Label>
-        <Select
-          value={formData.store_id || "none"}
-          onValueChange={(v) => setFormData({ ...formData, store_id: v === "none" ? null : v })}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Selecione uma loja" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">Nenhuma (grupo global)</SelectItem>
-            {stores.map((store) => (
-              <SelectItem key={store.id} value={store.id}>
-                {store.name} ({store.code})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <DialogFooter>
-        <Button onClick={onSubmit} disabled={!formData.name}>
-          {submitLabel}
-        </Button>
-      </DialogFooter>
-    </div>
-  );
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -234,7 +167,66 @@ const DeviceGroupsPage = () => {
             <DialogHeader>
               <DialogTitle>Criar Grupo</DialogTitle>
             </DialogHeader>
-            <GroupForm onSubmit={handleCreate} submitLabel="Criar" />
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Nome *</Label>
+                <Input
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Nome do grupo"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Descrição</Label>
+                <Textarea
+                  value={formData.description || ""}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Descrição do grupo"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Tipo de Tela</Label>
+                <Select
+                  value={formData.screen_type}
+                  onValueChange={(v) => setFormData({ ...formData, screen_type: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SCREEN_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Loja (opcional)</Label>
+                <Select
+                  value={formData.store_id || "none"}
+                  onValueChange={(v) => setFormData({ ...formData, store_id: v === "none" ? null : v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione uma loja" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhuma (grupo global)</SelectItem>
+                    {stores.map((store) => (
+                      <SelectItem key={store.id} value={store.id}>
+                        {store.name} ({store.code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter>
+                <Button onClick={handleCreate} disabled={!formData.name}>
+                  Criar
+                </Button>
+              </DialogFooter>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
@@ -321,7 +313,66 @@ const DeviceGroupsPage = () => {
           <DialogHeader>
             <DialogTitle>Editar Grupo</DialogTitle>
           </DialogHeader>
-          <GroupForm onSubmit={handleUpdate} submitLabel="Salvar" />
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nome *</Label>
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Nome do grupo"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Descrição</Label>
+              <Textarea
+                value={formData.description || ""}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Descrição do grupo"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Tipo de Tela</Label>
+              <Select
+                value={formData.screen_type}
+                onValueChange={(v) => setFormData({ ...formData, screen_type: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SCREEN_TYPES.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Loja (opcional)</Label>
+              <Select
+                value={formData.store_id || "none"}
+                onValueChange={(v) => setFormData({ ...formData, store_id: v === "none" ? null : v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma loja" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhuma (grupo global)</SelectItem>
+                  {stores.map((store) => (
+                    <SelectItem key={store.id} value={store.id}>
+                      {store.name} ({store.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button onClick={handleUpdate} disabled={!formData.name}>
+                Salvar
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
