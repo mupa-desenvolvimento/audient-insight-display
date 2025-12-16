@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Search, Mail, Building2, Shield, ShieldCheck, Trash2 } from 'lucide-react';
+import { Users, Search, Mail, Building2, Shield, ShieldCheck, Trash2, UserPlus, Loader2, Eye, EyeOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +8,8 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -42,6 +44,16 @@ export function TenantUsersList({ tenants }: TenantUsersListProps) {
   const [selectedUser, setSelectedUser] = useState<UserWithMappings | null>(null);
   const [selectedMapping, setSelectedMapping] = useState<{ id: string; tenantName: string } | null>(null);
   const [isRemoveOpen, setIsRemoveOpen] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [newUserForm, setNewUserForm] = useState({
+    email: '',
+    password: '',
+    full_name: '',
+    tenant_id: '',
+    is_tenant_admin: false
+  });
 
   const fetchUsers = async () => {
     try {
@@ -157,6 +169,67 @@ export function TenantUsersList({ tenants }: TenantUsersListProps) {
     }
   };
 
+  const resetNewUserForm = () => {
+    setNewUserForm({
+      email: '',
+      password: '',
+      full_name: '',
+      tenant_id: '',
+      is_tenant_admin: false
+    });
+    setShowPassword(false);
+  };
+
+  const handleCreateUser = async () => {
+    if (!newUserForm.email || !newUserForm.password) {
+      toast.error('Email e senha são obrigatórios');
+      return;
+    }
+
+    if (newUserForm.password.length < 6) {
+      toast.error('Senha deve ter no mínimo 6 caracteres');
+      return;
+    }
+
+    try {
+      setIsCreating(true);
+      const { data: sessionData } = await supabase.auth.getSession();
+      
+      const response = await supabase.functions.invoke('create-user', {
+        body: {
+          email: newUserForm.email.trim(),
+          password: newUserForm.password,
+          full_name: newUserForm.full_name.trim() || null,
+          tenant_id: newUserForm.tenant_id || null,
+          is_tenant_admin: newUserForm.is_tenant_admin
+        }
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
+
+      if (response.data?.warning) {
+        toast.warning(response.data.warning);
+      } else {
+        toast.success('Usuário criado com sucesso');
+      }
+
+      setIsCreateOpen(false);
+      resetNewUserForm();
+      await fetchUsers();
+    } catch (error: any) {
+      console.error('Error creating user:', error);
+      toast.error(error.message || 'Erro ao criar usuário');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   const getInitials = (name?: string | null, email?: string) => {
     if (name) {
       return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -210,6 +283,10 @@ export function TenantUsersList({ tenants }: TenantUsersListProps) {
             ))}
           </SelectContent>
         </Select>
+        <Button onClick={() => setIsCreateOpen(true)}>
+          <UserPlus className="h-4 w-4 mr-2" />
+          Novo Usuário
+        </Button>
       </div>
 
       {/* Stats */}
@@ -361,6 +438,120 @@ export function TenantUsersList({ tenants }: TenantUsersListProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Create User Dialog */}
+      <Dialog open={isCreateOpen} onOpenChange={(open) => { setIsCreateOpen(open); if (!open) resetNewUserForm(); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5" />
+              Novo Usuário
+            </DialogTitle>
+            <DialogDescription>
+              Cadastre um novo usuário no sistema
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-user-name">Nome Completo</Label>
+              <Input
+                id="new-user-name"
+                value={newUserForm.full_name}
+                onChange={(e) => setNewUserForm({ ...newUserForm, full_name: e.target.value })}
+                placeholder="João da Silva"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="new-user-email">Email *</Label>
+              <Input
+                id="new-user-email"
+                type="email"
+                value={newUserForm.email}
+                onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
+                placeholder="joao@empresa.com"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="new-user-password">Senha *</Label>
+              <div className="relative">
+                <Input
+                  id="new-user-password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={newUserForm.password}
+                  onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
+                  placeholder="Mínimo 6 caracteres"
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="new-user-tenant">Vincular a Cliente (opcional)</Label>
+              <Select
+                value={newUserForm.tenant_id}
+                onValueChange={(value) => setNewUserForm({ ...newUserForm, tenant_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecionar cliente..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Nenhum</SelectItem>
+                  {tenants.map(tenant => (
+                    <SelectItem key={tenant.id} value={tenant.id}>
+                      {tenant.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {newUserForm.tenant_id && (
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="new-user-admin"
+                  checked={newUserForm.is_tenant_admin}
+                  onCheckedChange={(checked) => setNewUserForm({ ...newUserForm, is_tenant_admin: checked })}
+                />
+                <Label htmlFor="new-user-admin" className="flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  Admin do Cliente
+                </Label>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsCreateOpen(false); resetNewUserForm(); }}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleCreateUser} 
+              disabled={!newUserForm.email || !newUserForm.password || isCreating}
+            >
+              {isCreating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Criando...
+                </>
+              ) : (
+                'Criar Usuário'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
