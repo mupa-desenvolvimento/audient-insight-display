@@ -22,6 +22,7 @@ import Stores from "./pages/admin/Stores";
 import Regions from "./pages/admin/Regions";
 import Channels from "./pages/admin/Channels";
 import Playlists from "./pages/admin/Playlists";
+import PlaylistEditorPage from "./pages/admin/PlaylistEditor";
 import DeviceGroups from "./pages/admin/DeviceGroups";
 import Tenants from "./pages/admin/Tenants";
 
@@ -55,6 +56,8 @@ const App = () => (
                         <Route path="regions" element={<Regions />} />
                         <Route path="channels" element={<Channels />} />
                         <Route path="playlists" element={<Playlists />} />
+                        <Route path="playlists/:id/edit" element={<PlaylistEditorPage />} />
+                        <Route path="playlists/new" element={<PlaylistEditorPage />} />
                         <Route path="media" element={<Media />} />
                         <Route path="analytics" element={<Analytics />} />
                         <Route path="settings" element={<Settings />} />
