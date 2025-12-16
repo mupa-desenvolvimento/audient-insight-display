@@ -1,8 +1,8 @@
-
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Settings } from "lucide-react";
 import { useLocation } from "react-router-dom";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const Header = () => {
   const location = useLocation();
@@ -14,13 +14,30 @@ const Header = () => {
         return 'Dashboard';
       case '/admin/devices':
         return 'Dispositivos';
+      case '/admin/device-groups':
+        return 'Grupos de Dispositivos';
+      case '/admin/stores':
+        return 'Lojas';
+      case '/admin/regions':
+        return 'Regiões';
+      case '/admin/channels':
+        return 'Canais';
+      case '/admin/playlists':
+        return 'Playlists';
       case '/admin/media':
         return 'Mídias';
       case '/admin/analytics':
         return 'Analytics';
       case '/admin/settings':
         return 'Configurações';
+      case '/admin/tenants':
+        return 'Tenants';
+      case '/admin/monitoring':
+        return 'Monitoramento';
       default:
+        if (path.includes('/playlists/') && path.includes('/edit')) {
+          return 'Editor de Playlist';
+        }
         return 'Painel Administrativo';
     }
   };
@@ -35,6 +52,7 @@ const Header = () => {
         </div>
         
         <div className="flex items-center space-x-2">
+          <ThemeToggle />
           <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
             <Settings className="w-4 h-4" />
           </Button>
