@@ -107,8 +107,24 @@ export function StoreImportDialog({ open, onOpenChange }: StoreImportDialogProps
         const seenCodes = new Set<string>();
 
         for (let i = 1; i < lines.length; i++) {
-          // Handle CSV with quotes
-          const values = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g)?.map(v => v.replace(/^"|"$/g, '').trim()) || lines[i].split(',').map(v => v.trim());
+          // Parse CSV properly handling quoted values with commas and spaces
+          const values: string[] = [];
+          let current = '';
+          let inQuotes = false;
+          const line = lines[i];
+          
+          for (let j = 0; j < line.length; j++) {
+            const char = line[j];
+            if (char === '"') {
+              inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+              values.push(current.trim());
+              current = '';
+            } else {
+              current += char;
+            }
+          }
+          values.push(current.trim()); // Push last value
           
           const row: ParsedRow = {
             codigo: columnIndexes.codigo >= 0 ? values[columnIndexes.codigo] || '' : '',
