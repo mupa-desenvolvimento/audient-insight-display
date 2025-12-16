@@ -10,6 +10,13 @@ export interface Playlist {
   channel_id: string | null;
   is_active: boolean;
   schedule: Json | null;
+  start_date: string | null;
+  end_date: string | null;
+  days_of_week: number[] | null;
+  start_time: string | null;
+  end_time: string | null;
+  priority: number;
+  fallback_media_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -25,6 +32,13 @@ export interface PlaylistInsert {
   channel_id?: string | null;
   is_active?: boolean;
   schedule?: Json | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  days_of_week?: number[] | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  priority?: number;
+  fallback_media_id?: string | null;
 }
 
 export const usePlaylists = () => {

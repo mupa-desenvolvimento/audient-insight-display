@@ -12,6 +12,7 @@ export interface Channel {
   priority: number;
   is_active: boolean;
   metadata: Json | null;
+  fallback_playlist_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -24,6 +25,7 @@ export interface ChannelInsert {
   priority?: number;
   is_active?: boolean;
   metadata?: Json | null;
+  fallback_playlist_id?: string | null;
 }
 
 export const useChannels = () => {
