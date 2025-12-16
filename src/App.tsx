@@ -23,6 +23,7 @@ import Regions from "./pages/admin/Regions";
 import Channels from "./pages/admin/Channels";
 import Playlists from "./pages/admin/Playlists";
 import DeviceGroups from "./pages/admin/DeviceGroups";
+import Tenants from "./pages/admin/Tenants";
 
 const queryClient = new QueryClient();
 
@@ -59,6 +60,7 @@ const App = () => (
                         <Route path="settings" element={<Settings />} />
                         <Route path="camera" element={<Camera />} />
                         <Route path="monitoring" element={<LiveMonitoring />} />
+                        <Route path="tenants" element={<Tenants />} />
                       </Routes>
                     </AppLayout>
                   </div>

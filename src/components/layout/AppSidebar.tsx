@@ -1,6 +1,7 @@
-import { Monitor, BarChart3, Image, Settings, Grid2x2, Database, Camera, Eye, Store, MapPin, LogOut, Tv, ListVideo, Layers } from "lucide-react";
+import { Monitor, BarChart3, Image, Settings, Grid2x2, Database, Camera, Eye, Store, MapPin, LogOut, Tv, ListVideo, Layers, Building2 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { Button } from "@/components/ui/button";
 import {
   Sidebar,
@@ -30,8 +31,13 @@ const menuItems = [
   { title: "Configurações", url: "/admin/settings", icon: Settings },
 ];
 
+const superAdminItems = [
+  { title: "Clientes", url: "/admin/tenants", icon: Building2 },
+];
+
 const AppSidebar = () => {
   const { user, signOut } = useAuth();
+  const { isSuperAdmin } = useSuperAdmin();
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
@@ -84,6 +90,38 @@ const AppSidebar = () => {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Super Admin Section */}
+        {isSuperAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-xs font-medium text-muted-foreground px-3 py-2">
+              SUPER ADMIN
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {superAdminItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink 
+                        to={item.url}
+                        className={({ isActive }) =>
+                          `flex items-center space-x-3 px-3 py-2 rounded-lg transition-all duration-200 ${
+                            isActive
+                              ? 'bg-primary text-primary-foreground shadow-md'
+                              : 'hover:bg-accent hover:text-accent-foreground'
+                          }`
+                        }
+                      >
+                        <item.icon className="w-4 h-4" />
+                        <span className="font-medium">{item.title}</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="p-4 border-t border-border">
