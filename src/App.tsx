@@ -20,7 +20,9 @@ import LiveMonitoring from "./pages/LiveMonitoring";
 import Auth from "./pages/Auth";
 import Stores from "./pages/admin/Stores";
 import Regions from "./pages/admin/Regions";
-
+import Channels from "./pages/admin/Channels";
+import Playlists from "./pages/admin/Playlists";
+import DeviceGroups from "./pages/admin/DeviceGroups";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -46,8 +48,11 @@ const App = () => (
                       <Routes>
                         <Route path="dashboard" element={<Dashboard />} />
                         <Route path="devices" element={<Devices />} />
+                        <Route path="device-groups" element={<DeviceGroups />} />
                         <Route path="stores" element={<Stores />} />
                         <Route path="regions" element={<Regions />} />
+                        <Route path="channels" element={<Channels />} />
+                        <Route path="playlists" element={<Playlists />} />
                         <Route path="media" element={<Media />} />
                         <Route path="analytics" element={<Analytics />} />
                         <Route path="settings" element={<Settings />} />

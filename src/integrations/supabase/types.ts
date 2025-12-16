@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           created_at: string
           description: string | null
+          fallback_playlist_id: string | null
           id: string
           is_active: boolean
           metadata: Json | null
@@ -30,6 +31,7 @@ export type Database = {
         Insert: {
           created_at?: string
           description?: string | null
+          fallback_playlist_id?: string | null
           id?: string
           is_active?: boolean
           metadata?: Json | null
@@ -42,6 +44,7 @@ export type Database = {
         Update: {
           created_at?: string
           description?: string | null
+          fallback_playlist_id?: string | null
           id?: string
           is_active?: boolean
           metadata?: Json | null
@@ -51,7 +54,15 @@ export type Database = {
           type?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "channels_fallback_playlist_id_fkey"
+            columns: ["fallback_playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlists"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cities: {
         Row: {
@@ -109,6 +120,45 @@ export type Database = {
         }
         Relationships: []
       }
+      device_group_channels: {
+        Row: {
+          channel_id: string
+          created_at: string
+          group_id: string
+          id: string
+          position: number
+        }
+        Insert: {
+          channel_id: string
+          created_at?: string
+          group_id: string
+          id?: string
+          position?: number
+        }
+        Update: {
+          channel_id?: string
+          created_at?: string
+          group_id?: string
+          id?: string
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "device_group_channels_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "device_group_channels_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "device_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       device_group_members: {
         Row: {
           created_at: string
@@ -151,6 +201,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          screen_type: string | null
           store_id: string | null
           updated_at: string
         }
@@ -159,6 +210,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          screen_type?: string | null
           store_id?: string | null
           updated_at?: string
         }
@@ -167,6 +219,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          screen_type?: string | null
           store_id?: string | null
           updated_at?: string
         }
@@ -428,31 +481,52 @@ export type Database = {
         Row: {
           channel_id: string | null
           created_at: string
+          days_of_week: number[] | null
           description: string | null
+          end_date: string | null
+          end_time: string | null
+          fallback_media_id: string | null
           id: string
           is_active: boolean
           name: string
+          priority: number | null
           schedule: Json | null
+          start_date: string | null
+          start_time: string | null
           updated_at: string
         }
         Insert: {
           channel_id?: string | null
           created_at?: string
+          days_of_week?: number[] | null
           description?: string | null
+          end_date?: string | null
+          end_time?: string | null
+          fallback_media_id?: string | null
           id?: string
           is_active?: boolean
           name: string
+          priority?: number | null
           schedule?: Json | null
+          start_date?: string | null
+          start_time?: string | null
           updated_at?: string
         }
         Update: {
           channel_id?: string | null
           created_at?: string
+          days_of_week?: number[] | null
           description?: string | null
+          end_date?: string | null
+          end_time?: string | null
+          fallback_media_id?: string | null
           id?: string
           is_active?: boolean
           name?: string
+          priority?: number | null
           schedule?: Json | null
+          start_date?: string | null
+          start_time?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -461,6 +535,13 @@ export type Database = {
             columns: ["channel_id"]
             isOneToOne: false
             referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playlists_fallback_media_id_fkey"
+            columns: ["fallback_media_id"]
+            isOneToOne: false
+            referencedRelation: "media_items"
             referencedColumns: ["id"]
           },
         ]

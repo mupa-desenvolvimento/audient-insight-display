@@ -1,5 +1,4 @@
-
-import { Monitor, BarChart3, Image, Settings, Grid2x2, Database, Camera, Eye, Store, MapPin, LogOut } from "lucide-react";
+import { Monitor, BarChart3, Image, Settings, Grid2x2, Database, Camera, Eye, Store, MapPin, LogOut, Tv, ListVideo, Layers } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -21,6 +20,9 @@ const menuItems = [
   { title: "Lojas", url: "/admin/stores", icon: Store },
   { title: "Regiões", url: "/admin/regions", icon: MapPin },
   { title: "Dispositivos", url: "/admin/devices", icon: Monitor },
+  { title: "Grupos", url: "/admin/device-groups", icon: Layers },
+  { title: "Canais", url: "/admin/channels", icon: Tv },
+  { title: "Playlists", url: "/admin/playlists", icon: ListVideo },
   { title: "Mídias", url: "/admin/media", icon: Image },
   { title: "Câmera", url: "/admin/camera", icon: Camera },
   { title: "Monitoramento", url: "/admin/monitoring", icon: Eye },
