@@ -8,9 +8,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Label } from '@/components/ui/label';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTenants, Tenant } from '@/hooks/useTenants';
 import { useSuperAdmin } from '@/hooks/useSuperAdmin';
 import { TenantUsersDialog } from '@/components/admin/TenantUsersDialog';
+import { TenantUsersList } from '@/components/admin/TenantUsersList';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -146,11 +148,27 @@ const Tenants = () => {
             Gerenciamento de clientes multi-tenant
           </p>
         </div>
-        <Button onClick={() => setIsCreateOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Novo Cliente
-        </Button>
       </div>
+
+      <Tabs defaultValue="clientes" className="w-full">
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <TabsList>
+            <TabsTrigger value="clientes" className="gap-2">
+              <Building2 className="h-4 w-4" />
+              Clientes
+            </TabsTrigger>
+            <TabsTrigger value="usuarios" className="gap-2">
+              <Users className="h-4 w-4" />
+              Usuários
+            </TabsTrigger>
+          </TabsList>
+          <Button onClick={() => setIsCreateOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo Cliente
+          </Button>
+        </div>
+
+        <TabsContent value="clientes" className="space-y-6 mt-0">
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-4">
@@ -304,6 +322,12 @@ const Tenants = () => {
           </p>
         </div>
       )}
+        </TabsContent>
+
+        <TabsContent value="usuarios" className="mt-0">
+          <TenantUsersList tenants={tenants} />
+        </TabsContent>
+      </Tabs>
 
       {/* Create Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
