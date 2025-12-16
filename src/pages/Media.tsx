@@ -7,9 +7,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Image, FileText, Clock, Grid2x2, Loader2 } from "lucide-react";
 import { useMediaItems } from "@/hooks/useMediaItems";
 import { usePlaylists } from "@/hooks/usePlaylists";
+import { MediaUploadDialog } from "@/components/media/MediaUploadDialog";
+import { useQueryClient } from "@tanstack/react-query";
 
 const Media = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
   const { mediaItems, isLoading: loadingMedia } = useMediaItems();
   const { playlists, isLoading: loadingPlaylists } = usePlaylists();
 
@@ -59,11 +63,17 @@ const Media = () => {
           <h1 className="text-2xl font-bold">Mídias</h1>
           <p className="text-muted-foreground">Gerencie conteúdos e playlists</p>
         </div>
-        <Button className="gradient-primary text-white">
+        <Button className="gradient-primary text-white" onClick={() => setUploadDialogOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
           Upload Mídia
         </Button>
       </div>
+
+      <MediaUploadDialog 
+        open={uploadDialogOpen} 
+        onOpenChange={setUploadDialogOpen}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["media-items"] })}
+      />
 
       <Tabs defaultValue="media" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2 max-w-md">
