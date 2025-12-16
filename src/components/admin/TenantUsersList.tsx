@@ -500,14 +500,14 @@ export function TenantUsersList({ tenants }: TenantUsersListProps) {
             <div className="space-y-2">
               <Label htmlFor="new-user-tenant">Vincular a Cliente (opcional)</Label>
               <Select
-                value={newUserForm.tenant_id}
-                onValueChange={(value) => setNewUserForm({ ...newUserForm, tenant_id: value })}
+                value={newUserForm.tenant_id || 'none'}
+                onValueChange={(value) => setNewUserForm({ ...newUserForm, tenant_id: value === 'none' ? '' : value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecionar cliente..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhum</SelectItem>
+                  <SelectItem value="none">Nenhum</SelectItem>
                   {tenants.map(tenant => (
                     <SelectItem key={tenant.id} value={tenant.id}>
                       {tenant.name}
