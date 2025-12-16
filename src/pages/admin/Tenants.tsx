@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Building2, Plus, Search, Power, PowerOff, Trash2, Edit, Users, Monitor, Store as StoreIcon, Shield } from 'lucide-react';
+import { Building2, Plus, Search, Power, PowerOff, Trash2, Edit, Users, Monitor, Store as StoreIcon, Shield, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTenants, Tenant } from '@/hooks/useTenants';
 import { useSuperAdmin } from '@/hooks/useSuperAdmin';
+import { TenantUsersDialog } from '@/components/admin/TenantUsersDialog';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -21,6 +22,7 @@ const Tenants = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isUsersOpen, setIsUsersOpen] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -261,6 +263,16 @@ const Tenants = () => {
                   Editar
                 </Button>
                 <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedTenant(tenant);
+                    setIsUsersOpen(true);
+                  }}
+                >
+                  <UserPlus className="h-4 w-4" />
+                </Button>
+                <Button
                   variant={tenant.is_active !== false ? 'outline' : 'default'}
                   size="sm"
                   onClick={() => toggleTenantStatus(tenant.id, tenant.is_active === false)}
@@ -457,6 +469,16 @@ const Tenants = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Users Dialog */}
+      <TenantUsersDialog
+        tenant={selectedTenant}
+        open={isUsersOpen}
+        onOpenChange={(open) => {
+          setIsUsersOpen(open);
+          if (!open) setSelectedTenant(null);
+        }}
+      />
     </div>
   );
 };
