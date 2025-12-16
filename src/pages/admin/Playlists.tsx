@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { usePlaylists, PlaylistWithChannel } from "@/hooks/usePlaylists";
-import { useChannels } from "@/hooks/useChannels";
+import { useChannels, Channel } from "@/hooks/useChannels";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -38,6 +38,166 @@ interface PlaylistFormData {
   end_time: string;
   priority: number;
 }
+
+interface PlaylistFormProps {
+  formData: PlaylistFormData;
+  setFormData: React.Dispatch<React.SetStateAction<PlaylistFormData>>;
+  channels: Channel[];
+  onSubmit: () => void;
+  submitLabel: string;
+}
+
+const PlaylistForm = ({ formData, setFormData, channels, onSubmit, submitLabel }: PlaylistFormProps) => {
+  const toggleDayOfWeek = (day: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      days_of_week: prev.days_of_week.includes(day)
+        ? prev.days_of_week.filter((d) => d !== day)
+        : [...prev.days_of_week, day].sort(),
+    }));
+  };
+
+  return (
+    <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+      <div className="space-y-2">
+        <Label>Nome *</Label>
+        <Input
+          value={formData.name}
+          onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+          placeholder="Nome da playlist"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Descrição</Label>
+        <Textarea
+          value={formData.description || ""}
+          onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+          placeholder="Descrição da playlist"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Canal</Label>
+        <Select
+          value={formData.channel_id || "none"}
+          onValueChange={(v) => setFormData((prev) => ({ ...prev, channel_id: v === "none" ? null : v }))}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Selecione um canal" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Nenhum</SelectItem>
+            {channels.map((channel) => (
+              <SelectItem key={channel.id} value={channel.id}>
+                {channel.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="border rounded-lg p-4 space-y-4">
+        <h4 className="font-medium flex items-center gap-2">
+          <Calendar className="w-4 h-4" />
+          Programação
+        </h4>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Data Início</Label>
+            <Input
+              type="date"
+              value={formData.start_date || ""}
+              onChange={(e) => setFormData((prev) => ({ ...prev, start_date: e.target.value || null }))}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Data Fim</Label>
+            <Input
+              type="date"
+              value={formData.end_date || ""}
+              onChange={(e) => setFormData((prev) => ({ ...prev, end_date: e.target.value || null }))}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Dias da Semana</Label>
+          <div className="flex flex-wrap gap-2">
+            {DAYS_OF_WEEK.map((day) => (
+              <label
+                key={day.value}
+                className={`flex items-center justify-center w-10 h-10 rounded-lg border cursor-pointer transition-colors ${
+                  formData.days_of_week.includes(day.value)
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background hover:bg-accent"
+                }`}
+              >
+                <Checkbox
+                  checked={formData.days_of_week.includes(day.value)}
+                  onCheckedChange={() => toggleDayOfWeek(day.value)}
+                  className="sr-only"
+                />
+                <span className="text-xs font-medium">{day.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Horário Início
+            </Label>
+            <Input
+              type="time"
+              value={formData.start_time}
+              onChange={(e) => setFormData((prev) => ({ ...prev, start_time: e.target.value }))}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Horário Fim
+            </Label>
+            <Input
+              type="time"
+              value={formData.end_time}
+              onChange={(e) => setFormData((prev) => ({ ...prev, end_time: e.target.value }))}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Prioridade (1-10)</Label>
+          <Input
+            type="number"
+            min={1}
+            max={10}
+            value={formData.priority}
+            onChange={(e) => setFormData((prev) => ({ ...prev, priority: parseInt(e.target.value) || 5 }))}
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center space-x-2">
+        <Switch
+          checked={formData.is_active}
+          onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, is_active: checked }))}
+        />
+        <Label>Playlist ativa</Label>
+      </div>
+
+      <DialogFooter>
+        <Button onClick={onSubmit} disabled={!formData.name}>
+          {submitLabel}
+        </Button>
+      </DialogFooter>
+    </div>
+  );
+};
 
 const PlaylistsPage = () => {
   const { playlists, isLoading, createPlaylist, updatePlaylist, deletePlaylist } = usePlaylists();
@@ -162,15 +322,6 @@ const PlaylistsPage = () => {
     });
   };
 
-  const toggleDayOfWeek = (day: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      days_of_week: prev.days_of_week.includes(day)
-        ? prev.days_of_week.filter((d) => d !== day)
-        : [...prev.days_of_week, day].sort(),
-    }));
-  };
-
   const getPlaylistStatus = (playlist: PlaylistWithChannel) => {
     const schedule = playlist.schedule as Record<string, unknown> | null;
     const now = new Date();
@@ -199,147 +350,6 @@ const PlaylistsPage = () => {
     return { status: "active", message: "Ativa", color: "default" };
   };
 
-  const PlaylistForm = ({ onSubmit, submitLabel }: { onSubmit: () => void; submitLabel: string }) => (
-    <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-      <div className="space-y-2">
-        <Label>Nome *</Label>
-        <Input
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          placeholder="Nome da playlist"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label>Descrição</Label>
-        <Textarea
-          value={formData.description || ""}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          placeholder="Descrição da playlist"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label>Canal</Label>
-        <Select
-          value={formData.channel_id || "none"}
-          onValueChange={(v) => setFormData({ ...formData, channel_id: v === "none" ? null : v })}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Selecione um canal" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">Nenhum</SelectItem>
-            {channels.map((channel) => (
-              <SelectItem key={channel.id} value={channel.id}>
-                {channel.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="border rounded-lg p-4 space-y-4">
-        <h4 className="font-medium flex items-center gap-2">
-          <Calendar className="w-4 h-4" />
-          Programação
-        </h4>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Data Início</Label>
-            <Input
-              type="date"
-              value={formData.start_date || ""}
-              onChange={(e) => setFormData({ ...formData, start_date: e.target.value || null })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Data Fim</Label>
-            <Input
-              type="date"
-              value={formData.end_date || ""}
-              onChange={(e) => setFormData({ ...formData, end_date: e.target.value || null })}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label>Dias da Semana</Label>
-          <div className="flex flex-wrap gap-2">
-            {DAYS_OF_WEEK.map((day) => (
-              <label
-                key={day.value}
-                className={`flex items-center justify-center w-10 h-10 rounded-lg border cursor-pointer transition-colors ${
-                  formData.days_of_week.includes(day.value)
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-background hover:bg-accent"
-                }`}
-              >
-                <Checkbox
-                  checked={formData.days_of_week.includes(day.value)}
-                  onCheckedChange={() => toggleDayOfWeek(day.value)}
-                  className="sr-only"
-                />
-                <span className="text-xs font-medium">{day.label}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              Horário Início
-            </Label>
-            <Input
-              type="time"
-              value={formData.start_time}
-              onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              Horário Fim
-            </Label>
-            <Input
-              type="time"
-              value={formData.end_time}
-              onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label>Prioridade (1-10)</Label>
-          <Input
-            type="number"
-            min={1}
-            max={10}
-            value={formData.priority}
-            onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value) || 5 })}
-          />
-        </div>
-      </div>
-
-      <div className="flex items-center space-x-2">
-        <Switch
-          checked={formData.is_active}
-          onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-        />
-        <Label>Playlist ativa</Label>
-      </div>
-
-      <DialogFooter>
-        <Button onClick={onSubmit} disabled={!formData.name}>
-          {submitLabel}
-        </Button>
-      </DialogFooter>
-    </div>
-  );
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -358,7 +368,7 @@ const PlaylistsPage = () => {
             <DialogHeader>
               <DialogTitle>Criar Playlist</DialogTitle>
             </DialogHeader>
-            <PlaylistForm onSubmit={handleCreate} submitLabel="Criar" />
+            <PlaylistForm formData={formData} setFormData={setFormData} channels={channels} onSubmit={handleCreate} submitLabel="Criar" />
           </DialogContent>
         </Dialog>
       </div>
@@ -487,7 +497,7 @@ const PlaylistsPage = () => {
           <DialogHeader>
             <DialogTitle>Editar Playlist</DialogTitle>
           </DialogHeader>
-          <PlaylistForm onSubmit={handleUpdate} submitLabel="Salvar" />
+          <PlaylistForm formData={formData} setFormData={setFormData} channels={channels} onSubmit={handleUpdate} submitLabel="Salvar" />
         </DialogContent>
       </Dialog>
 
