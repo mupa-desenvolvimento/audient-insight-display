@@ -699,6 +699,92 @@ export type Database = {
           },
         ]
       }
+      tenant_admin_logs: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_id: string | null
+          created_at: string | null
+          details: Json | null
+          id: string
+          tenant_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          tenant_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_admin_logs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenants: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          last_migration_at: string | null
+          max_devices: number | null
+          max_stores: number | null
+          max_users: number | null
+          metadata: Json | null
+          migration_version: number | null
+          name: string
+          schema_name: string
+          slug: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_migration_at?: string | null
+          max_devices?: number | null
+          max_stores?: number | null
+          max_users?: number | null
+          metadata?: Json | null
+          migration_version?: number | null
+          name: string
+          schema_name: string
+          slug: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_migration_at?: string | null
+          max_devices?: number | null
+          max_stores?: number | null
+          max_users?: number | null
+          metadata?: Json | null
+          migration_version?: number | null
+          name?: string
+          schema_name?: string
+          slug?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       user_permissions: {
         Row: {
           created_at: string
@@ -744,11 +830,44 @@ export type Database = {
         }
         Relationships: []
       }
+      user_tenant_mappings: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_tenant_admin: boolean | null
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_tenant_admin?: boolean | null
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_tenant_admin?: boolean | null
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_tenant_mappings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      get_user_tenant_id: { Args: { check_user_id?: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -760,7 +879,12 @@ export type Database = {
         Args: { _store_id: string; _user_id: string }
         Returns: boolean
       }
+      has_tenant_access: {
+        Args: { check_tenant_id: string; check_user_id: string }
+        Returns: boolean
+      }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_super_admin: { Args: { check_user_id?: string }; Returns: boolean }
     }
     Enums: {
       app_role:
