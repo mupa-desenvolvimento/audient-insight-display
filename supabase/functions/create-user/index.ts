@@ -23,7 +23,10 @@ Deno.serve(async (req) => {
 
     // Verify the caller is authenticated and is a super admin
     const authHeader = req.headers.get('Authorization')
+    console.log('Auth header present:', !!authHeader)
+    
     if (!authHeader) {
+      console.error('Missing authorization header')
       return new Response(
         JSON.stringify({ error: 'Missing authorization header' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -31,7 +34,13 @@ Deno.serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '')
+    console.log('Token length:', token.length)
+    
     const { data: { user: callerUser }, error: authError } = await supabaseAdmin.auth.getUser(token)
+    
+    if (authError) {
+      console.error('Auth error:', authError.message)
+    }
     
     if (authError || !callerUser) {
       return new Response(
@@ -39,6 +48,8 @@ Deno.serve(async (req) => {
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+    
+    console.log('Caller user:', callerUser.email)
 
     // Check if caller is super admin
     const { data: isSuperAdmin } = await supabaseAdmin.rpc('is_super_admin', { check_user_id: callerUser.id })

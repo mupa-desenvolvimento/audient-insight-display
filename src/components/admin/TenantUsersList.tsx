@@ -193,12 +193,8 @@ export function TenantUsersList({ tenants }: TenantUsersListProps) {
 
     try {
       setIsCreating(true);
-      const { data: { session } } = await supabase.auth.getSession();
       
-      if (!session?.access_token) {
-        throw new Error('Sessão não encontrada. Faça login novamente.');
-      }
-      
+      // supabase.functions.invoke automatically includes the user's JWT
       const response = await supabase.functions.invoke('create-user', {
         body: {
           email: newUserForm.email.trim(),
@@ -206,9 +202,6 @@ export function TenantUsersList({ tenants }: TenantUsersListProps) {
           full_name: newUserForm.full_name.trim() || null,
           tenant_id: newUserForm.tenant_id || null,
           is_tenant_admin: newUserForm.is_tenant_admin
-        },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
         }
       });
 
