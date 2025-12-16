@@ -6,6 +6,9 @@ const corsHeaders = {
 }
 
 Deno.serve(async (req) => {
+  console.log('=== create-user function called ===')
+  console.log('Method:', req.method)
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -13,7 +16,15 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
     
+    console.log('Environment vars present:', { 
+      url: !!supabaseUrl, 
+      serviceKey: !!supabaseServiceKey,
+      anonKey: !!supabaseAnonKey 
+    })
+
+    // Admin client for privileged operations
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
@@ -21,7 +32,7 @@ Deno.serve(async (req) => {
       }
     })
 
-    // Verify the caller is authenticated and is a super admin
+    // Verify the caller is authenticated
     const authHeader = req.headers.get('Authorization')
     console.log('Auth header present:', !!authHeader)
     
@@ -33,16 +44,24 @@ Deno.serve(async (req) => {
       )
     }
 
-    const token = authHeader.replace('Bearer ', '')
-    console.log('Token length:', token.length)
+    // Create a client with the user's auth context to verify identity
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: { Authorization: authHeader }
+      }
+    })
+
+    // Get the authenticated user
+    const { data: { user: callerUser }, error: authError } = await supabaseClient.auth.getUser()
     
-    const { data: { user: callerUser }, error: authError } = await supabaseAdmin.auth.getUser(token)
-    
-    if (authError) {
-      console.error('Auth error:', authError.message)
-    }
+    console.log('Auth result:', { 
+      hasUser: !!callerUser, 
+      userEmail: callerUser?.email,
+      error: authError?.message 
+    })
     
     if (authError || !callerUser) {
+      console.error('Auth error:', authError?.message)
       return new Response(
         JSON.stringify({ error: 'Invalid token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -51,8 +70,8 @@ Deno.serve(async (req) => {
     
     console.log('Caller user:', callerUser.email)
 
-    // Check if caller is super admin
-    const { data: isSuperAdmin } = await supabaseAdmin.rpc('is_super_admin', { check_user_id: callerUser.id })
+    // Check if caller is super admin using the user's authenticated client
+    const { data: isSuperAdmin } = await supabaseClient.rpc('is_super_admin', { check_user_id: callerUser.id })
     
     if (!isSuperAdmin) {
       return new Response(
