@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { usePlaylists, PlaylistWithChannel } from "@/hooks/usePlaylists";
 import { useChannels, Channel } from "@/hooks/useChannels";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Search, ListVideo, Edit, Trash2, Calendar, Clock, AlertTriangle, CheckCircle } from "lucide-react";
+import { Plus, Search, ListVideo, Edit, Trash2, Calendar, Clock, AlertTriangle, CheckCircle, Layers } from "lucide-react";
 import { format, parseISO, isAfter, isBefore, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -200,6 +201,7 @@ const PlaylistForm = ({ formData, setFormData, channels, onSubmit, submitLabel }
 };
 
 const PlaylistsPage = () => {
+  const navigate = useNavigate();
   const { playlists, isLoading, createPlaylist, updatePlaylist, deletePlaylist } = usePlaylists();
   const { channels } = useChannels();
   const [searchTerm, setSearchTerm] = useState("");
@@ -477,6 +479,15 @@ const PlaylistsPage = () => {
                   )}
 
                   <div className="flex justify-end space-x-2 pt-2 border-t">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => navigate(`/admin/playlists/${playlist.id}/edit`)}
+                      className="gap-1"
+                    >
+                      <Layers className="w-4 h-4" />
+                      Conteúdo
+                    </Button>
                     <Button variant="ghost" size="sm" onClick={() => openEdit(playlist)}>
                       <Edit className="w-4 h-4" />
                     </Button>
