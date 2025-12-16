@@ -23,6 +23,7 @@ import Regions from "./pages/admin/Regions";
 import Channels from "./pages/admin/Channels";
 import Playlists from "./pages/admin/Playlists";
 import DeviceGroups from "./pages/admin/DeviceGroups";
+
 const queryClient = new QueryClient();
 
 const App = () => (
