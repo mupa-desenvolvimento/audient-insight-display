@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -91,8 +91,9 @@ const CameraFullscreen = () => {
     };
   }, []);
 
+
   // Inicializar câmera
-  const startCamera = async () => {
+  const startCamera = useCallback(async () => {
     if (!isModelsLoaded) {
       toast({
         title: "Modelos carregando",
@@ -133,10 +134,10 @@ const CameraFullscreen = () => {
         variant: "destructive",
       });
     }
-  };
+  }, [isModelsLoaded, toast]);
 
   // Parar câmera
-  const stopCamera = () => {
+  const stopCamera = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
@@ -150,7 +151,14 @@ const CameraFullscreen = () => {
       title: "Câmera parada",
       description: "Sistema de reconhecimento desativado",
     });
-  };
+  }, [toast]);
+
+  // Iniciar câmera automaticamente quando os modelos estiverem carregados
+  useEffect(() => {
+    if (isModelsLoaded && !isStreaming && !cameraError) {
+      startCamera();
+    }
+  }, [isModelsLoaded, isStreaming, cameraError, startCamera]);
 
   const registeredFaces = activeFaces.filter(face => face.isRegistered);
   const unregisteredFaces = activeFaces.filter(face => !face.isRegistered);
