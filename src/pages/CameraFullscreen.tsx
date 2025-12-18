@@ -105,32 +105,85 @@ const CameraFullscreen = () => {
 
     try {
       setCameraError(null);
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          width: { ideal: 1920 }, 
-          height: { ideal: 1080 },
-          facingMode: 'user' 
+      
+      // Verificar se a API de mídia está disponível
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("API de câmera não disponível neste navegador");
+      }
+
+      // Configurações mais flexíveis para Android
+      const constraints: MediaStreamConstraints = {
+        video: {
+          facingMode: 'user',
+          width: { ideal: 1280, min: 640 },
+          height: { ideal: 720, min: 480 }
         },
         audio: false
-      });
+      };
+
+      console.log("Solicitando acesso à câmera...");
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log("Stream obtido:", stream);
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
-        setIsStreaming(true);
         
-        toast({
-          title: "Câmera iniciada",
-          description: "Sistema de reconhecimento ativo em tela cheia",
-        });
+        // Aguardar o vídeo estar pronto antes de marcar como streaming
+        videoRef.current.onloadedmetadata = () => {
+          console.log("Vídeo metadata carregado");
+          videoRef.current?.play()
+            .then(() => {
+              console.log("Vídeo iniciado com sucesso");
+              setIsStreaming(true);
+              toast({
+                title: "Câmera iniciada",
+                description: "Sistema de reconhecimento ativo em tela cheia",
+              });
+            })
+            .catch((playError) => {
+              console.error("Erro ao reproduzir vídeo:", playError);
+              // Tentar novamente com muted (necessário em alguns navegadores mobile)
+              if (videoRef.current) {
+                videoRef.current.muted = true;
+                videoRef.current.play()
+                  .then(() => {
+                    setIsStreaming(true);
+                    toast({
+                      title: "Câmera iniciada",
+                      description: "Sistema de reconhecimento ativo",
+                    });
+                  })
+                  .catch((e) => {
+                    console.error("Falha ao reproduzir mesmo com muted:", e);
+                    setCameraError("Não foi possível iniciar o vídeo. Toque na tela para tentar novamente.");
+                  });
+              }
+            });
+        };
       }
-    } catch (error) {
-      setCameraError("Erro ao acessar a câmera. Verifique as permissões.");
+    } catch (error: any) {
       console.error("Erro ao acessar câmera:", error);
+      
+      let errorMessage = "Erro ao acessar a câmera.";
+      
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        errorMessage = "Permissão de câmera negada. Verifique as configurações do navegador.";
+      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+        errorMessage = "Nenhuma câmera encontrada no dispositivo.";
+      } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+        errorMessage = "A câmera está sendo usada por outro aplicativo.";
+      } else if (error.name === 'OverconstrainedError') {
+        errorMessage = "Configurações de câmera não suportadas.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setCameraError(errorMessage);
       
       toast({
         title: "Erro na câmera",
-        description: "Não foi possível acessar a câmera",
+        description: errorMessage,
         variant: "destructive",
       });
     }
