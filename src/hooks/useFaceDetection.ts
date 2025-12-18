@@ -71,6 +71,58 @@ const calculateAverageAge = (estimates: number[]): number => {
   return Math.round(sum / trimmed.length);
 };
 
+// Check if face is looking at camera using landmarks
+const isFacingCamera = (landmarks: faceapi.FaceLandmarks68): boolean => {
+  const positions = landmarks.positions;
+  
+  // Get key facial points
+  const leftEye = landmarks.getLeftEye();
+  const rightEye = landmarks.getRightEye();
+  const nose = landmarks.getNose();
+  
+  // Calculate eye centers
+  const leftEyeCenter = {
+    x: leftEye.reduce((sum, p) => sum + p.x, 0) / leftEye.length,
+    y: leftEye.reduce((sum, p) => sum + p.y, 0) / leftEye.length
+  };
+  const rightEyeCenter = {
+    x: rightEye.reduce((sum, p) => sum + p.x, 0) / rightEye.length,
+    y: rightEye.reduce((sum, p) => sum + p.y, 0) / rightEye.length
+  };
+  
+  // Get nose tip (index 30 in 68-point model)
+  const noseTip = positions[30];
+  
+  // Calculate face width (distance between eyes)
+  const eyeDistance = Math.abs(rightEyeCenter.x - leftEyeCenter.x);
+  
+  // Calculate center point between eyes
+  const eyesCenterX = (leftEyeCenter.x + rightEyeCenter.x) / 2;
+  
+  // Calculate horizontal offset of nose from eyes center
+  const noseOffset = Math.abs(noseTip.x - eyesCenterX);
+  
+  // Calculate ratio - if nose is too far from center, face is turned
+  const turnRatio = noseOffset / eyeDistance;
+  
+  // Threshold: if nose offset is more than 25% of eye distance, face is turned away
+  const horizontalThreshold = 0.25;
+  
+  // Also check vertical alignment - get jaw outline for face tilt
+  const jawOutline = landmarks.getJawOutline();
+  const jawLeft = jawOutline[0];
+  const jawRight = jawOutline[16];
+  
+  // Calculate face tilt (if one side of jaw is much higher than other)
+  const jawTilt = Math.abs(jawLeft.y - jawRight.y) / eyeDistance;
+  const tiltThreshold = 0.4;
+  
+  const isFacingHorizontally = turnRatio < horizontalThreshold;
+  const isNotTilted = jawTilt < tiltThreshold;
+  
+  return isFacingHorizontally && isNotTilted;
+};
+
 const FACE_MATCH_THRESHOLD = 0.45; // Stricter threshold for better matching
 const FACE_TIMEOUT_MS = 2000; // Remove tracked face after 2 seconds of not being seen
 const DETECTION_INTERVAL_MS = 500; // Faster detection for smoother tracking
@@ -246,6 +298,12 @@ export const useFaceDetection = (
 
       for (let index = 0; index < detections.length; index++) {
         const detection = detections[index];
+        
+        // Skip faces not looking at camera
+        if (!isFacingCamera(detection.landmarks)) {
+          continue;
+        }
+        
         const box = detection.detection.box;
         const rawAge = detection.age;
         const genderProbability = detection.genderProbability;
