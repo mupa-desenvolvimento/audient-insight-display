@@ -120,6 +120,53 @@ export type Database = {
         }
         Relationships: []
       }
+      device_detection_logs: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          detected_at: string
+          device_id: string | null
+          device_nickname: string | null
+          device_serial: string
+          face_descriptor: Json | null
+          id: string
+          is_facing_camera: boolean | null
+          metadata: Json | null
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          detected_at?: string
+          device_id?: string | null
+          device_nickname?: string | null
+          device_serial: string
+          face_descriptor?: Json | null
+          id?: string
+          is_facing_camera?: boolean | null
+          metadata?: Json | null
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          detected_at?: string
+          device_id?: string | null
+          device_nickname?: string | null
+          device_serial?: string
+          face_descriptor?: Json | null
+          id?: string
+          is_facing_camera?: boolean | null
+          metadata?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "device_detection_logs_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       device_group_channels: {
         Row: {
           channel_id: string
