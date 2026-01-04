@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Verify user is authenticated and is admin
+    // Verify user is authenticated
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       return new Response(
@@ -57,15 +57,29 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Check if user is admin
-    const { data: isAdmin } = await supabase.rpc('is_admin', { _user_id: userData.user.id })
+    const userId = userData.user.id
+
+    // Check if user is tenant admin or super admin
+    const { data: isTenantAdmin } = await supabase.rpc('is_tenant_admin', { check_user_id: userId })
     
-    if (!isAdmin) {
+    if (!isTenantAdmin) {
       return new Response(
-        JSON.stringify({ error: 'Permissão negada. Apenas administradores podem importar lojas.' }),
+        JSON.stringify({ error: 'Permissão negada. Apenas administradores do tenant podem importar lojas.' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    // Get user's tenant_id
+    const { data: tenantId } = await supabase.rpc('get_user_tenant_id_strict', { check_user_id: userId })
+    
+    if (!tenantId) {
+      return new Response(
+        JSON.stringify({ error: 'Usuário não está vinculado a nenhum tenant.' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log(`User ${userId} importing stores for tenant ${tenantId}`)
 
     const { rows, import_log_id }: ImportRequest = await req.json()
 
@@ -87,21 +101,23 @@ Deno.serve(async (req) => {
       })
       .eq('id', import_log_id)
 
-    // Get or create Brazil country
+    // Get or create Brazil country for this tenant
     let { data: country } = await supabase
       .from('countries')
       .select('id')
       .eq('code', 'BR')
+      .eq('tenant_id', tenantId)
       .maybeSingle()
 
     if (!country) {
       const { data: newCountry, error: countryError } = await supabase
         .from('countries')
-        .insert({ code: 'BR', name: 'Brasil' })
+        .insert({ code: 'BR', name: 'Brasil', tenant_id: tenantId })
         .select('id')
         .single()
       
       if (countryError) {
+        console.error('Error creating country:', countryError)
         await updateImportLogError(supabase, import_log_id, 'Erro ao criar país Brasil')
         return new Response(
           JSON.stringify({ error: 'Erro ao criar país Brasil' }),
@@ -116,11 +132,26 @@ Deno.serve(async (req) => {
     const createdStates: Record<string, { id: string }> = {}
     const createdCities: Record<string, { id: string }> = {}
 
-    // Fetch existing data
-    const { data: existingRegions } = await supabase.from('regions').select('id, name, code')
-    const { data: existingStates } = await supabase.from('states').select('id, name, code, region_id')
-    const { data: existingCities } = await supabase.from('cities').select('id, name, state_id')
-    const { data: existingStores } = await supabase.from('stores').select('code')
+    // Fetch existing data for this tenant
+    const { data: existingRegions } = await supabase
+      .from('regions')
+      .select('id, name, code')
+      .eq('tenant_id', tenantId)
+    
+    const { data: existingStates } = await supabase
+      .from('states')
+      .select('id, name, code, region_id')
+      .eq('tenant_id', tenantId)
+    
+    const { data: existingCities } = await supabase
+      .from('cities')
+      .select('id, name, state_id')
+      .eq('tenant_id', tenantId)
+    
+    const { data: existingStores } = await supabase
+      .from('stores')
+      .select('code')
+      .eq('tenant_id', tenantId)
 
     const existingStoreCodes = new Set(existingStores?.map(s => s.code.toLowerCase()) || [])
 
@@ -162,7 +193,12 @@ Deno.serve(async (req) => {
           if (!region) {
             const { data: newRegion, error: regionError } = await supabase
               .from('regions')
-              .insert({ country_id: country.id, name: regionName, code: stateCode })
+              .insert({ 
+                country_id: country.id, 
+                name: regionName, 
+                code: stateCode,
+                tenant_id: tenantId 
+              })
               .select('id')
               .single()
             
@@ -185,7 +221,12 @@ Deno.serve(async (req) => {
           if (!state) {
             const { data: newState, error: stateError } = await supabase
               .from('states')
-              .insert({ region_id: region.id, name: stateName, code: stateCode })
+              .insert({ 
+                region_id: region.id, 
+                name: stateName, 
+                code: stateCode,
+                tenant_id: tenantId 
+              })
               .select('id')
               .single()
             
@@ -208,7 +249,11 @@ Deno.serve(async (req) => {
           if (!city) {
             const { data: newCity, error: cityError } = await supabase
               .from('cities')
-              .insert({ state_id: state.id, name: row.cidade })
+              .insert({ 
+                state_id: state.id, 
+                name: row.cidade,
+                tenant_id: tenantId 
+              })
               .select('id')
               .single()
             
@@ -221,7 +266,7 @@ Deno.serve(async (req) => {
             createdCities[cityKey] = newCity
           }
 
-          // Create store
+          // Create store with tenant_id
           const { error: storeError } = await supabase
             .from('stores')
             .insert({
@@ -235,6 +280,7 @@ Deno.serve(async (req) => {
               regional_responsavel: row.regional || null,
               is_active: true,
               metadata: {},
+              tenant_id: tenantId,
             })
 
           if (storeError) {

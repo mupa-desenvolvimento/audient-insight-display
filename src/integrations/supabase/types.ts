@@ -70,6 +70,7 @@ export type Database = {
           id: string
           name: string
           state_id: string
+          tenant_id: string | null
           updated_at: string
         }
         Insert: {
@@ -77,6 +78,7 @@ export type Database = {
           id?: string
           name: string
           state_id: string
+          tenant_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -84,6 +86,7 @@ export type Database = {
           id?: string
           name?: string
           state_id?: string
+          tenant_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -94,6 +97,13 @@ export type Database = {
             referencedRelation: "states"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "cities_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
         ]
       }
       countries: {
@@ -102,6 +112,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          tenant_id: string | null
           updated_at: string
         }
         Insert: {
@@ -109,6 +120,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          tenant_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -116,9 +128,18 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          tenant_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "countries_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       device_detection_logs: {
         Row: {
@@ -627,6 +648,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          tenant_id: string | null
           updated_at: string
         }
         Insert: {
@@ -635,6 +657,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          tenant_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -643,6 +666,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          tenant_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -651,6 +675,13 @@ export type Database = {
             columns: ["country_id"]
             isOneToOne: false
             referencedRelation: "countries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "regions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -662,6 +693,7 @@ export type Database = {
           id: string
           name: string
           region_id: string
+          tenant_id: string | null
           updated_at: string
         }
         Insert: {
@@ -670,6 +702,7 @@ export type Database = {
           id?: string
           name: string
           region_id: string
+          tenant_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -678,6 +711,7 @@ export type Database = {
           id?: string
           name?: string
           region_id?: string
+          tenant_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -686,6 +720,13 @@ export type Database = {
             columns: ["region_id"]
             isOneToOne: false
             referencedRelation: "regions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "states_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -704,6 +745,7 @@ export type Database = {
           metadata: Json | null
           name: string
           regional_responsavel: string | null
+          tenant_id: string | null
           updated_at: string
         }
         Insert: {
@@ -719,6 +761,7 @@ export type Database = {
           metadata?: Json | null
           name: string
           regional_responsavel?: string | null
+          tenant_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -734,6 +777,7 @@ export type Database = {
           metadata?: Json | null
           name?: string
           regional_responsavel?: string | null
+          tenant_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -742,6 +786,13 @@ export type Database = {
             columns: ["city_id"]
             isOneToOne: false
             referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stores_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -914,6 +965,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_tenant_data: {
+        Args: { check_tenant_id: string; check_user_id: string }
+        Returns: boolean
+      }
       create_tenant_schema: {
         Args: { p_schema_name: string; p_tenant_id: string }
         Returns: undefined
@@ -923,6 +978,10 @@ export type Database = {
         Returns: undefined
       }
       get_user_tenant_id: { Args: { check_user_id?: string }; Returns: string }
+      get_user_tenant_id_strict: {
+        Args: { check_user_id?: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -940,6 +999,7 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { check_user_id?: string }; Returns: boolean }
+      is_tenant_admin: { Args: { check_user_id?: string }; Returns: boolean }
       list_tenant_schemas: {
         Args: never
         Returns: {

@@ -129,10 +129,19 @@ export function StoreImportDialog({ open, onOpenChange, onImportComplete }: Stor
         return false;
       }
 
-      const { data: isAdmin, error } = await supabase.rpc('is_admin', { _user_id: user.id });
+      // Check if user is tenant admin (includes super admins)
+      const { data: isTenantAdmin, error } = await supabase.rpc('is_tenant_admin', { check_user_id: user.id });
       
-      if (error || !isAdmin) {
-        setPermissionError('Apenas administradores podem importar lojas.');
+      if (error || !isTenantAdmin) {
+        setPermissionError('Apenas administradores do tenant podem importar lojas.');
+        return false;
+      }
+
+      // Check if user has a tenant assigned
+      const { data: tenantId } = await supabase.rpc('get_user_tenant_id_strict', { check_user_id: user.id });
+      
+      if (!tenantId) {
+        setPermissionError('Você não está vinculado a nenhum cliente. Entre em contato com o suporte.');
         return false;
       }
 
