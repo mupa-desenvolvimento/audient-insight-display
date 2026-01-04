@@ -110,21 +110,38 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     if (!country) {
-      const { data: newCountry, error: countryError } = await supabase
+      // Use upsert to handle concurrent imports and existing records
+      const { data: upsertedCountry, error: countryError } = await supabase
         .from('countries')
-        .insert({ code: 'BR', name: 'Brasil', tenant_id: tenantId })
+        .upsert(
+          { code: 'BR', name: 'Brasil', tenant_id: tenantId },
+          { onConflict: 'code,tenant_id', ignoreDuplicates: false }
+        )
         .select('id')
         .single()
       
       if (countryError) {
-        console.error('Error creating country:', countryError)
-        await updateImportLogError(supabase, import_log_id, 'Erro ao criar país Brasil')
-        return new Response(
-          JSON.stringify({ error: 'Erro ao criar país Brasil' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+        // Try to fetch again in case of race condition
+        const { data: existingCountry } = await supabase
+          .from('countries')
+          .select('id')
+          .eq('code', 'BR')
+          .eq('tenant_id', tenantId)
+          .maybeSingle()
+        
+        if (existingCountry) {
+          country = existingCountry
+        } else {
+          console.error('Error creating country:', countryError)
+          await updateImportLogError(supabase, import_log_id, 'Erro ao criar país Brasil')
+          return new Response(
+            JSON.stringify({ error: 'Erro ao criar país Brasil' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+      } else {
+        country = upsertedCountry
       }
-      country = newCountry
     }
 
     // Cache for created entities
