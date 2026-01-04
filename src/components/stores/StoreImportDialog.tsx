@@ -1,17 +1,18 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Upload, FileSpreadsheet, CheckCircle2, XCircle, AlertCircle, Loader2, Download } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Upload, FileSpreadsheet, CheckCircle2, XCircle, AlertCircle, Loader2, Download, ShieldAlert, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useStores } from '@/hooks/useStores';
 
 interface StoreImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onImportComplete?: () => void;
 }
 
 interface ParsedRow {
@@ -28,23 +29,85 @@ interface ParsedRow {
   error?: string;
 }
 
-type ImportStatus = 'idle' | 'parsing' | 'preview' | 'importing' | 'completed' | 'error';
+interface ImportLog {
+  id: string;
+  status: string;
+  total_rows: number | null;
+  success_rows: number | null;
+  error_rows: number | null;
+  errors: string[] | null;
+}
+
+type ImportStatus = 'idle' | 'parsing' | 'validating' | 'preview' | 'importing' | 'completed' | 'error';
 
 const CSV_TEMPLATE = `codigo,nome,regional,cnpj,endereco,bairro,cep,cidade,estado
 LJ001,Loja Centro,João Silva,12.345.678/0001-90,Rua Principal 100,Centro,01234-567,São Paulo,SP
 LJ002,Loja Shopping,Maria Santos,98.765.432/0001-10,Av. Brasil 500,Jardins,04567-890,Rio de Janeiro,RJ`;
 
-export function StoreImportDialog({ open, onOpenChange }: StoreImportDialogProps) {
-  const { regions, states, cities, createState, createCity, createRegion, refetch } = useStores();
+export function StoreImportDialog({ open, onOpenChange, onImportComplete }: StoreImportDialogProps) {
   const [status, setStatus] = useState<ImportStatus>('idle');
   const [parsedData, setParsedData] = useState<ParsedRow[]>([]);
   const [progress, setProgress] = useState(0);
+  const [importLogId, setImportLogId] = useState<string | null>(null);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
   const [results, setResults] = useState({ success: 0, error: 0, errors: [] as string[] });
+
+  // Subscribe to import log updates for real-time progress
+  useEffect(() => {
+    if (!importLogId || status !== 'importing') return;
+
+    const channel = supabase
+      .channel(`import-${importLogId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'import_logs',
+          filter: `id=eq.${importLogId}`
+        },
+        (payload) => {
+          const log = payload.new as ImportLog;
+          
+          if (log.total_rows && log.success_rows !== null && log.error_rows !== null) {
+            const processedRows = (log.success_rows || 0) + (log.error_rows || 0);
+            const newProgress = Math.round((processedRows / log.total_rows) * 100);
+            setProgress(newProgress);
+            setResults({
+              success: log.success_rows || 0,
+              error: log.error_rows || 0,
+              errors: (log.errors as string[]) || []
+            });
+          }
+
+          if (log.status === 'completed') {
+            setStatus('completed');
+            setResults({
+              success: log.success_rows || 0,
+              error: log.error_rows || 0,
+              errors: (log.errors as string[]) || []
+            });
+            toast.success('Importação concluída!');
+            onImportComplete?.();
+          } else if (log.status === 'error') {
+            setStatus('error');
+            toast.error('Erro na importação');
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [importLogId, status, onImportComplete]);
 
   const resetState = () => {
     setStatus('idle');
     setParsedData([]);
     setProgress(0);
+    setImportLogId(null);
+    setPermissionError(null);
     setResults({ success: 0, error: 0, errors: [] });
   };
 
@@ -55,19 +118,55 @@ export function StoreImportDialog({ open, onOpenChange }: StoreImportDialogProps
     link.download = 'modelo_importacao_lojas.csv';
     link.click();
     URL.revokeObjectURL(link.href);
-    toast.success('Modelo CSV baixado com sucesso');
+    toast.success('Modelo CSV baixado');
   };
 
-  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const validatePermissions = async (): Promise<boolean> => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setPermissionError('Você precisa estar logado para importar lojas.');
+        return false;
+      }
+
+      const { data: isAdmin, error } = await supabase.rpc('is_admin', { _user_id: user.id });
+      
+      if (error || !isAdmin) {
+        setPermissionError('Apenas administradores podem importar lojas.');
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      setPermissionError('Erro ao verificar permissões. Tente novamente.');
+      return false;
+    }
+  };
+
+  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Reset file input
+    e.target.value = '';
 
     if (!file.name.endsWith('.csv')) {
       toast.error('Apenas arquivos CSV são permitidos');
       return;
     }
 
+    // Validate permissions first
+    setStatus('validating');
+    setPermissionError(null);
+    
+    const hasPermission = await validatePermissions();
+    if (!hasPermission) {
+      setStatus('idle');
+      return;
+    }
+
     setStatus('parsing');
+    
     const reader = new FileReader();
 
     reader.onload = (event) => {
@@ -81,7 +180,9 @@ export function StoreImportDialog({ open, onOpenChange }: StoreImportDialogProps
           return;
         }
 
-        const header = lines[0].toLowerCase().split(',').map(h => h.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+        const header = lines[0].toLowerCase().split(',').map(h => 
+          h.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        );
         const requiredColumns = ['codigo', 'nome', 'cidade', 'estado'];
         const missingColumns = requiredColumns.filter(col => !header.includes(col));
 
@@ -107,7 +208,6 @@ export function StoreImportDialog({ open, onOpenChange }: StoreImportDialogProps
         const seenCodes = new Set<string>();
 
         for (let i = 1; i < lines.length; i++) {
-          // Parse CSV properly handling quoted values with commas and spaces
           const values: string[] = [];
           let current = '';
           let inQuotes = false;
@@ -124,7 +224,7 @@ export function StoreImportDialog({ open, onOpenChange }: StoreImportDialogProps
               current += char;
             }
           }
-          values.push(current.trim()); // Push last value
+          values.push(current.trim());
           
           const row: ParsedRow = {
             codigo: columnIndexes.codigo >= 0 ? values[columnIndexes.codigo] || '' : '',
@@ -152,11 +252,14 @@ export function StoreImportDialog({ open, onOpenChange }: StoreImportDialogProps
           } else if (!row.estado) {
             row.valid = false;
             row.error = 'Estado obrigatório';
-          } else if (seenCodes.has(row.codigo)) {
+          } else if (row.estado.length > 50) {
+            row.valid = false;
+            row.error = 'Estado muito longo';
+          } else if (seenCodes.has(row.codigo.toLowerCase())) {
             row.valid = false;
             row.error = 'Código duplicado no arquivo';
           } else {
-            seenCodes.add(row.codigo);
+            seenCodes.add(row.codigo.toLowerCase());
           }
 
           parsed.push(row);
@@ -164,6 +267,11 @@ export function StoreImportDialog({ open, onOpenChange }: StoreImportDialogProps
 
         setParsedData(parsed);
         setStatus('preview');
+        
+        const invalidCount = parsed.filter(r => !r.valid).length;
+        if (invalidCount > 0) {
+          toast.warning(`${invalidCount} linha(s) com problemas detectados`);
+        }
       } catch (error) {
         console.error('Error parsing CSV:', error);
         toast.error('Erro ao processar arquivo');
@@ -175,154 +283,86 @@ export function StoreImportDialog({ open, onOpenChange }: StoreImportDialogProps
   }, []);
 
   const handleImport = async () => {
+    const validRows = parsedData.filter(r => r.valid);
+    
+    if (validRows.length === 0) {
+      toast.error('Nenhuma linha válida para importar');
+      return;
+    }
+
     setStatus('importing');
     setProgress(0);
 
-    const validRows = parsedData.filter(r => r.valid);
-    let successCount = 0;
-    let errorCount = 0;
-    const errors: string[] = [];
-
-    // Cache for created entities to avoid duplicates
-    const createdRegions: Record<string, { id: string }> = {};
-    const createdStates: Record<string, { id: string }> = {};
-    const createdCities: Record<string, { id: string }> = {};
-
-    // First, get existing country (Brazil) or create it
-    let { data: country } = await supabase
-      .from('countries')
-      .select('id')
-      .eq('code', 'BR')
-      .maybeSingle();
-
-    if (!country) {
-      const { data: newCountry, error } = await supabase
-        .from('countries')
-        .insert({ code: 'BR', name: 'Brasil' })
-        .select('id')
-        .single();
+    try {
+      // Create import log first
+      const { data: { user } } = await supabase.auth.getUser();
       
-      if (error) {
-        toast.error('Erro ao criar país Brasil');
-        setStatus('error');
-        return;
+      const { data: log, error: logError } = await supabase
+        .from('import_logs')
+        .insert({
+          user_id: user?.id,
+          type: 'stores',
+          status: 'pending',
+          total_rows: validRows.length,
+          success_rows: 0,
+          error_rows: 0,
+          errors: []
+        })
+        .select()
+        .single();
+
+      if (logError) {
+        throw new Error('Erro ao criar log de importação');
       }
-      country = newCountry;
-    }
 
-    for (let i = 0; i < validRows.length; i++) {
-      const row = validRows[i];
-      setProgress(Math.round(((i + 1) / validRows.length) * 100));
+      setImportLogId(log.id);
 
-      try {
-        // Normalize state code
-        const stateCode = row.estado.toUpperCase().trim().substring(0, 2);
-        const stateName = row.estado.length > 2 ? row.estado : stateCode;
-        
-        // Create region name based on state (e.g., "Região SP" or "Sudeste")
-        const regionName = `Região ${stateCode}`;
-        const regionKey = regionName.toLowerCase();
-
-        // Find or create region
-        let region = regions.find(r => r.name.toLowerCase() === regionKey) || createdRegions[regionKey];
-        
-        if (!region) {
-          try {
-            const newRegion = await createRegion({
-              country_id: country.id,
-              name: regionName,
-              code: stateCode,
-            });
-            region = newRegion;
-            createdRegions[regionKey] = newRegion;
-          } catch {
-            errors.push(`Linha ${i + 2}: Erro ao criar região "${regionName}"`);
-            errorCount++;
-            continue;
-          }
+      // Get session for auth header
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      // Call edge function
+      const response = await supabase.functions.invoke('import-stores', {
+        body: {
+          rows: validRows.map(r => ({
+            codigo: r.codigo,
+            nome: r.nome,
+            regional: r.regional,
+            cnpj: r.cnpj,
+            endereco: r.endereco,
+            bairro: r.bairro,
+            cep: r.cep,
+            cidade: r.cidade,
+            estado: r.estado,
+          })),
+          import_log_id: log.id
+        },
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`
         }
+      });
 
-        // Find or create state
-        const stateKey = `${stateCode}-${region.id}`;
-        let state = states.find(s => 
-          (s.code.toLowerCase() === stateCode.toLowerCase() || s.name.toLowerCase() === stateName.toLowerCase()) &&
-          s.region_id === region.id
-        ) || createdStates[stateKey];
-
-        if (!state) {
-          try {
-            const newState = await createState({
-              region_id: region.id,
-              name: stateName,
-              code: stateCode,
-            });
-            state = newState;
-            createdStates[stateKey] = newState;
-          } catch {
-            errors.push(`Linha ${i + 2}: Erro ao criar estado "${stateName}"`);
-            errorCount++;
-            continue;
-          }
-        }
-
-        // Find or create city
-        const cityKey = `${row.cidade.toLowerCase()}-${state.id}`;
-        let city = cities.find(c => 
-          c.name.toLowerCase() === row.cidade.toLowerCase() &&
-          c.state_id === state.id
-        ) || createdCities[cityKey];
-
-        if (!city) {
-          try {
-            const newCity = await createCity({
-              state_id: state.id,
-              name: row.cidade,
-            });
-            city = newCity;
-            createdCities[cityKey] = newCity;
-          } catch {
-            errors.push(`Linha ${i + 2}: Erro ao criar cidade "${row.cidade}"`);
-            errorCount++;
-            continue;
-          }
-        }
-
-        // Create store with all fields
-        const { error } = await supabase
-          .from('stores')
-          .insert({
-            code: row.codigo,
-            name: row.nome,
-            city_id: city.id,
-            address: row.endereco || null,
-            cnpj: row.cnpj || null,
-            bairro: row.bairro || null,
-            cep: row.cep || null,
-            regional_responsavel: row.regional || null,
-            is_active: true,
-            metadata: {},
-          });
-
-        if (error) {
-          if (error.code === '23505') {
-            errors.push(`Linha ${i + 2}: Código "${row.codigo}" já existe`);
-          } else {
-            errors.push(`Linha ${i + 2}: ${error.message}`);
-          }
-          errorCount++;
-        } else {
-          successCount++;
-        }
-      } catch (error) {
-        console.error('Import error:', error);
-        errors.push(`Linha ${i + 2}: Erro inesperado`);
-        errorCount++;
+      if (response.error) {
+        throw new Error(response.error.message || 'Erro na importação');
       }
-    }
 
-    setResults({ success: successCount, error: errorCount, errors });
-    setStatus('completed');
-    await refetch();
+      // The completion will be handled by realtime subscription
+      // But also handle the response if realtime doesn't catch it
+      if (response.data) {
+        setResults({
+          success: response.data.success_count || 0,
+          error: response.data.error_count || 0,
+          errors: response.data.errors || []
+        });
+        setProgress(100);
+        setStatus('completed');
+        onImportComplete?.();
+      }
+
+    } catch (error: any) {
+      console.error('Import error:', error);
+      setStatus('error');
+      toast.error(error.message || 'Erro ao importar lojas');
+    }
   };
 
   const validCount = parsedData.filter(r => r.valid).length;
@@ -337,6 +377,13 @@ export function StoreImportDialog({ open, onOpenChange }: StoreImportDialogProps
             Importe lojas em massa usando um arquivo CSV. O sistema criará automaticamente as regiões, estados e cidades.
           </DialogDescription>
         </DialogHeader>
+
+        {permissionError && (
+          <Alert variant="destructive">
+            <ShieldAlert className="h-4 w-4" />
+            <AlertDescription>{permissionError}</AlertDescription>
+          </Alert>
+        )}
 
         {status === 'idle' && (
           <div className="flex flex-col items-center justify-center py-8 border-2 border-dashed rounded-lg">
@@ -375,12 +422,19 @@ export function StoreImportDialog({ open, onOpenChange }: StoreImportDialogProps
             <div className="mt-6 p-4 bg-muted/50 rounded-lg text-sm max-w-lg">
               <p className="font-medium mb-2">Como funciona:</p>
               <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                <li>O sistema criará automaticamente as regiões baseado no estado</li>
-                <li>Estados e cidades serão criados se não existirem</li>
-                <li>O código de cada loja deve ser único</li>
-                <li>Use o modelo CSV como referência para o formato correto</li>
+                <li>O sistema valida suas permissões antes de iniciar</li>
+                <li>A importação é processada em lotes em segundo plano</li>
+                <li>Você pode acompanhar o progresso em tempo real</li>
+                <li>Erros são registrados sem interromper a importação</li>
               </ul>
             </div>
+          </div>
+        )}
+
+        {status === 'validating' && (
+          <div className="flex flex-col items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+            <p className="text-muted-foreground">Verificando permissões...</p>
           </div>
         )}
 
@@ -393,7 +447,7 @@ export function StoreImportDialog({ open, onOpenChange }: StoreImportDialogProps
 
         {status === 'preview' && (
           <div className="flex-1 overflow-hidden flex flex-col">
-            <div className="flex gap-4 mb-4">
+            <div className="flex gap-4 mb-4 items-center">
               <Badge variant="default" className="text-sm">
                 <CheckCircle2 className="h-3 w-3 mr-1" />
                 {validCount} válidos
@@ -404,18 +458,22 @@ export function StoreImportDialog({ open, onOpenChange }: StoreImportDialogProps
                   {invalidCount} inválidos
                 </Badge>
               )}
+              <span className="text-sm text-muted-foreground ml-auto">
+                Apenas linhas válidas serão importadas
+              </span>
             </div>
+            
             <div className="flex-1 overflow-auto border rounded-lg">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-12">Status</TableHead>
-                    <TableHead>Código</TableHead>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Regional</TableHead>
-                    <TableHead>CNPJ</TableHead>
-                    <TableHead>Cidade</TableHead>
-                    <TableHead>UF</TableHead>
+                    <TableHead className="w-12 sticky top-0 bg-background">Status</TableHead>
+                    <TableHead className="sticky top-0 bg-background">Código</TableHead>
+                    <TableHead className="sticky top-0 bg-background">Nome</TableHead>
+                    <TableHead className="sticky top-0 bg-background">Regional</TableHead>
+                    <TableHead className="sticky top-0 bg-background">Cidade</TableHead>
+                    <TableHead className="sticky top-0 bg-background">UF</TableHead>
+                    <TableHead className="sticky top-0 bg-background">Erro</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -425,17 +483,15 @@ export function StoreImportDialog({ open, onOpenChange }: StoreImportDialogProps
                         {row.valid ? (
                           <CheckCircle2 className="h-4 w-4 text-primary" />
                         ) : (
-                          <div className="flex items-center gap-1" title={row.error}>
-                            <XCircle className="h-4 w-4 text-destructive" />
-                          </div>
+                          <XCircle className="h-4 w-4 text-destructive" />
                         )}
                       </TableCell>
                       <TableCell className="font-mono">{row.codigo}</TableCell>
                       <TableCell>{row.nome}</TableCell>
-                      <TableCell>{row.regional}</TableCell>
-                      <TableCell className="font-mono text-xs">{row.cnpj}</TableCell>
+                      <TableCell>{row.regional || '-'}</TableCell>
                       <TableCell>{row.cidade}</TableCell>
                       <TableCell>{row.estado}</TableCell>
+                      <TableCell className="text-destructive text-sm">{row.error || '-'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -452,11 +508,22 @@ export function StoreImportDialog({ open, onOpenChange }: StoreImportDialogProps
         {status === 'importing' && (
           <div className="flex flex-col items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-            <p className="text-muted-foreground mb-4">Importando lojas...</p>
+            <p className="text-lg font-medium mb-2">Importando lojas...</p>
+            <p className="text-muted-foreground mb-4 text-sm">
+              Processando em lotes de 50 registros
+            </p>
             <div className="w-full max-w-md">
-              <Progress value={progress} className="h-2" />
-              <p className="text-center text-sm text-muted-foreground mt-2">{progress}%</p>
+              <Progress value={progress} className="h-3" />
+              <div className="flex justify-between text-sm text-muted-foreground mt-2">
+                <span>{progress}% concluído</span>
+                <span>
+                  {results.success} importados | {results.error} erros
+                </span>
+              </div>
             </div>
+            <p className="text-sm text-muted-foreground mt-6">
+              Você pode continuar navegando. A importação continua em segundo plano.
+            </p>
           </div>
         )}
 
@@ -465,50 +532,66 @@ export function StoreImportDialog({ open, onOpenChange }: StoreImportDialogProps
             <CheckCircle2 className="h-12 w-12 text-primary mb-4" />
             <h3 className="text-xl font-semibold mb-2">Importação Concluída</h3>
             <div className="flex gap-4 mb-4">
-              <Badge variant="default">
+              <Badge variant="default" className="text-sm">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
                 {results.success} importados
               </Badge>
               {results.error > 0 && (
-                <Badge variant="destructive">
+                <Badge variant="destructive" className="text-sm">
+                  <XCircle className="h-3 w-3 mr-1" />
                   {results.error} erros
                 </Badge>
               )}
             </div>
+            
             {results.errors.length > 0 && (
-              <div className="w-full max-h-48 overflow-auto border rounded-lg p-4 bg-destructive/5">
-                {results.errors.slice(0, 20).map((err, i) => (
-                  <div key={i} className="flex items-start gap-2 text-sm text-destructive mb-1">
-                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                    {err}
-                  </div>
-                ))}
-                {results.errors.length > 20 && (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    ...e mais {results.errors.length - 20} erros
-                  </p>
-                )}
+              <div className="w-full max-w-lg mt-4">
+                <p className="text-sm font-medium mb-2 text-destructive">Erros encontrados:</p>
+                <div className="max-h-40 overflow-auto bg-muted/50 rounded-lg p-3 text-sm">
+                  {results.errors.slice(0, 20).map((error, i) => (
+                    <p key={i} className="text-muted-foreground">{error}</p>
+                  ))}
+                  {results.errors.length > 20 && (
+                    <p className="text-muted-foreground mt-2">
+                      ... e mais {results.errors.length - 20} erros
+                    </p>
+                  )}
+                </div>
               </div>
             )}
           </div>
         )}
 
-        <DialogFooter>
-          {status === 'idle' && (
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
+        {status === 'error' && (
+          <div className="flex flex-col items-center justify-center py-8">
+            <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+            <h3 className="text-xl font-semibold mb-2">Erro na Importação</h3>
+            <p className="text-muted-foreground mb-4">
+              Ocorreu um erro durante a importação. Tente novamente.
+            </p>
+            <Button variant="outline" onClick={resetState}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Tentar Novamente
             </Button>
-          )}
+          </div>
+        )}
+
+        <DialogFooter>
           {status === 'preview' && (
             <>
-              <Button variant="outline" onClick={() => { resetState(); }}>
+              <Button variant="outline" onClick={resetState}>
                 Cancelar
               </Button>
-              <Button onClick={handleImport} disabled={validCount === 0}>
+              <Button 
+                onClick={handleImport} 
+                disabled={validCount === 0}
+              >
+                <Upload className="mr-2 h-4 w-4" />
                 Importar {validCount} lojas
               </Button>
             </>
           )}
-          {status === 'completed' && (
+          {(status === 'completed' || status === 'error') && (
             <Button onClick={() => { resetState(); onOpenChange(false); }}>
               Fechar
             </Button>
