@@ -125,7 +125,7 @@ const StoreForm = ({ formData, setFormData, cities }: StoreFormProps) => (
 );
 
 export default function Stores() {
-  const { stores, cities, isLoading, updateStore, deleteStore } = useStores();
+  const { stores, cities, isLoading, updateStore, deleteStore, refetch } = useStores();
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -446,7 +446,11 @@ export default function Stores() {
       </Dialog>
 
       {/* Import Dialog */}
-      <StoreImportDialog open={isImportOpen} onOpenChange={setIsImportOpen} />
+      <StoreImportDialog 
+        open={isImportOpen} 
+        onOpenChange={setIsImportOpen} 
+        onImportComplete={refetch}
+      />
     </div>
   );
 }

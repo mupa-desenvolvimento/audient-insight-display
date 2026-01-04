@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.device-detection]
 verify_jwt = false
+
+[functions.import-stores]
+verify_jwt = false
