@@ -23,6 +23,73 @@ const CHANNEL_TYPES = [
   { value: "custom", label: "Personalizado" },
 ];
 
+interface ChannelFormProps {
+  formData: ChannelInsert;
+  setFormData: React.Dispatch<React.SetStateAction<ChannelInsert>>;
+  onSubmit: () => void;
+  submitLabel: string;
+}
+
+const ChannelForm = ({ formData, setFormData, onSubmit, submitLabel }: ChannelFormProps) => (
+  <div className="space-y-4">
+    <div className="space-y-2">
+      <Label>Nome *</Label>
+      <Input
+        value={formData.name}
+        onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+        placeholder="Nome do canal"
+      />
+    </div>
+    <div className="space-y-2">
+      <Label>Descrição</Label>
+      <Textarea
+        value={formData.description || ""}
+        onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+        placeholder="Descrição do canal"
+      />
+    </div>
+    <div className="grid grid-cols-2 gap-4">
+      <div className="space-y-2">
+        <Label>Tipo</Label>
+        <Select value={formData.type} onValueChange={(v) => setFormData((prev) => ({ ...prev, type: v }))}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {CHANNEL_TYPES.map((type) => (
+              <SelectItem key={type.value} value={type.value}>
+                {type.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <Label>Prioridade (1-10)</Label>
+        <Input
+          type="number"
+          min={1}
+          max={10}
+          value={formData.priority}
+          onChange={(e) => setFormData((prev) => ({ ...prev, priority: parseInt(e.target.value) || 5 }))}
+        />
+      </div>
+    </div>
+    <div className="flex items-center space-x-2">
+      <Switch
+        checked={formData.is_active}
+        onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, is_active: checked }))}
+      />
+      <Label>Canal ativo</Label>
+    </div>
+    <DialogFooter>
+      <Button onClick={onSubmit} disabled={!formData.name}>
+        {submitLabel}
+      </Button>
+    </DialogFooter>
+  </div>
+);
+
 const ChannelsPage = () => {
   const { channels, isLoading, createChannel, updateChannel, deleteChannel } = useChannels();
   const { playlists } = usePlaylists();
@@ -111,66 +178,6 @@ const ChannelsPage = () => {
     return { status: "success", message: `${activePlaylists.length} playlist(s) ativa(s)` };
   };
 
-  const ChannelForm = ({ onSubmit, submitLabel }: { onSubmit: () => void; submitLabel: string }) => (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <Label>Nome *</Label>
-        <Input
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          placeholder="Nome do canal"
-        />
-      </div>
-      <div className="space-y-2">
-        <Label>Descrição</Label>
-        <Textarea
-          value={formData.description || ""}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          placeholder="Descrição do canal"
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Tipo</Label>
-          <Select value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v })}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {CHANNEL_TYPES.map((type) => (
-                <SelectItem key={type.value} value={type.value}>
-                  {type.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Prioridade (1-10)</Label>
-          <Input
-            type="number"
-            min={1}
-            max={10}
-            value={formData.priority}
-            onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value) || 5 })}
-          />
-        </div>
-      </div>
-      <div className="flex items-center space-x-2">
-        <Switch
-          checked={formData.is_active}
-          onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-        />
-        <Label>Canal ativo</Label>
-      </div>
-      <DialogFooter>
-        <Button onClick={onSubmit} disabled={!formData.name}>
-          {submitLabel}
-        </Button>
-      </DialogFooter>
-    </div>
-  );
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -189,7 +196,7 @@ const ChannelsPage = () => {
             <DialogHeader>
               <DialogTitle>Criar Canal</DialogTitle>
             </DialogHeader>
-            <ChannelForm onSubmit={handleCreate} submitLabel="Criar" />
+            <ChannelForm formData={formData} setFormData={setFormData} onSubmit={handleCreate} submitLabel="Criar" />
           </DialogContent>
         </Dialog>
       </div>
@@ -287,7 +294,7 @@ const ChannelsPage = () => {
           <DialogHeader>
             <DialogTitle>Editar Canal</DialogTitle>
           </DialogHeader>
-          <ChannelForm onSubmit={handleUpdate} submitLabel="Salvar" />
+          <ChannelForm formData={formData} setFormData={setFormData} onSubmit={handleUpdate} submitLabel="Salvar" />
         </DialogContent>
       </Dialog>
 

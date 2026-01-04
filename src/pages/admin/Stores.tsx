@@ -9,13 +9,123 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Search, Upload, Store, MapPin, Edit, Trash2, Loader2, Download } from 'lucide-react';
-import { StoreWithHierarchy } from '@/types/database';
+import { StoreWithHierarchy, City, State } from '@/types/database';
 import { toast } from 'sonner';
 import { StoreImportDialog } from '@/components/stores/StoreImportDialog';
 import { supabase } from '@/integrations/supabase/client';
 
+interface StoreFormData {
+  code: string;
+  name: string;
+  city_id: string;
+  address: string;
+  cnpj: string;
+  bairro: string;
+  cep: string;
+  regional_responsavel: string;
+}
+
+interface CityWithState extends City {
+  state?: State;
+}
+
+interface StoreFormProps {
+  formData: StoreFormData;
+  setFormData: React.Dispatch<React.SetStateAction<StoreFormData>>;
+  cities: CityWithState[];
+}
+
+const StoreForm = ({ formData, setFormData, cities }: StoreFormProps) => (
+  <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
+    <div className="grid grid-cols-2 gap-4">
+      <div className="space-y-2">
+        <Label>Código *</Label>
+        <Input
+          placeholder="Ex: LJ001"
+          value={formData.code}
+          onChange={(e) => setFormData((prev) => ({ ...prev, code: e.target.value }))}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>Unidade (Nome) *</Label>
+        <Input
+          placeholder="Nome da loja"
+          value={formData.name}
+          onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+        />
+      </div>
+    </div>
+
+    <div className="grid grid-cols-2 gap-4">
+      <div className="space-y-2">
+        <Label>Regional (Responsável)</Label>
+        <Input
+          placeholder="Nome do responsável"
+          value={formData.regional_responsavel}
+          onChange={(e) => setFormData((prev) => ({ ...prev, regional_responsavel: e.target.value }))}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>CNPJ</Label>
+        <Input
+          placeholder="00.000.000/0000-00"
+          value={formData.cnpj}
+          onChange={(e) => setFormData((prev) => ({ ...prev, cnpj: e.target.value }))}
+        />
+      </div>
+    </div>
+
+    <div className="space-y-2">
+      <Label>Endereço</Label>
+      <Input
+        placeholder="Endereço completo"
+        value={formData.address}
+        onChange={(e) => setFormData((prev) => ({ ...prev, address: e.target.value }))}
+      />
+    </div>
+
+    <div className="grid grid-cols-2 gap-4">
+      <div className="space-y-2">
+        <Label>Bairro</Label>
+        <Input
+          placeholder="Bairro"
+          value={formData.bairro}
+          onChange={(e) => setFormData((prev) => ({ ...prev, bairro: e.target.value }))}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>CEP</Label>
+        <Input
+          placeholder="00000-000"
+          value={formData.cep}
+          onChange={(e) => setFormData((prev) => ({ ...prev, cep: e.target.value }))}
+        />
+      </div>
+    </div>
+
+    <div className="space-y-2">
+      <Label>Cidade *</Label>
+      <Select
+        value={formData.city_id}
+        onValueChange={(value) => setFormData((prev) => ({ ...prev, city_id: value }))}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Selecione a cidade" />
+        </SelectTrigger>
+        <SelectContent>
+          {cities.map((city) => (
+            <SelectItem key={city.id} value={city.id}>
+              {city.name} - {city.state?.code}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  </div>
+);
+
 export default function Stores() {
-  const { stores, cities, isLoading, createStore, updateStore, deleteStore } = useStores();
+  const { stores, cities, isLoading, updateStore, deleteStore } = useStores();
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -23,7 +133,7 @@ export default function Stores() {
   const [selectedStore, setSelectedStore] = useState<StoreWithHierarchy | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<StoreFormData>({
     code: '',
     name: '',
     city_id: '',
@@ -187,95 +297,6 @@ export default function Stores() {
     );
   }
 
-  const StoreForm = ({ isEdit = false }: { isEdit?: boolean }) => (
-    <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Código *</Label>
-          <Input
-            placeholder="Ex: LJ001"
-            value={formData.code}
-            onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Unidade (Nome) *</Label>
-          <Input
-            placeholder="Nome da loja"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Regional (Responsável)</Label>
-          <Input
-            placeholder="Nome do responsável"
-            value={formData.regional_responsavel}
-            onChange={(e) => setFormData({ ...formData, regional_responsavel: e.target.value })}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>CNPJ</Label>
-          <Input
-            placeholder="00.000.000/0000-00"
-            value={formData.cnpj}
-            onChange={(e) => setFormData({ ...formData, cnpj: e.target.value })}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Endereço</Label>
-        <Input
-          placeholder="Endereço completo"
-          value={formData.address}
-          onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Bairro</Label>
-          <Input
-            placeholder="Bairro"
-            value={formData.bairro}
-            onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>CEP</Label>
-          <Input
-            placeholder="00000-000"
-            value={formData.cep}
-            onChange={(e) => setFormData({ ...formData, cep: e.target.value })}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Cidade *</Label>
-        <Select
-          value={formData.city_id}
-          onValueChange={(value) => setFormData({ ...formData, city_id: value })}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Selecione a cidade" />
-          </SelectTrigger>
-          <SelectContent>
-            {cities.map((city) => (
-              <SelectItem key={city.id} value={city.id}>
-                {city.name} - {city.state?.code}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-    </div>
-  );
-
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -304,7 +325,7 @@ export default function Stores() {
                 <DialogTitle>Nova Loja</DialogTitle>
                 <DialogDescription>Adicione uma nova loja ao sistema</DialogDescription>
               </DialogHeader>
-              <StoreForm />
+              <StoreForm formData={formData} setFormData={setFormData} cities={cities} />
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
                   Cancelar
@@ -412,7 +433,7 @@ export default function Stores() {
             <DialogTitle>Editar Loja</DialogTitle>
             <DialogDescription>Atualize as informações da loja</DialogDescription>
           </DialogHeader>
-          <StoreForm isEdit />
+          <StoreForm formData={formData} setFormData={setFormData} cities={cities} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>
               Cancelar
