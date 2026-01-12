@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { UserPlus, Users, Trash2, Calendar, Eye, User, Clock } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { UserPlus, Users, Trash2, Calendar, Eye, Camera, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { usePeopleRegistry } from '@/hooks/usePeopleRegistry';
-import * as faceapi from 'face-api.js';
+import { FaceCapture, FaceCaptureData } from '@/components/FaceCapture';
 
 interface PeopleRegistrationProps {
   videoRef: React.RefObject<HTMLVideoElement>;
@@ -17,74 +18,37 @@ interface PeopleRegistrationProps {
 
 export const PeopleRegistration = ({ videoRef, isStreaming }: PeopleRegistrationProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isAddCapturesDialogOpen, setIsAddCapturesDialogOpen] = useState(false);
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ name: '', cpf: '' });
-  const [faceInfo, setFaceInfo] = useState<{ age: number; gender: string; confidence: number } | null>(null);
-  const [isDetecting, setIsDetecting] = useState(false);
+  const [capturedFaces, setCapturedFaces] = useState<FaceCaptureData[]>([]);
   const { toast } = useToast();
   
   const { 
     registeredPeople, 
     isLoading, 
-    registerPerson, 
+    registerPersonWithCaptures, 
+    addCapturesToPerson,
     removePerson, 
     clearRegistry,
     totalRegistered 
   } = usePeopleRegistry();
 
-  // Detectar face quando o diálogo estiver aberto
-  useEffect(() => {
-    if (!isDialogOpen || !isStreaming || !videoRef.current) {
-      setFaceInfo(null);
-      return;
-    }
-
-    const detectFace = async () => {
-      if (!videoRef.current || isDetecting) return;
-      
-      setIsDetecting(true);
-      try {
-        const detections = await faceapi
-          .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
-          .withAgeAndGender();
-
-        if (detections) {
-          const { age, gender, genderProbability } = detections;
-          // Usando a propriedade gender que retorna 'male' ou 'female'
-          const detectedGender = gender === 'female' ? 'feminino' : 
-                                gender === 'male' ? 'masculino' : 'indefinido';
-          
-          console.log('Registration gender detection:', { gender, genderProbability, detectedGender });
-          
-          setFaceInfo({
-            age: Math.round(age),
-            gender: detectedGender,
-            confidence: Math.max(genderProbability, 1 - genderProbability)
-          });
-        } else {
-          setFaceInfo(null);
-        }
-      } catch (error) {
-        console.error('Erro na detecção facial:', error);
-      } finally {
-        setIsDetecting(false);
-      }
-    };
-
-    const interval = setInterval(detectFace, 1000); // Detectar a cada segundo
-    return () => clearInterval(interval);
-  }, [isDialogOpen, isStreaming, isDetecting]);
+  const handleCapture = (captures: FaceCaptureData[]) => {
+    setCapturedFaces(captures);
+  };
 
   const handleRegister = async () => {
-    if (!videoRef.current || !isStreaming) {
+    if (capturedFaces.length === 0) {
       toast({
         title: "Erro",
-        description: "Câmera deve estar ativa para cadastrar",
+        description: "Capture pelo menos uma foto da face",
         variant: "destructive",
       });
       return;
     }
 
-    const result = await registerPerson(formData.name, formData.cpf, videoRef.current);
+    const result = await registerPersonWithCaptures(formData.name, formData.cpf, capturedFaces);
     
     toast({
       title: result.success ? "Sucesso" : "Erro",
@@ -94,7 +58,25 @@ export const PeopleRegistration = ({ videoRef, isStreaming }: PeopleRegistration
 
     if (result.success) {
       setFormData({ name: '', cpf: '' });
+      setCapturedFaces([]);
       setIsDialogOpen(false);
+    }
+  };
+
+  const handleAddCaptures = async (captures: FaceCaptureData[]) => {
+    if (!selectedPersonId) return;
+
+    const result = await addCapturesToPerson(selectedPersonId, captures);
+    
+    toast({
+      title: result.success ? "Sucesso" : "Erro",
+      description: result.message,
+      variant: result.success ? "default" : "destructive",
+    });
+
+    if (result.success) {
+      setIsAddCapturesDialogOpen(false);
+      setSelectedPersonId(null);
     }
   };
 
@@ -107,15 +89,24 @@ export const PeopleRegistration = ({ videoRef, isStreaming }: PeopleRegistration
   };
 
   const formatCPF = (cpf: string) => {
+    if (cpf.length !== 11) return cpf;
     return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
   };
 
   const handleCPFChange = (value: string) => {
-    // Remove tudo que não é número
     const numbers = value.replace(/\D/g, '');
-    // Limita a 11 dígitos
     const limited = numbers.slice(0, 11);
     setFormData({ ...formData, cpf: limited });
+  };
+
+  const openAddCapturesDialog = (personId: string) => {
+    setSelectedPersonId(personId);
+    setIsAddCapturesDialogOpen(true);
+  };
+
+  const resetDialog = () => {
+    setFormData({ name: '', cpf: '' });
+    setCapturedFaces([]);
   };
 
   return (
@@ -129,89 +120,76 @@ export const PeopleRegistration = ({ videoRef, isStreaming }: PeopleRegistration
           </p>
         </div>
         <div className="flex space-x-2">
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) resetDialog();
+          }}>
             <DialogTrigger asChild>
               <Button className="gradient-primary text-white" disabled={!isStreaming}>
                 <UserPlus className="w-4 h-4 mr-2" />
                 Cadastrar Pessoa
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Cadastrar Nova Pessoa</DialogTitle>
+                <DialogTitle className="flex items-center gap-2">
+                  <Camera className="w-5 h-5" />
+                  Cadastrar Nova Pessoa
+                </DialogTitle>
               </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Nome Completo</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Digite o nome completo"
-                  />
+              <div className="space-y-6">
+                {/* Dados pessoais */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="name">Nome Completo</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="Digite o nome completo"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="cpf">CPF</Label>
+                    <Input
+                      id="cpf"
+                      value={formData.cpf.length === 11 ? formatCPF(formData.cpf) : formData.cpf}
+                      onChange={(e) => handleCPFChange(e.target.value)}
+                      placeholder="000.000.000-00"
+                      maxLength={14}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <Label htmlFor="cpf">CPF</Label>
-                  <Input
-                    id="cpf"
-                    value={formatCPF(formData.cpf)}
-                    onChange={(e) => handleCPFChange(e.target.value)}
-                    placeholder="000.000.000-00"
-                    maxLength={14}
+
+                {/* Captura de face melhorada */}
+                <div className="border rounded-lg p-4 bg-muted/30">
+                  <h4 className="font-medium mb-4 flex items-center gap-2">
+                    <Camera className="w-4 h-4" />
+                    Captura Facial (3 fotos para maior precisão)
+                  </h4>
+                  <FaceCapture
+                    videoRef={videoRef}
+                    isStreaming={isStreaming}
+                    onCapture={handleCapture}
+                    requiredCaptures={3}
                   />
                 </div>
 
-                {/* Informações da face detectada */}
-                {faceInfo ? (
-                  <div className="bg-green-50 dark:bg-green-950 p-4 rounded-lg border border-green-200 dark:border-green-800">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <User className="w-4 h-4 text-green-600" />
-                      <span className="text-sm font-medium text-green-800 dark:text-green-200">Face detectada</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="text-center">
-                        <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
-                          {faceInfo.gender}
-                        </Badge>
-                        <p className="text-xs text-muted-foreground mt-1">Gênero</p>
-                      </div>
-                      <div className="text-center">
-                        <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-200">
-                          {faceInfo.age} anos
-                        </Badge>
-                        <p className="text-xs text-muted-foreground mt-1">Idade aprox.</p>
-                      </div>
-                    </div>
-                    <p className="text-xs text-green-600 dark:text-green-400 mt-2 text-center">
-                      Confiança: {(faceInfo.confidence * 100).toFixed(1)}%
-                    </p>
-                  </div>
-                ) : (
-                  <div className="bg-orange-50 dark:bg-orange-950 p-4 rounded-lg border border-orange-200 dark:border-orange-800">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Clock className="w-4 h-4 text-orange-600" />
-                      <span className="text-sm font-medium text-orange-800 dark:text-orange-200">
-                        {isDetecting ? 'Detectando face...' : 'Nenhuma face detectada'}
-                      </span>
-                    </div>
-                    <p className="text-xs text-orange-600 dark:text-orange-400">
-                      📸 Posicione-se de frente para a câmera para ver suas informações
-                    </p>
-                  </div>
-                )}
-
-                <div className="bg-muted p-3 rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    💡 As informações de idade e gênero são estimativas baseadas na análise facial
+                {/* Informação sobre as capturas */}
+                <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    💡 <strong>Dica:</strong> Para melhor reconhecimento, capture fotos com diferentes ângulos sutis e expressões.
+                    O sistema usará múltiplas capturas para criar um perfil mais preciso.
                   </p>
                 </div>
+
                 <div className="flex space-x-2">
                   <Button
                     onClick={handleRegister}
-                    disabled={isLoading || !formData.name.trim() || formData.cpf.length !== 11}
+                    disabled={isLoading || !formData.name.trim() || formData.cpf.length !== 11 || capturedFaces.length === 0}
                     className="flex-1"
                   >
-                    {isLoading ? "Processando..." : "Confirmar Cadastro"}
+                    {isLoading ? "Processando..." : `Confirmar Cadastro (${capturedFaces.length} capturas)`}
                   </Button>
                   <Button
                     variant="outline"
@@ -242,6 +220,26 @@ export const PeopleRegistration = ({ videoRef, isStreaming }: PeopleRegistration
         </div>
       </div>
 
+      {/* Dialog para adicionar capturas */}
+      <Dialog open={isAddCapturesDialogOpen} onOpenChange={setIsAddCapturesDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Adicionar Capturas</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Adicione mais fotos para melhorar a precisão do reconhecimento.
+            </p>
+            <FaceCapture
+              videoRef={videoRef}
+              isStreaming={isStreaming}
+              onCapture={handleAddCaptures}
+              requiredCaptures={2}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Lista de pessoas cadastradas */}
       <Card>
         <CardHeader>
@@ -262,36 +260,62 @@ export const PeopleRegistration = ({ videoRef, isStreaming }: PeopleRegistration
             <div className="space-y-3 max-h-96 overflow-y-auto">
               {registeredPeople.map((person) => (
                 <div key={person.id} className="flex items-center justify-between p-4 bg-muted rounded-lg">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-3 h-3 rounded-full bg-primary"></div>
-                      <div>
+                  <div className="flex items-center gap-4">
+                    <Avatar className="w-14 h-14 border-2 border-primary">
+                      {person.photoUrl ? (
+                        <AvatarImage src={person.photoUrl} alt={person.name} />
+                      ) : null}
+                      <AvatarFallback className="bg-primary/10 text-primary text-lg">
+                        {person.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
                         <h4 className="font-medium">{person.name}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          CPF: {formatCPF(person.cpf)}
-                        </p>
-                        <div className="flex items-center space-x-4 mt-2">
-                          <div className="flex items-center space-x-1 text-xs text-muted-foreground">
-                            <Calendar className="w-3 h-3" />
-                            <span>Cadastrado: {person.registeredAt.toLocaleDateString()}</span>
-                          </div>
-                          {person.lastSeen && (
-                            <div className="flex items-center space-x-1 text-xs text-muted-foreground">
-                              <Eye className="w-3 h-3" />
-                              <span>Visto: {person.lastSeen.toLocaleString()}</span>
-                            </div>
-                          )}
+                        <Badge variant="secondary" className="text-xs">
+                          {person.faceDescriptors.length} captura{person.faceDescriptors.length !== 1 ? 's' : ''}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        CPF: {formatCPF(person.cpf)}
+                      </p>
+                      <div className="flex items-center gap-4 mt-1">
+                        {person.age && person.gender && (
+                          <span className="text-xs text-muted-foreground">
+                            {person.gender}, ~{person.age} anos
+                          </span>
+                        )}
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Calendar className="w-3 h-3" />
+                          <span>{person.registeredAt.toLocaleDateString()}</span>
                         </div>
+                        {person.lastSeen && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Eye className="w-3 h-3" />
+                            <span>{person.lastSeen.toLocaleString()}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => handleRemove(person.id, person.name)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openAddCapturesDialog(person.id)}
+                      disabled={!isStreaming}
+                      title="Adicionar mais capturas"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleRemove(person.id, person.name)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

@@ -328,7 +328,8 @@ export const useFaceDetection = (
         if (detection.descriptor) {
           for (const person of registeredPeople) {
             try {
-              const distance = faceapi.euclideanDistance(detection.descriptor, person.faceDescriptor);
+              // Use averageDescriptor for comparison with multiple captures
+              const distance = faceapi.euclideanDistance(detection.descriptor, person.averageDescriptor);
               if (distance < 0.55) { // Stricter threshold
                 identifiedPerson = {
                   id: person.id,
