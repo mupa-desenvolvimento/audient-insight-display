@@ -185,22 +185,34 @@ Deno.serve(async (req) => {
       thumbnailGenerated = false
     }
 
-    // Step 5: Verify public access
-    console.log('Step 5: Verifying public access...')
-    try {
-      // Construct public URL
-      const publicBaseUrl = Deno.env.get('CLOUDFLARE_R2_PUBLIC_URL') || `https://pub-${accountId}.r2.dev`
-      const publicFileUrl = `${publicBaseUrl}/${fileKey}`
-      
-      // Try to access the file (HEAD request)
-      const accessCheck = await fetch(publicFileUrl, { method: 'HEAD' })
-      if (accessCheck.ok) {
-        console.log('Public access verified:', publicFileUrl)
-      } else {
-        console.warn('Public access check failed, using signed URL:', accessCheck.status)
+    // Step 5: Build public URL and verify access
+    console.log('Step 5: Building public URL...')
+    
+    // Get public URL from environment or construct default
+    const publicBaseUrl = Deno.env.get('CLOUDFLARE_R2_PUBLIC_URL')
+    let publicFileUrl = uploadUrl // fallback to signed URL
+    let publicThumbnailUrl = thumbnailUrl
+    
+    if (publicBaseUrl) {
+      publicFileUrl = `${publicBaseUrl}/${fileKey}`
+      if (thumbnailUrl) {
+        publicThumbnailUrl = `${publicBaseUrl}/${thumbnailKey}`
       }
-    } catch (accessError) {
-      console.warn('Access verification skipped:', accessError)
+      console.log('Using public URL:', publicFileUrl)
+      
+      // Try to verify access
+      try {
+        const accessCheck = await fetch(publicFileUrl, { method: 'HEAD' })
+        if (accessCheck.ok) {
+          console.log('Public access verified')
+        } else {
+          console.warn('Public access check failed:', accessCheck.status)
+        }
+      } catch (accessError) {
+        console.warn('Access verification skipped:', accessError)
+      }
+    } else {
+      console.warn('CLOUDFLARE_R2_PUBLIC_URL not set, using signed URL')
     }
 
     // Step 6: Save to database
@@ -216,12 +228,12 @@ Deno.serve(async (req) => {
       .insert({
         name: fileName,
         type: mediaType,
-        file_url: uploadUrl,
+        file_url: publicFileUrl,
         file_size: file.size,
         duration: duration || (isImage ? 10 : null), // Default 10s for images
         resolution: resolution,
         status: thumbnailGenerated ? 'active' : 'processing',
-        thumbnail_url: thumbnailUrl,
+        thumbnail_url: publicThumbnailUrl,
         metadata: {
           r2_key: fileKey,
           thumbnail_key: thumbnailKey,
@@ -229,7 +241,8 @@ Deno.serve(async (req) => {
           uploaded_by: user.email,
           thumbnail_generated: thumbnailGenerated,
           validated_at: new Date().toISOString(),
-          thumbnail_size: { width: THUMBNAIL_WIDTH, height: THUMBNAIL_HEIGHT }
+          thumbnail_size: { width: THUMBNAIL_WIDTH, height: THUMBNAIL_HEIGHT },
+          original_signed_url: uploadUrl
         }
       })
       .select()
@@ -250,8 +263,8 @@ Deno.serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         mediaItem,
-        fileUrl: uploadUrl,
-        thumbnailUrl: thumbnailUrl,
+        fileUrl: publicFileUrl,
+        thumbnailUrl: publicThumbnailUrl,
         r2Key: fileKey,
         thumbnailGenerated,
         validation: {

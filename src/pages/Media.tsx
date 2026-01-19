@@ -4,11 +4,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Image, Video, Clock, Grid2x2, Loader2, Play, Eye } from "lucide-react";
-import { useMediaItems } from "@/hooks/useMediaItems";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
+import { Plus, Image, Video, Clock, Grid2x2, Loader2, Play, Eye, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { useMediaItems, MediaItem } from "@/hooks/useMediaItems";
 import { usePlaylists } from "@/hooks/usePlaylists";
 import { MediaUploadDialog } from "@/components/media/MediaUploadDialog";
 import { MediaLightbox } from "@/components/media/MediaLightbox";
+import { MediaEditDialog } from "@/components/media/MediaEditDialog";
+import { MediaDeleteDialog } from "@/components/media/MediaDeleteDialog";
 import { useQueryClient } from "@tanstack/react-query";
 
 const Media = () => {
@@ -16,8 +25,12 @@ const Media = () => {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
+  
   const queryClient = useQueryClient();
-  const { mediaItems, isLoading: loadingMedia } = useMediaItems();
+  const { mediaItems, isLoading: loadingMedia, updateMediaItem, deleteMediaItem } = useMediaItems();
   const { playlists, isLoading: loadingPlaylists } = usePlaylists();
 
   const filteredMedia = mediaItems.filter(media =>
@@ -29,6 +42,7 @@ const Media = () => {
       case "active": return "default";
       case "draft": return "secondary";
       case "scheduled": return "outline";
+      case "processing": return "outline";
       default: return "destructive";
     }
   };
@@ -39,6 +53,7 @@ const Media = () => {
       case "draft": return "Rascunho";
       case "scheduled": return "Agendado";
       case "inactive": return "Inativo";
+      case "processing": return "Processando";
       default: return status;
     }
   };
@@ -47,6 +62,26 @@ const Media = () => {
     if (!bytes) return "-";
     const mb = bytes / (1024 * 1024);
     return `${mb.toFixed(1)} MB`;
+  };
+
+  const handleEdit = (media: MediaItem, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setSelectedMedia(media);
+    setEditDialogOpen(true);
+  };
+
+  const handleDelete = (media: MediaItem, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setSelectedMedia(media);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleSaveMedia = async (id: string, updates: { name: string; status: string; duration?: number }) => {
+    await updateMediaItem.mutateAsync({ id, ...updates });
+  };
+
+  const handleConfirmDelete = async (id: string) => {
+    await deleteMediaItem.mutateAsync(id);
   };
 
   const isLoading = loadingMedia || loadingPlaylists;
@@ -83,6 +118,22 @@ const Media = () => {
         onOpenChange={setLightboxOpen}
         mediaItems={filteredMedia}
         initialIndex={lightboxIndex}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+      />
+
+      <MediaEditDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        media={selectedMedia}
+        onSave={handleSaveMedia}
+      />
+
+      <MediaDeleteDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        media={selectedMedia}
+        onConfirm={handleConfirmDelete}
       />
 
       <Tabs defaultValue="media" className="space-y-6">
@@ -141,7 +192,6 @@ const Media = () => {
                               muted
                               preload="metadata"
                               onLoadedData={(e) => {
-                                // Seek to 1 second for preview
                                 const video = e.currentTarget;
                                 if (video.duration > 1) {
                                   video.currentTime = 1;
@@ -160,13 +210,8 @@ const Media = () => {
                                   video.currentTime = 0;
                                 }
                               }}
-                              onError={(e) => {
-                                console.error('Video load error:', media.name);
-                                // Replace with fallback
-                                const parent = e.currentTarget.parentElement;
-                                if (parent) {
-                                  e.currentTarget.style.display = 'none';
-                                }
+                              onError={() => {
+                                console.warn('Video preview error:', media.name);
                               }}
                             />
                             <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition-colors pointer-events-none">
@@ -182,16 +227,8 @@ const Media = () => {
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             loading="lazy"
                             onError={(e) => {
-                              console.error('Image load error:', media.name);
-                              // Replace with fallback icon
+                              console.warn('Image preview error:', media.name);
                               e.currentTarget.style.display = 'none';
-                              const parent = e.currentTarget.parentElement;
-                              if (parent) {
-                                const fallback = document.createElement('div');
-                                fallback.className = 'w-full h-full flex items-center justify-center bg-muted';
-                                fallback.innerHTML = '<svg class="w-10 h-10 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>';
-                                parent.appendChild(fallback);
-                              }
                             }}
                           />
                         )
@@ -232,9 +269,9 @@ const Media = () => {
                         </div>
                       </div>
                       
-                      {/* Hover overlay with preview button */}
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
-                        <div className="flex items-center gap-2 pointer-events-auto">
+                      {/* Hover overlay with action buttons */}
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                        <div className="flex items-center gap-2">
                           <Button
                             size="sm"
                             variant="secondary"
@@ -248,6 +285,31 @@ const Media = () => {
                             Ver
                           </Button>
                         </div>
+                      </div>
+
+                      {/* Actions menu */}
+                      <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                            <Button variant="secondary" size="icon" className="h-7 w-7">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start">
+                            <DropdownMenuItem onClick={(e) => handleEdit(media, e as unknown as React.MouseEvent)}>
+                              <Pencil className="w-4 h-4 mr-2" />
+                              Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              onClick={(e) => handleDelete(media, e as unknown as React.MouseEvent)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Excluir
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   
