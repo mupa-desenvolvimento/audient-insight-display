@@ -8,6 +8,7 @@ export interface MediaItem {
   name: string;
   type: string;
   file_url: string | null;
+  thumbnail_url: string | null;
   file_size: number | null;
   duration: number | null;
   resolution: string | null;
@@ -21,6 +22,7 @@ export interface MediaItemInsert {
   name: string;
   type?: string;
   file_url?: string | null;
+  thumbnail_url?: string | null;
   file_size?: number | null;
   duration?: number | null;
   resolution?: string | null;

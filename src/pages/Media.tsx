@@ -105,114 +105,149 @@ const Media = () => {
             </Card>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {filteredMedia.map((media) => (
-                <Card key={media.id} className="group hover:shadow-lg transition-all duration-300 overflow-hidden">
-                  {/* Thumbnail */}
-                  <div className="relative aspect-video bg-muted overflow-hidden">
-                    {media.file_url ? (
-                      media.type === "video" ? (
-                        <>
-                          <video
-                            src={media.file_url}
-                            className="w-full h-full object-cover"
-                            muted
-                            preload="metadata"
-                            onMouseEnter={(e) => {
-                              const video = e.currentTarget;
-                              video.currentTime = 0;
-                              video.play().catch(() => {});
-                            }}
-                            onMouseLeave={(e) => {
-                              const video = e.currentTarget;
-                              video.pause();
-                              video.currentTime = 0;
+              {filteredMedia.map((media) => {
+                // Use thumbnail_url field directly, fallback to file_url
+                const thumbnailUrl = media.thumbnail_url || media.file_url;
+                
+                return (
+                  <Card key={media.id} className="group hover:shadow-lg transition-all duration-300 overflow-hidden">
+                    {/* Thumbnail */}
+                    <div className="relative aspect-video bg-muted overflow-hidden">
+                      {thumbnailUrl ? (
+                        media.type === "video" ? (
+                          <>
+                            <video
+                              src={media.file_url || ''}
+                              className="w-full h-full object-cover"
+                              muted
+                              preload="metadata"
+                              onLoadedData={(e) => {
+                                // Seek to 1 second for preview
+                                const video = e.currentTarget;
+                                if (video.duration > 1) {
+                                  video.currentTime = 1;
+                                }
+                              }}
+                              onMouseEnter={(e) => {
+                                const video = e.currentTarget;
+                                video.play().catch(() => {});
+                              }}
+                              onMouseLeave={(e) => {
+                                const video = e.currentTarget;
+                                video.pause();
+                                if (video.duration > 1) {
+                                  video.currentTime = 1;
+                                } else {
+                                  video.currentTime = 0;
+                                }
+                              }}
+                              onError={(e) => {
+                                console.error('Video load error:', media.name);
+                                // Replace with fallback
+                                const parent = e.currentTarget.parentElement;
+                                if (parent) {
+                                  e.currentTarget.style.display = 'none';
+                                }
+                              }}
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition-colors pointer-events-none">
+                              <div className="w-10 h-10 rounded-full bg-black/60 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <Play className="w-5 h-5 text-white ml-0.5" />
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <img
+                            src={thumbnailUrl}
+                            alt={media.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            loading="lazy"
+                            onError={(e) => {
+                              console.error('Image load error:', media.name);
+                              // Replace with fallback icon
+                              e.currentTarget.style.display = 'none';
+                              const parent = e.currentTarget.parentElement;
+                              if (parent) {
+                                const fallback = document.createElement('div');
+                                fallback.className = 'w-full h-full flex items-center justify-center bg-muted';
+                                fallback.innerHTML = '<svg class="w-10 h-10 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>';
+                                parent.appendChild(fallback);
+                              }
                             }}
                           />
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition-colors pointer-events-none">
-                            <div className="w-10 h-10 rounded-full bg-black/60 flex items-center justify-center group-hover:scale-110 transition-transform">
-                              <Play className="w-5 h-5 text-white ml-0.5" />
-                            </div>
-                          </div>
-                        </>
+                        )
                       ) : (
-                        <img
-                          src={media.file_url}
-                          alt={media.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          loading="lazy"
-                        />
-                      )
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        {media.type === "video" ? (
-                          <Video className="w-10 h-10 text-muted-foreground" />
-                        ) : (
-                          <Image className="w-10 h-10 text-muted-foreground" />
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* Status badge overlay */}
-                    <div className="absolute top-2 right-2">
-                      <Badge variant={getStatusVariant(media.status)} className="text-xs">
-                        {getStatusLabel(media.status)}
-                      </Badge>
-                    </div>
-                    
-                    {/* Duration badge for videos */}
-                    {media.type === "video" && media.duration && (
-                      <div className="absolute bottom-2 right-2">
-                        <span className="px-1.5 py-0.5 bg-black/70 text-white text-xs rounded">
-                          {Math.floor(media.duration / 60)}:{String(media.duration % 60).padStart(2, '0')}
-                        </span>
-                      </div>
-                    )}
-                    
-                    {/* Type icon overlay */}
-                    <div className="absolute bottom-2 left-2">
-                      <div className="w-6 h-6 rounded bg-black/60 flex items-center justify-center">
-                        {media.type === "video" ? (
-                          <Video className="w-3.5 h-3.5 text-white" />
-                        ) : (
-                          <Image className="w-3.5 h-3.5 text-white" />
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Hover overlay with preview button */}
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                      {media.file_url && (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="h-8"
-                          onClick={() => window.open(media.file_url!, '_blank')}
-                        >
-                          <Eye className="w-4 h-4 mr-1" />
-                          Ver
-                        </Button>
+                        <div className="w-full h-full flex items-center justify-center">
+                          {media.type === "video" ? (
+                            <Video className="w-10 h-10 text-muted-foreground" />
+                          ) : (
+                            <Image className="w-10 h-10 text-muted-foreground" />
+                          )}
+                        </div>
                       )}
-                    </div>
-                  </div>
-                  
-                  {/* Info */}
-                  <CardContent className="p-3">
-                    <h3 className="font-medium text-sm truncate" title={media.name}>
-                      {media.name}
-                    </h3>
-                    <div className="flex items-center justify-between mt-1 text-xs text-muted-foreground">
-                      <span>{media.resolution || "-"}</span>
-                      <span>{formatFileSize(media.file_size)}</span>
-                    </div>
-                    {media.type === "image" && (
-                      <div className="flex items-center mt-1 text-xs text-muted-foreground">
-                        <Clock className="w-3 h-3 mr-1" />
-                        <span>{media.duration || 10}s</span>
+                      
+                      {/* Status badge overlay */}
+                      <div className="absolute top-2 right-2">
+                        <Badge variant={getStatusVariant(media.status)} className="text-xs">
+                          {getStatusLabel(media.status)}
+                        </Badge>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+                      
+                      {/* Duration badge for videos */}
+                      {media.type === "video" && media.duration && (
+                        <div className="absolute bottom-2 right-2">
+                          <span className="px-1.5 py-0.5 bg-black/70 text-white text-xs rounded">
+                            {Math.floor(media.duration / 60)}:{String(media.duration % 60).padStart(2, '0')}
+                          </span>
+                        </div>
+                      )}
+                      
+                      {/* Type icon overlay */}
+                      <div className="absolute bottom-2 left-2">
+                        <div className="w-6 h-6 rounded bg-black/60 flex items-center justify-center">
+                          {media.type === "video" ? (
+                            <Video className="w-3.5 h-3.5 text-white" />
+                          ) : (
+                            <Image className="w-3.5 h-3.5 text-white" />
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Hover overlay with preview button */}
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                        {media.file_url && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="h-8"
+                            onClick={() => window.open(media.file_url!, '_blank')}
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            Ver
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  
+                    {/* Info */}
+                    <CardContent className="p-3">
+                      <h3 className="font-medium text-sm truncate" title={media.name}>
+                        {media.name}
+                      </h3>
+                      <div className="flex items-center justify-between mt-1 text-xs text-muted-foreground">
+                        <span>{media.resolution || "-"}</span>
+                        <span>{formatFileSize(media.file_size)}</span>
+                      </div>
+                      {media.type === "image" && (
+                        <div className="flex items-center mt-1 text-xs text-muted-foreground">
+                          <Clock className="w-3 h-3 mr-1" />
+                          <span>{media.duration || 10}s</span>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </TabsContent>

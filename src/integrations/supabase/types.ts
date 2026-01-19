@@ -472,6 +472,7 @@ export type Database = {
           name: string
           resolution: string | null
           status: string
+          thumbnail_url: string | null
           type: string
           updated_at: string
         }
@@ -485,6 +486,7 @@ export type Database = {
           name: string
           resolution?: string | null
           status?: string
+          thumbnail_url?: string | null
           type?: string
           updated_at?: string
         }
@@ -498,6 +500,7 @@ export type Database = {
           name?: string
           resolution?: string | null
           status?: string
+          thumbnail_url?: string | null
           type?: string
           updated_at?: string
         }
