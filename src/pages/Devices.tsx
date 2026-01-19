@@ -3,17 +3,32 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Monitor, Plus, Settings, MapPin, Copy, ExternalLink, Camera, Loader2 } from "lucide-react";
+import { Monitor, Plus, Settings, MapPin, Copy, ExternalLink, Camera, Loader2, Trash2, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useDevices } from "@/hooks/useDevices";
+import { useDevices, DeviceInsert, DeviceUpdate, DeviceWithRelations } from "@/hooks/useDevices";
 import { usePlaylists } from "@/hooks/usePlaylists";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { DeviceFormDialog } from "@/components/devices/DeviceFormDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const Devices = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingDevice, setEditingDevice] = useState<DeviceWithRelations | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deviceToDelete, setDeviceToDelete] = useState<DeviceWithRelations | null>(null);
   const { toast } = useToast();
-  const { devices, isLoading } = useDevices();
+  const { devices, isLoading, createDevice, updateDevice, deleteDevice } = useDevices();
   const { playlists } = usePlaylists();
 
   const filteredDevices = devices.filter(device =>
@@ -48,7 +63,7 @@ const Devices = () => {
   };
 
   const copyDeviceLink = (deviceCode: string) => {
-    const deviceUrl = `${window.location.origin}/device/${deviceCode}`;
+    const deviceUrl = `${window.location.origin}/play/${deviceCode}`;
     navigator.clipboard.writeText(deviceUrl);
     toast({
       title: "Link copiado!",
@@ -57,13 +72,45 @@ const Devices = () => {
   };
 
   const openDevicePlayer = (deviceCode: string) => {
-    const deviceUrl = `/device/${deviceCode}`;
+    const deviceUrl = `/play/${deviceCode}`;
     window.open(deviceUrl, '_blank');
   };
 
   const formatLastSeen = (lastSeen: string | null) => {
     if (!lastSeen) return "Nunca";
     return formatDistanceToNow(new Date(lastSeen), { addSuffix: true, locale: ptBR });
+  };
+
+  const handleAddDevice = () => {
+    setEditingDevice(null);
+    setDialogOpen(true);
+  };
+
+  const handleEditDevice = (device: DeviceWithRelations) => {
+    setEditingDevice(device);
+    setDialogOpen(true);
+  };
+
+  const handleDeleteClick = (device: DeviceWithRelations) => {
+    setDeviceToDelete(device);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (deviceToDelete) {
+      await deleteDevice.mutateAsync(deviceToDelete.id);
+      setDeleteDialogOpen(false);
+      setDeviceToDelete(null);
+    }
+  };
+
+  const handleFormSubmit = async (data: DeviceInsert | (DeviceUpdate & { id: string })) => {
+    if ('id' in data && data.id) {
+      const { id, ...updates } = data;
+      await updateDevice.mutateAsync({ id, ...updates });
+    } else {
+      await createDevice.mutateAsync(data as DeviceInsert);
+    }
   };
 
   if (isLoading) {
@@ -81,7 +128,7 @@ const Devices = () => {
           <h1 className="text-2xl font-bold">Dispositivos</h1>
           <p className="text-muted-foreground">Gerencie todos os displays conectados</p>
         </div>
-        <Button className="gradient-primary text-white">
+        <Button className="gradient-primary text-white" onClick={handleAddDevice}>
           <Plus className="w-4 h-4 mr-2" />
           Adicionar Dispositivo
         </Button>
@@ -106,6 +153,12 @@ const Devices = () => {
                 ? "Nenhum dispositivo corresponde à sua busca."
                 : "Adicione seu primeiro dispositivo para começar a gerenciar seus displays."}
             </p>
+            {!searchTerm && (
+              <Button className="mt-4" onClick={handleAddDevice}>
+                <Plus className="w-4 h-4 mr-2" />
+                Adicionar Primeiro Dispositivo
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -133,9 +186,14 @@ const Devices = () => {
                       </CardDescription>
                     </div>
                   </div>
-                  <Button variant="ghost" size="sm">
-                    <Settings className="w-4 h-4" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => handleEditDevice(device)}>
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleDeleteClick(device)}>
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -174,10 +232,10 @@ const Devices = () => {
                 </div>
 
                 <div className="border-t pt-3">
-                  <div className="text-xs text-muted-foreground mb-2">Link do Dispositivo:</div>
+                  <div className="text-xs text-muted-foreground mb-2">Link do Player:</div>
                   <div className="flex items-center space-x-2">
                     <code className="flex-1 text-xs bg-muted p-2 rounded text-ellipsis overflow-hidden">
-                      /device/{device.device_code}
+                      /play/{device.device_code}
                     </code>
                     <Button 
                       variant="outline" 
@@ -197,20 +255,40 @@ const Devices = () => {
                     </Button>
                   </div>
                 </div>
-                
-                <div className="flex space-x-2 pt-2">
-                  <Button variant="outline" size="sm" className="flex-1">
-                    Visualizar
-                  </Button>
-                  <Button size="sm" className="flex-1">
-                    Configurar
-                  </Button>
-                </div>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+
+      <DeviceFormDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        device={editingDevice}
+        onSubmit={handleFormSubmit}
+        isLoading={createDevice.isPending || updateDevice.isPending}
+      />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Dispositivo</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o dispositivo "{deviceToDelete?.name}"?
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
