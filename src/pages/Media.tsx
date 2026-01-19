@@ -8,11 +8,14 @@ import { Plus, Image, Video, Clock, Grid2x2, Loader2, Play, Eye } from "lucide-r
 import { useMediaItems } from "@/hooks/useMediaItems";
 import { usePlaylists } from "@/hooks/usePlaylists";
 import { MediaUploadDialog } from "@/components/media/MediaUploadDialog";
+import { MediaLightbox } from "@/components/media/MediaLightbox";
 import { useQueryClient } from "@tanstack/react-query";
 
 const Media = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
   const queryClient = useQueryClient();
   const { mediaItems, isLoading: loadingMedia } = useMediaItems();
   const { playlists, isLoading: loadingPlaylists } = usePlaylists();
@@ -75,6 +78,13 @@ const Media = () => {
         onSuccess={() => queryClient.invalidateQueries({ queryKey: ["media-items"] })}
       />
 
+      <MediaLightbox
+        open={lightboxOpen}
+        onOpenChange={setLightboxOpen}
+        mediaItems={filteredMedia}
+        initialIndex={lightboxIndex}
+      />
+
       <Tabs defaultValue="media" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2 max-w-md">
           <TabsTrigger value="media">Mídias</TabsTrigger>
@@ -105,12 +115,21 @@ const Media = () => {
             </Card>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {filteredMedia.map((media) => {
+              {filteredMedia.map((media, index) => {
                 // Use thumbnail_url field directly, fallback to file_url
                 const thumbnailUrl = media.thumbnail_url || media.file_url;
                 
+                const openLightbox = () => {
+                  setLightboxIndex(index);
+                  setLightboxOpen(true);
+                };
+                
                 return (
-                  <Card key={media.id} className="group hover:shadow-lg transition-all duration-300 overflow-hidden">
+                  <Card 
+                    key={media.id} 
+                    className="group hover:shadow-lg transition-all duration-300 overflow-hidden cursor-pointer"
+                    onClick={openLightbox}
+                  >
                     {/* Thumbnail */}
                     <div className="relative aspect-video bg-muted overflow-hidden">
                       {thumbnailUrl ? (
@@ -214,18 +233,21 @@ const Media = () => {
                       </div>
                       
                       {/* Hover overlay with preview button */}
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                        {media.file_url && (
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
+                        <div className="flex items-center gap-2 pointer-events-auto">
                           <Button
                             size="sm"
                             variant="secondary"
                             className="h-8"
-                            onClick={() => window.open(media.file_url!, '_blank')}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openLightbox();
+                            }}
                           >
                             <Eye className="w-4 h-4 mr-1" />
                             Ver
                           </Button>
-                        )}
+                        </div>
                       </div>
                     </div>
                   
