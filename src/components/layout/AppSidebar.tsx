@@ -1,4 +1,20 @@
-import { Monitor, BarChart3, Image, Settings, Grid2x2, Database, Camera, Eye, Store, MapPin, LogOut, Tv, ListVideo, Layers, Building2 } from "lucide-react";
+import {
+  Monitor,
+  BarChart3,
+  Image,
+  Settings,
+  Grid2x2,
+  Database,
+  Camera,
+  Eye,
+  Store,
+  MapPin,
+  LogOut,
+  Tv,
+  ListVideo,
+  Layers,
+  Building2,
+} from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
@@ -24,16 +40,14 @@ const menuItems = [
   { title: "Grupos", url: "/admin/device-groups", icon: Layers },
   { title: "Canais", url: "/admin/channels", icon: Tv },
   { title: "Playlists", url: "/admin/playlists", icon: ListVideo },
-  { title: "Mídias", url: "/admin/media", icon: Image },
+  { title: "Galeria", url: "/admin/media", icon: Image },
   { title: "Câmera", url: "/admin/camera", icon: Camera },
   { title: "Monitoramento", url: "/admin/monitoring", icon: Eye },
   { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },
   { title: "Configurações", url: "/admin/settings", icon: Settings },
 ];
 
-const superAdminItems = [
-  { title: "Clientes", url: "/admin/tenants", icon: Building2 },
-];
+const superAdminItems = [{ title: "Clientes", url: "/admin/tenants", icon: Building2 }];
 
 const AppSidebar = () => {
   const { user, signOut } = useAuth();
@@ -42,7 +56,7 @@ const AppSidebar = () => {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/auth');
+    navigate("/auth");
   };
 
   return (
@@ -60,7 +74,7 @@ const AppSidebar = () => {
           </div>
         </div>
       </SidebarHeader>
-      
+
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel className="text-xs font-medium text-muted-foreground px-3 py-2">
@@ -71,13 +85,13 @@ const AppSidebar = () => {
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <NavLink 
+                    <NavLink
                       to={item.url}
                       className={({ isActive }) =>
                         `flex items-center space-x-3 px-3 py-2 rounded-lg transition-all duration-200 ${
                           isActive
-                            ? 'bg-primary text-primary-foreground shadow-md'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                            ? "bg-primary text-primary-foreground shadow-md"
+                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                         }`
                       }
                     >
@@ -102,13 +116,13 @@ const AppSidebar = () => {
                 {superAdminItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild>
-                      <NavLink 
+                      <NavLink
                         to={item.url}
                         className={({ isActive }) =>
                           `flex items-center space-x-3 px-3 py-2 rounded-lg transition-all duration-200 ${
                             isActive
-                              ? 'bg-primary text-primary-foreground shadow-md'
-                              : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                              ? "bg-primary text-primary-foreground shadow-md"
+                              : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                           }`
                         }
                       >
