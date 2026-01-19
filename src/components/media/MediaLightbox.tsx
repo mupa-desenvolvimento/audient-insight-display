@@ -11,7 +11,9 @@ import {
   Video,
   Image,
   Clock,
-  HardDrive
+  HardDrive,
+  Pencil,
+  Trash2
 } from "lucide-react";
 import type { MediaItem } from "@/hooks/useMediaItems";
 
@@ -20,13 +22,17 @@ interface MediaLightboxProps {
   onOpenChange: (open: boolean) => void;
   mediaItems: MediaItem[];
   initialIndex: number;
+  onEdit?: (media: MediaItem) => void;
+  onDelete?: (media: MediaItem) => void;
 }
 
 export function MediaLightbox({ 
   open, 
   onOpenChange, 
   mediaItems, 
-  initialIndex 
+  initialIndex,
+  onEdit,
+  onDelete
 }: MediaLightboxProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
 
@@ -204,6 +210,34 @@ export function MediaLightbox({
 
               {/* Right: Actions */}
               <div className="flex items-center gap-2 flex-shrink-0">
+                {onEdit && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-white hover:bg-white/20"
+                    onClick={() => {
+                      onOpenChange(false);
+                      onEdit(currentMedia);
+                    }}
+                  >
+                    <Pencil className="w-4 h-4 mr-2" />
+                    Editar
+                  </Button>
+                )}
+                {onDelete && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                    onClick={() => {
+                      onOpenChange(false);
+                      onDelete(currentMedia);
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Excluir
+                  </Button>
+                )}
                 {currentMedia.file_url && (
                   <>
                     <Button

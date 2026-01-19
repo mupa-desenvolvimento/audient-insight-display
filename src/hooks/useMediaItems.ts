@@ -30,6 +30,28 @@ export interface MediaItemInsert {
   metadata?: Json | null;
 }
 
+// Helper to convert R2 signed URL to public URL
+const getPublicUrl = (url: string | null): string | null => {
+  if (!url) return null;
+  
+  // If already a public URL (pub-*.r2.dev), return as is
+  if (url.includes('.r2.dev/')) return url;
+  
+  // Convert R2 storage URL to public URL format
+  // From: https://{account_id}.r2.cloudflarestorage.com/{bucket}/{key}
+  // To: https://{public_domain}/{key}
+  const r2Match = url.match(/https:\/\/[^/]+\.r2\.cloudflarestorage\.com\/[^/]+\/(.+)/);
+  if (r2Match) {
+    // Use environment variable or fallback
+    const publicDomain = import.meta.env.VITE_R2_PUBLIC_URL;
+    if (publicDomain) {
+      return `${publicDomain}/${r2Match[1]}`;
+    }
+  }
+  
+  return url;
+};
+
 export const useMediaItems = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -43,7 +65,13 @@ export const useMediaItems = () => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return data as MediaItem[];
+      
+      // Transform URLs to public format
+      return (data as MediaItem[]).map(item => ({
+        ...item,
+        file_url: getPublicUrl(item.file_url),
+        thumbnail_url: getPublicUrl(item.thumbnail_url),
+      }));
     },
   });
 
@@ -90,8 +118,32 @@ export const useMediaItems = () => {
 
   const deleteMediaItem = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("media_items").delete().eq("id", id);
-      if (error) throw error;
+      // Call edge function to delete from R2 and database
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error("Não autenticado");
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-media`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ mediaId: id }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao excluir mídia');
+      }
+
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["media-items"] });
