@@ -16,6 +16,7 @@ import Player from "./pages/Player";
 import Index from "./pages/Index";
 import DevicePlayer from "./pages/DevicePlayer";
 import DeviceDetector from "./pages/DeviceDetector";
+import OfflinePlayer from "./pages/OfflinePlayer";
 import Camera from "./pages/Camera";
 import CameraFullscreen from "./pages/CameraFullscreen";
 import LiveMonitoring from "./pages/LiveMonitoring";
@@ -43,6 +44,7 @@ const App = () => (
             <Route path="/player" element={<Player />} />
             <Route path="/device/:deviceId" element={<DevicePlayer />} />
             <Route path="/detect/:deviceCode" element={<DeviceDetector />} />
+            <Route path="/play/:deviceCode" element={<OfflinePlayer />} />
             <Route path="/camera" element={<Camera />} />
             <Route path="/camera-fullscreen" element={<CameraFullscreen />} />
             <Route
