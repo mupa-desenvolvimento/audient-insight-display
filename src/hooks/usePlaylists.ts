@@ -52,7 +52,7 @@ export const usePlaylists = () => {
         .from("playlists")
         .select(`
           *,
-          channel:channels(id, name, type)
+          channel:channels!playlists_channel_id_fkey(id, name, type)
         `)
         .order("created_at", { ascending: false });
 
