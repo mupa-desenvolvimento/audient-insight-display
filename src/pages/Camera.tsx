@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,20 +12,18 @@ import AttentionHistory from "@/components/AttentionHistory";
 const Camera = () => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  
+
   const { toast } = useToast();
-  
-  const { 
-    isModelsLoaded, 
-    isLoading, 
-    activeFaces,
-    totalLooking,
-    totalSessionsToday
-  } = useFaceDetection(videoRef, canvasRef, isStreaming);
+
+  const { isModelsLoaded, isLoading, activeFaces, totalLooking, totalSessionsToday } = useFaceDetection(
+    videoRef,
+    canvasRef,
+    isStreaming,
+  );
 
   // Inicializar câmera
   const startCamera = async () => {
@@ -42,19 +39,19 @@ const Camera = () => {
     try {
       setCameraError(null);
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          width: 640, 
+        video: {
+          width: 640,
           height: 480,
-          facingMode: 'user' 
+          facingMode: "user",
         },
-        audio: false
+        audio: false,
       });
-      
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
         setIsStreaming(true);
-        
+
         toast({
           title: "Câmera iniciada",
           description: "Sistema de reconhecimento ativo",
@@ -63,7 +60,7 @@ const Camera = () => {
     } catch (error) {
       setCameraError("Erro ao acessar a câmera. Verifique as permissões.");
       console.error("Erro ao acessar câmera:", error);
-      
+
       toast({
         title: "Erro na câmera",
         description: "Não foi possível acessar a câmera",
@@ -75,14 +72,14 @@ const Camera = () => {
   // Parar câmera
   const stopCamera = () => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
     setIsStreaming(false);
-    
+
     toast({
       title: "Câmera parada",
       description: "Sistema de reconhecimento desativado",
@@ -91,21 +88,31 @@ const Camera = () => {
 
   const getGenderColor = (gender: string) => {
     switch (gender) {
-      case 'masculino': return 'bg-blue-500';
-      case 'feminino': return 'bg-pink-500';
-      default: return 'bg-gray-500';
+      case "masculino":
+        return "bg-blue-500";
+      case "feminino":
+        return "bg-pink-500";
+      default:
+        return "bg-gray-500";
     }
   };
 
   const getAgeGroupColor = (ageGroup: string) => {
     switch (ageGroup) {
-      case '0-12': return 'bg-green-500';
-      case '13-18': return 'bg-yellow-500';
-      case '19-25': return 'bg-orange-500';
-      case '26-35': return 'bg-red-500';
-      case '36-50': return 'bg-purple-500';
-      case '51+': return 'bg-indigo-500';
-      default: return 'bg-gray-500';
+      case "0-12":
+        return "bg-green-500";
+      case "13-18":
+        return "bg-yellow-500";
+      case "19-25":
+        return "bg-orange-500";
+      case "26-35":
+        return "bg-red-500";
+      case "36-50":
+        return "bg-purple-500";
+      case "51+":
+        return "bg-indigo-500";
+      default:
+        return "bg-gray-500";
     }
   };
 
@@ -117,10 +124,7 @@ const Camera = () => {
           <p className="text-muted-foreground">Sistema de detecção de pessoas em tempo real</p>
         </div>
         <div className="flex space-x-2">
-          <Button 
-            variant="outline"
-            onClick={() => window.open("/camera-fullscreen", "_blank")}
-          >
+          <Button variant="outline" onClick={() => window.open("/camera-fullscreen", "_blank")}>
             <CameraIcon className="w-4 h-4 mr-2" />
             Tela Cheia
           </Button>
@@ -129,8 +133,8 @@ const Camera = () => {
             Configurar
           </Button>
           {!isStreaming ? (
-            <Button 
-              onClick={startCamera} 
+            <Button
+              onClick={startCamera}
               className="gradient-primary text-white"
               disabled={isLoading || !isModelsLoaded}
             >
@@ -155,9 +159,7 @@ const Camera = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{totalLooking}</div>
-            <p className="text-xs text-muted-foreground">
-              Pessoas olhando para o dispositivo
-            </p>
+            <p className="text-xs text-muted-foreground">Pessoas olhando para o dispositivo</p>
           </CardContent>
         </Card>
 
@@ -168,9 +170,7 @@ const Camera = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-primary">{totalSessionsToday}</div>
-            <p className="text-xs text-muted-foreground">
-              Total de sessões hoje
-            </p>
+            <p className="text-xs text-muted-foreground">Total de sessões hoje</p>
           </CardContent>
         </Card>
 
@@ -185,9 +185,7 @@ const Camera = () => {
                 {isLoading ? "Carregando" : isModelsLoaded ? "Pronto" : "Erro"}
               </Badge>
             </div>
-            <p className="text-xs text-muted-foreground">
-              SSD MobileNet v1
-            </p>
+            <p className="text-xs text-muted-foreground">SSD MobileNet v1</p>
           </CardContent>
         </Card>
 
@@ -198,13 +196,9 @@ const Camera = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              <Badge variant={isStreaming ? "default" : "secondary"}>
-                {isStreaming ? "Ativa" : "Inativa"}
-              </Badge>
+              <Badge variant={isStreaming ? "default" : "secondary"}>{isStreaming ? "Ativa" : "Inativa"}</Badge>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {isStreaming ? "Detectando faces" : "Câmera desligada"}
-            </p>
+            <p className="text-xs text-muted-foreground">{isStreaming ? "Detectando faces" : "Câmera desligada"}</p>
           </CardContent>
         </Card>
       </div>
@@ -229,17 +223,8 @@ const Camera = () => {
                 </div>
               ) : (
                 <>
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="w-full h-64 object-cover"
-                  />
-                  <canvas
-                    ref={canvasRef}
-                    className="absolute top-0 left-0 w-full h-full pointer-events-none"
-                  />
+                  <video ref={videoRef} autoPlay playsInline muted className="w-full h-64 object-cover" />
+                  <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full pointer-events-none" />
                 </>
               )}
             </div>
@@ -267,7 +252,9 @@ const Camera = () => {
                 activeFaces.map((face) => (
                   <div key={face.trackId} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                     <div className="flex items-center space-x-3">
-                      <div className={`w-3 h-3 rounded-full ${face.isRegistered ? 'bg-green-500' : 'bg-orange-500'} animate-pulse`}></div>
+                      <div
+                        className={`w-3 h-3 rounded-full ${face.isRegistered ? "bg-green-500" : "bg-orange-500"} animate-pulse`}
+                      ></div>
                       <div>
                         {face.isRegistered ? (
                           <div>
@@ -277,22 +264,20 @@ const Camera = () => {
                         ) : (
                           <div>
                             <div className="flex items-center space-x-2">
-                              <Badge 
-                                variant="outline" 
+                              <Badge
+                                variant="outline"
                                 className={`${getGenderColor(face.gender)} text-white border-none`}
                               >
                                 {face.gender}
                               </Badge>
-                              <Badge 
+                              <Badge
                                 variant="outline"
                                 className={`${getAgeGroupColor(face.ageGroup)} text-white border-none`}
                               >
                                 {face.age} anos
                               </Badge>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Pessoa não cadastrada
-                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">Pessoa não cadastrada</p>
                           </div>
                         )}
                       </div>
@@ -302,9 +287,7 @@ const Camera = () => {
                         <Clock className="w-4 h-4" />
                         <span className="font-bold">{face.lookingDuration.toFixed(1)}s</span>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        olhando
-                      </p>
+                      <p className="text-xs text-muted-foreground">olhando</p>
                     </div>
                   </div>
                 ))
@@ -316,11 +299,11 @@ const Camera = () => {
 
       {/* Seção de Cadastro de Pessoas */}
       <PeopleRegistration videoRef={videoRef} isStreaming={isStreaming} />
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Histórico de Detecções */}
         <DetectionHistory />
-        
+
         {/* Histórico de Atenção */}
         <AttentionHistory />
       </div>
