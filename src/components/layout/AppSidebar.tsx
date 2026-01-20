@@ -68,7 +68,7 @@ const AppSidebar = () => {
           </div>
           <div>
             <h1 className="text-lg font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-              SignageAI
+              MupaMídias
             </h1>
             <p className="text-xs text-muted-foreground">Digital Signage Pro</p>
           </div>
