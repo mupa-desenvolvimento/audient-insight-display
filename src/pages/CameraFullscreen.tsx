@@ -7,11 +7,20 @@ import { useToast } from "@/hooks/use-toast";
 import { useFaceDetection } from "@/hooks/useFaceDetection";
 import { usePeopleRegistry } from "@/hooks/usePeopleRegistry";
 import { useNavigate } from "react-router-dom";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const CameraFullscreen = () => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string>("");
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -28,6 +37,30 @@ const CameraFullscreen = () => {
     totalLooking,
     totalSessionsToday
   } = useFaceDetection(videoRef, canvasRef, isStreaming);
+
+  // Enumerar câmeras disponíveis
+  useEffect(() => {
+    const enumerateCameras = async () => {
+      try {
+        // Solicitar permissão primeiro para obter labels das câmeras
+        await navigator.mediaDevices.getUserMedia({ video: true })
+          .then(stream => stream.getTracks().forEach(track => track.stop()));
+        
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        setCameras(videoDevices);
+        
+        // Selecionar a primeira câmera por padrão
+        if (videoDevices.length > 0 && !selectedCameraId) {
+          setSelectedCameraId(videoDevices[0].deviceId);
+        }
+      } catch (error) {
+        console.error("Erro ao enumerar câmeras:", error);
+      }
+    };
+    
+    enumerateCameras();
+  }, []);
 
   // Entrar em modo fullscreen com suporte amplo
   const enterFullscreen = async () => {
@@ -111,17 +144,23 @@ const CameraFullscreen = () => {
         throw new Error("API de câmera não disponível neste navegador");
       }
 
-      // Configurações mais flexíveis para Android
+      // Configurações com deviceId específico se selecionado
       const constraints: MediaStreamConstraints = {
-        video: {
-          facingMode: 'user',
-          width: { ideal: 1280, min: 640 },
-          height: { ideal: 720, min: 480 }
-        },
+        video: selectedCameraId 
+          ? {
+              deviceId: { exact: selectedCameraId },
+              width: { ideal: 1280, min: 640 },
+              height: { ideal: 720, min: 480 }
+            }
+          : {
+              facingMode: 'user',
+              width: { ideal: 1280, min: 640 },
+              height: { ideal: 720, min: 480 }
+            },
         audio: false
       };
 
-      console.log("Solicitando acesso à câmera...");
+      console.log("Solicitando acesso à câmera:", selectedCameraId || "default");
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       console.log("Stream obtido:", stream);
       
@@ -187,7 +226,7 @@ const CameraFullscreen = () => {
         variant: "destructive",
       });
     }
-  }, [isModelsLoaded, toast]);
+  }, [isModelsLoaded, toast, selectedCameraId]);
 
   // Parar câmera
   const stopCamera = useCallback(() => {
@@ -236,13 +275,26 @@ const CameraFullscreen = () => {
           Voltar
         </Button>
         
-        <Button
-          variant="secondary"
-          className="bg-black/50 text-white border-white/20 hover:bg-black/70"
-        >
-          <Settings className="w-4 h-4 mr-2" />
-          Config
-        </Button>
+        {/* Seleção de Câmera */}
+        {cameras.length > 1 && (
+          <Select
+            value={selectedCameraId}
+            onValueChange={setSelectedCameraId}
+            disabled={isStreaming}
+          >
+            <SelectTrigger className="w-[200px] bg-black/50 text-white border-white/20">
+              <CameraIcon className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="Selecionar câmera" />
+            </SelectTrigger>
+            <SelectContent className="bg-background border z-[10000]">
+              {cameras.map((camera) => (
+                <SelectItem key={camera.deviceId} value={camera.deviceId}>
+                  {camera.label || `Câmera ${cameras.indexOf(camera) + 1}`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Controle de câmera no canto superior direito */}
