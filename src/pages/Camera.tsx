@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,10 +8,24 @@ import { useFaceDetection } from "@/hooks/useFaceDetection";
 import { PeopleRegistration } from "@/components/PeopleRegistration";
 import { DetectionHistory } from "@/components/DetectionHistory";
 import AttentionHistory from "@/components/AttentionHistory";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+interface CameraDevice {
+  deviceId: string;
+  label: string;
+}
 
 const Camera = () => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [cameras, setCameras] = useState<CameraDevice[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string>("");
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -24,6 +38,35 @@ const Camera = () => {
     canvasRef,
     isStreaming,
   );
+
+  // Listar câmeras disponíveis
+  useEffect(() => {
+    const enumerateCameras = async () => {
+      try {
+        // Solicitar permissão primeiro para obter labels
+        await navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+          stream.getTracks().forEach(track => track.stop());
+        });
+
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoInputs = devices
+          .filter(device => device.kind === "videoinput")
+          .map((device, index) => ({
+            deviceId: device.deviceId,
+            label: device.label || `Câmera ${index + 1}`,
+          }));
+
+        setCameras(videoInputs);
+        if (videoInputs.length > 0 && !selectedCameraId) {
+          setSelectedCameraId(videoInputs[0].deviceId);
+        }
+      } catch (error) {
+        console.error("Erro ao enumerar câmeras:", error);
+      }
+    };
+
+    enumerateCameras();
+  }, []);
 
   // Inicializar câmera
   const startCamera = async () => {
@@ -38,14 +81,16 @@ const Camera = () => {
 
     try {
       setCameraError(null);
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const constraints: MediaStreamConstraints = {
         video: {
           width: 640,
           height: 480,
-          facingMode: "user",
+          ...(selectedCameraId ? { deviceId: { exact: selectedCameraId } } : { facingMode: "user" }),
         },
         audio: false,
-      });
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -207,9 +252,27 @@ const Camera = () => {
         {/* Feed da Câmera */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <CameraIcon className="w-5 h-5" />
-              <span>Feed da Câmera</span>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <CameraIcon className="w-5 h-5" />
+                <span>Feed da Câmera</span>
+              </div>
+              <Select
+                value={selectedCameraId}
+                onValueChange={setSelectedCameraId}
+                disabled={isStreaming}
+              >
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Selecionar câmera" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cameras.map((camera) => (
+                    <SelectItem key={camera.deviceId} value={camera.deviceId}>
+                      {camera.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </CardTitle>
           </CardHeader>
           <CardContent>
