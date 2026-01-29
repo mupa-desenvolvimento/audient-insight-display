@@ -15,6 +15,7 @@ import Settings from "./pages/Settings";
 import Player from "./pages/Player";
 import Index from "./pages/Index";
 import DevicePlayer from "./pages/DevicePlayer";
+import DeviceSetup from "./pages/DeviceSetup";
 import DeviceDetector from "./pages/DeviceDetector";
 import OfflinePlayer from "./pages/OfflinePlayer";
 import Camera from "./pages/Camera";
@@ -65,6 +66,7 @@ function AppContent() {
           <Route path="/auth" element={<Auth />} />
           <Route path="/player" element={<Player />} />
           <Route path="/device/:deviceId" element={<DevicePlayer />} />
+          <Route path="/setup/:deviceId" element={<DeviceSetup />} />
           <Route path="/detect/:deviceCode" element={<DeviceDetector />} />
           <Route path="/play/:deviceCode" element={<OfflinePlayer />} />
           <Route path="/camera" element={<Camera />} />
