@@ -155,64 +155,41 @@ Deno.serve(async (req) => {
 
     console.log('Original file uploaded successfully:', fileKey)
 
-    // Step 4: Generate thumbnail
-    console.log('Step 4: Generating thumbnail...')
-    let thumbnailUrl: string | null = null
-    let thumbnailGenerated = false
+    // Step 4: Build public URLs
+    console.log('Step 4: Building public URLs...')
+    
+    // Get public URL from environment - REQUIRED for proper access
+    const publicBaseUrl = Deno.env.get('CLOUDFLARE_R2_PUBLIC_URL')
+    
+    if (!publicBaseUrl) {
+      console.error('CLOUDFLARE_R2_PUBLIC_URL not configured')
+      return new Response(
+        JSON.stringify({ error: 'Storage public URL not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    
+    const publicFileUrl = `${publicBaseUrl}/${fileKey}`
+    // For images, use the main file as thumbnail; for videos, we'll leave it null
+    const publicThumbnailUrl = isImage ? publicFileUrl : null
+    const thumbnailGenerated = isImage
     let resolution: string | null = null
     let duration: number | null = null
-
+    
+    console.log('Public file URL:', publicFileUrl)
+    console.log('Public thumbnail URL:', publicThumbnailUrl)
+    
+    // Step 5: Verify public access
+    console.log('Step 5: Verifying public access...')
     try {
-      if (isImage) {
-        // For images: create a resized version using canvas-like processing
-        // Since Deno doesn't have native image processing, we'll store the original URL
-        // and generate thumbnails client-side or use a dedicated service
-        // For now, we'll use the original image as thumbnail for images
-        thumbnailUrl = uploadUrl
-        thumbnailGenerated = true
-        console.log('Image thumbnail: using original URL (client-side resize recommended)')
-      } else if (isVideo) {
-        // For videos: we can't extract frames server-side without ffmpeg
-        // We'll mark thumbnail as pending and let client generate it
-        // Or use the first frame approach with client-side processing
-        thumbnailUrl = null
-        thumbnailGenerated = false
-        console.log('Video thumbnail: marked as pending (client-side extraction needed)')
+      const accessCheck = await fetch(publicFileUrl, { method: 'HEAD' })
+      if (accessCheck.ok) {
+        console.log('Public access verified successfully')
+      } else {
+        console.warn('Public access check returned:', accessCheck.status)
       }
-    } catch (thumbnailError) {
-      console.error('Thumbnail generation error:', thumbnailError)
-      // Continue without thumbnail - don't fail the entire upload
-      thumbnailGenerated = false
-    }
-
-    // Step 5: Build public URL and verify access
-    console.log('Step 5: Building public URL...')
-    
-    // Get public URL from environment or construct default
-    const publicBaseUrl = Deno.env.get('CLOUDFLARE_R2_PUBLIC_URL')
-    let publicFileUrl = uploadUrl // fallback to signed URL
-    let publicThumbnailUrl = thumbnailUrl
-    
-    if (publicBaseUrl) {
-      publicFileUrl = `${publicBaseUrl}/${fileKey}`
-      if (thumbnailUrl) {
-        publicThumbnailUrl = `${publicBaseUrl}/${thumbnailKey}`
-      }
-      console.log('Using public URL:', publicFileUrl)
-      
-      // Try to verify access
-      try {
-        const accessCheck = await fetch(publicFileUrl, { method: 'HEAD' })
-        if (accessCheck.ok) {
-          console.log('Public access verified')
-        } else {
-          console.warn('Public access check failed:', accessCheck.status)
-        }
-      } catch (accessError) {
-        console.warn('Access verification skipped:', accessError)
-      }
-    } else {
-      console.warn('CLOUDFLARE_R2_PUBLIC_URL not set, using signed URL')
+    } catch (accessError) {
+      console.warn('Access verification skipped:', accessError)
     }
 
     // Step 6: Save to database
