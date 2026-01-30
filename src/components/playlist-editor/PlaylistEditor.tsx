@@ -5,25 +5,13 @@ import { usePlaylistItems } from "@/hooks/usePlaylistItems";
 import { useChannels } from "@/hooks/useChannels";
 import { useDevices } from "@/hooks/useDevices";
 import { MediaItem } from "@/hooks/useMediaItems";
-import { MediaLibrary } from "./MediaLibrary";
-import { PlaylistTimeline } from "./PlaylistTimeline";
-import { PlaylistSettings } from "./PlaylistSettings";
-import { PlaylistPreview } from "./PlaylistPreview";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { EditorSidebar } from "./EditorSidebar";
+import { EditorCanvas } from "./EditorCanvas";
+import { EditorTimeline } from "./EditorTimeline";
+import { EditorHeader } from "./EditorHeader";
+import { EditorPropertiesPanel } from "./EditorPropertiesPanel";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { 
-  ArrowLeft, 
-  Save, 
-  Eye, 
-  EyeOff,
-  Loader2,
-  Radio,
-  AlertCircle,
-  RefreshCw,
-  Monitor
-} from "lucide-react";
 
 interface PlaylistFormData {
   name: string;
@@ -48,7 +36,6 @@ export const PlaylistEditor = () => {
   const { devices } = useDevices();
   const [createdPlaylistId, setCreatedPlaylistId] = useState<string | null>(null);
   
-  // Use created playlist ID if we just created one, otherwise use URL param
   const activePlaylistId = createdPlaylistId || playlistId || null;
   
   const { 
@@ -61,18 +48,17 @@ export const PlaylistEditor = () => {
     getTotalDuration 
   } = usePlaylistItems(activePlaylistId);
 
-  const [showPreview, setShowPreview] = useState(true);
+  const [activePanel, setActivePanel] = useState<"media" | "settings" | null>("media");
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdatingDevices, setIsUpdatingDevices] = useState(false);
-  const [draggingMedia, setDraggingMedia] = useState<MediaItem | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [zoom, setZoom] = useState(100);
 
   const existingPlaylist = playlists.find((p) => p.id === activePlaylistId);
   const isNewPlaylist = !playlistId && !createdPlaylistId;
-
-  // Get devices connected to this playlist
   const connectedDevices = devices.filter(d => d.current_playlist_id === activePlaylistId);
 
   const [formData, setFormData] = useState<PlaylistFormData>({
@@ -88,7 +74,6 @@ export const PlaylistEditor = () => {
     priority: 5,
   });
 
-  // Load existing playlist data
   useEffect(() => {
     if (existingPlaylist) {
       const schedule = existingPlaylist.schedule as Record<string, unknown> | null;
@@ -112,11 +97,9 @@ export const PlaylistEditor = () => {
     setHasUnsavedChanges(true);
   }, []);
 
-  // Create playlist on first media add if new
   const ensurePlaylistExists = async (): Promise<string | null> => {
     if (activePlaylistId) return activePlaylistId;
     
-    // Create a new playlist with temporary name
     const tempName = formData.name || `Nova Playlist ${new Date().toLocaleString("pt-BR")}`;
     
     const schedule = {
@@ -219,9 +202,9 @@ export const PlaylistEditor = () => {
         setCreatedPlaylistId(result.id);
       }
       setHasUnsavedChanges(false);
-      toast({ title: "Playlist salva com sucesso!" });
+      toast({ title: "Projeto salvo!" });
     } catch (error) {
-      toast({ title: "Erro ao salvar playlist", variant: "destructive" });
+      toast({ title: "Erro ao salvar", variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
@@ -231,7 +214,6 @@ export const PlaylistEditor = () => {
     if (!activePlaylistId || connectedDevices.length === 0) {
       toast({ 
         title: "Nenhum dispositivo conectado", 
-        description: "Esta playlist não está vinculada a nenhum dispositivo.",
         variant: "destructive" 
       });
       return;
@@ -240,7 +222,6 @@ export const PlaylistEditor = () => {
     setIsUpdatingDevices(true);
 
     try {
-      // Update the updated_at timestamp to trigger device refresh
       const { error } = await supabase
         .from("devices")
         .update({ updated_at: new Date().toISOString() })
@@ -249,164 +230,85 @@ export const PlaylistEditor = () => {
       if (error) throw error;
 
       toast({ 
-        title: "Dispositivos atualizados!", 
-        description: `${connectedDevices.length} dispositivo(s) receberão a atualização.` 
+        title: "Dispositivos sincronizados!", 
+        description: `${connectedDevices.length} dispositivo(s)` 
       });
     } catch (error) {
-      toast({ title: "Erro ao atualizar dispositivos", variant: "destructive" });
+      toast({ title: "Erro ao sincronizar", variant: "destructive" });
     } finally {
       setIsUpdatingDevices(false);
     }
   };
 
   const totalDuration = getTotalDuration();
-  const selectedChannel = channels.find(c => c.id === formData.channel_id);
+  const selectedItem = items.find(i => i.id === selectedItemId);
+  const currentPreviewItem = items[currentPreviewIndex];
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col">
+    <div className="h-screen w-screen flex flex-col bg-[#0a0a0b] text-white overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-3 border-b bg-card">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/admin/playlists")}
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold">
-                {isNewPlaylist ? "Nova Playlist" : "Editar Playlist"}
-              </h1>
-              {hasUnsavedChanges && (
-                <Badge variant="outline" className="text-yellow-600 border-yellow-300 bg-yellow-50">
-                  Alterações não salvas
-                </Badge>
-              )}
-            </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>{formData.name || "Sem nome"}</span>
-              {selectedChannel && (
-                <>
-                  <span>•</span>
-                  <Badge variant="secondary" className="gap-1 text-xs">
-                    <Radio className="w-3 h-3" />
-                    {selectedChannel.name}
-                  </Badge>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+      <EditorHeader
+        projectName={formData.name || "Novo Projeto"}
+        hasUnsavedChanges={hasUnsavedChanges}
+        isSaving={isSaving}
+        isUpdatingDevices={isUpdatingDevices}
+        connectedDevicesCount={connectedDevices.length}
+        onBack={() => navigate("/admin/playlists")}
+        onSave={handleSave}
+        onUpdateDevices={handleUpdateDevices}
+      />
 
-        <div className="flex items-center gap-2">
-          {!formData.channel_id && (
-            <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50 gap-1">
-              <AlertCircle className="w-3 h-3" />
-              Sem canal
-            </Badge>
-          )}
-
-          {/* Connected devices indicator */}
-          {connectedDevices.length > 0 && (
-            <Badge variant="outline" className="gap-1">
-              <Monitor className="w-3 h-3" />
-              {connectedDevices.length} dispositivo(s)
-            </Badge>
-          )}
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowPreview(!showPreview)}
-          >
-            {showPreview ? (
-              <>
-                <EyeOff className="w-4 h-4 mr-2" />
-                Esconder Preview
-              </>
-            ) : (
-              <>
-                <Eye className="w-4 h-4 mr-2" />
-                Mostrar Preview
-              </>
-            )}
-          </Button>
-
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={handleUpdateDevices}
-            disabled={isUpdatingDevices || connectedDevices.length === 0}
-          >
-            {isUpdatingDevices ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="w-4 h-4 mr-2" />
-            )}
-            Atualizar Dispositivos
-          </Button>
-
-          <Button onClick={handleSave} disabled={isSaving || !formData.name}>
-            {isSaving ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Save className="w-4 h-4 mr-2" />
-            )}
-            Salvar
-          </Button>
-        </div>
-      </div>
-
-      {/* Main Content - Improved Layout */}
+      {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Media Library - Left */}
-        <div className="w-80 flex-shrink-0 border-r">
-          <MediaLibrary onDragStart={setDraggingMedia} />
-        </div>
+        {/* Left Sidebar - Tools */}
+        <EditorSidebar
+          activePanel={activePanel}
+          onPanelChange={setActivePanel}
+        />
 
-        {/* Center Content - Preview + Timeline */}
-        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-          {/* Preview + Timeline Row */}
-          <div className="flex-1 flex overflow-hidden">
-            {/* Timeline takes most space */}
-            <div className="flex-1 overflow-hidden">
-              <PlaylistTimeline
-                items={items}
-                selectedItemId={selectedItemId}
-                onSelectItem={setSelectedItemId}
-                onAddMedia={handleAddMedia}
-                onRemoveItem={handleRemoveItem}
-                onDuplicateItem={handleDuplicateItem}
-                onUpdateDuration={handleUpdateDuration}
-                onReorderItems={handleReorderItems}
-                totalDuration={totalDuration}
-              />
-            </div>
-
-            {/* Preview on the right of timeline when visible */}
-            {showPreview && (
-              <div className="w-96 flex-shrink-0 p-4 border-l bg-muted/30 overflow-y-auto">
-                <PlaylistPreview
-                  items={items}
-                  isPlaying={isPreviewPlaying}
-                  onTogglePlay={() => setIsPreviewPlaying(!isPreviewPlaying)}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Settings - Right */}
-        <div className="w-80 flex-shrink-0">
-          <PlaylistSettings
-            playlist={formData}
+        {/* Left Panel - Media Library or Settings */}
+        {activePanel && (
+          <EditorPropertiesPanel
+            activePanel={activePanel}
+            formData={formData}
             channels={channels}
             itemCount={items.length}
             totalDuration={totalDuration}
-            onChange={handleFormChange}
             connectedDevicesCount={connectedDevices.length}
+            onFormChange={handleFormChange}
+            onAddMedia={handleAddMedia}
+            itemsLength={items.length}
+          />
+        )}
+
+        {/* Center - Canvas/Preview */}
+        <div className="flex-1 flex flex-col min-w-0">
+          <EditorCanvas
+            currentItem={currentPreviewItem}
+            isPlaying={isPreviewPlaying}
+            onTogglePlay={() => setIsPreviewPlaying(!isPreviewPlaying)}
+            onPrevious={() => setCurrentPreviewIndex(Math.max(0, currentPreviewIndex - 1))}
+            onNext={() => setCurrentPreviewIndex(Math.min(items.length - 1, currentPreviewIndex + 1))}
+            currentIndex={currentPreviewIndex}
+            totalItems={items.length}
+            zoom={zoom}
+            onZoomChange={setZoom}
+          />
+
+          {/* Timeline */}
+          <EditorTimeline
+            items={items}
+            selectedItemId={selectedItemId}
+            currentPreviewIndex={currentPreviewIndex}
+            onSelectItem={setSelectedItemId}
+            onSetPreviewIndex={setCurrentPreviewIndex}
+            onAddMedia={handleAddMedia}
+            onRemoveItem={handleRemoveItem}
+            onDuplicateItem={handleDuplicateItem}
+            onUpdateDuration={handleUpdateDuration}
+            onReorderItems={handleReorderItems}
+            totalDuration={totalDuration}
+            isPlaying={isPreviewPlaying}
           />
         </div>
       </div>
