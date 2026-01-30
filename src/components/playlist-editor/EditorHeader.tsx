@@ -42,30 +42,30 @@ export const EditorHeader = ({
   onUpdateDevices,
 }: EditorHeaderProps) => {
   return (
-    <header className="h-14 flex items-center justify-between px-4 bg-[#18181b] border-b border-white/10">
+    <header className="h-14 flex items-center justify-between px-4 bg-muted/50 border-b border-border">
       {/* Left Section */}
       <div className="flex items-center gap-3">
         <Button
           variant="ghost"
           size="icon"
           onClick={onBack}
-          className="h-9 w-9 text-white/70 hover:text-white hover:bg-white/10"
+          className="h-9 w-9"
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
 
         <div className="flex items-center gap-2">
-          <h1 className="text-sm font-medium text-white truncate max-w-[200px]">
+          <h1 className="text-sm font-medium truncate max-w-[200px]">
             {projectName}
           </h1>
           <div className="flex items-center gap-1.5 text-xs">
             {hasUnsavedChanges ? (
-              <span className="flex items-center gap-1 text-amber-400">
+              <span className="flex items-center gap-1 text-amber-500">
                 <Circle className="w-2 h-2 fill-current" />
                 Editando
               </span>
             ) : (
-              <span className="flex items-center gap-1 text-emerald-400">
+              <span className="flex items-center gap-1 text-emerald-500">
                 <Check className="w-3 h-3" />
                 Salvo
               </span>
@@ -79,7 +79,7 @@ export const EditorHeader = ({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-white/50 hover:text-white hover:bg-white/10"
+          className="h-8 w-8"
           disabled
         >
           <Undo2 className="w-4 h-4" />
@@ -87,7 +87,7 @@ export const EditorHeader = ({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-white/50 hover:text-white hover:bg-white/10"
+          className="h-8 w-8"
           disabled
         >
           <Redo2 className="w-4 h-4" />
@@ -101,7 +101,7 @@ export const EditorHeader = ({
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 text-white/70 hover:text-white hover:bg-white/10 gap-2"
+            className="h-8 gap-2"
             onClick={onUpdateDevices}
             disabled={isUpdatingDevices}
           >
@@ -120,19 +120,18 @@ export const EditorHeader = ({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
+              className="h-8 w-8"
             >
               <MoreHorizontal className="w-4 h-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48 bg-[#27272a] border-white/10">
-            <DropdownMenuItem className="text-white/70 hover:text-white focus:text-white focus:bg-white/10">
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem>
               <Download className="w-4 h-4 mr-2" />
               Exportar
             </DropdownMenuItem>
-            <DropdownMenuSeparator className="bg-white/10" />
+            <DropdownMenuSeparator />
             <DropdownMenuItem 
-              className="text-white/70 hover:text-white focus:text-white focus:bg-white/10"
               onClick={onUpdateDevices}
               disabled={connectedDevicesCount === 0}
             >
@@ -146,7 +145,7 @@ export const EditorHeader = ({
           onClick={onSave}
           disabled={isSaving}
           size="sm"
-          className="h-8 bg-primary hover:bg-primary/90 text-white gap-2"
+          className="h-8 gap-2"
         >
           {isSaving ? (
             <Loader2 className="w-4 h-4 animate-spin" />

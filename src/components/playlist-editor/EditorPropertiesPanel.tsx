@@ -100,14 +100,14 @@ const MediaLibraryPanel = ({ onAddMedia, itemsLength }: {
   return (
     <div className="h-full flex flex-col">
       {/* Search & Filter */}
-      <div className="p-3 space-y-2 border-b border-white/5">
+      <div className="p-3 space-y-2 border-b border-border">
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Buscar mídia..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 h-8 bg-white/5 border-white/10 text-white placeholder:text-white/40 text-sm"
+            className="pl-8 h-8 text-sm"
           />
         </div>
 
@@ -123,8 +123,8 @@ const MediaLibraryPanel = ({ onAddMedia, itemsLength }: {
               className={cn(
                 "flex-1 h-7 text-xs rounded transition-colors",
                 typeFilter === filter.value
-                  ? "bg-primary text-white"
-                  : "bg-white/5 text-white/60 hover:text-white hover:bg-white/10"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:text-foreground hover:bg-accent"
               )}
             >
               {filter.label}
@@ -136,9 +136,9 @@ const MediaLibraryPanel = ({ onAddMedia, itemsLength }: {
       {/* Media Grid */}
       <ScrollArea className="flex-1">
         {isLoading ? (
-          <div className="p-4 text-center text-white/40 text-sm">Carregando...</div>
+          <div className="p-4 text-center text-muted-foreground text-sm">Carregando...</div>
         ) : filteredItems.length === 0 ? (
-          <div className="p-4 text-center text-white/40 text-sm">Nenhuma mídia</div>
+          <div className="p-4 text-center text-muted-foreground text-sm">Nenhuma mídia</div>
         ) : (
           <div className="grid grid-cols-2 gap-2 p-3">
             {filteredItems.map((media) => {
@@ -149,7 +149,7 @@ const MediaLibraryPanel = ({ onAddMedia, itemsLength }: {
                   key={media.id}
                   draggable
                   onDragStart={(e) => handleDragStart(e, media)}
-                  className="group relative aspect-square rounded-lg overflow-hidden bg-white/5 cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-primary/50 transition-all"
+                  className="group relative aspect-square rounded-lg overflow-hidden bg-muted cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-primary/50 transition-all"
                 >
                   {media.file_url ? (
                     media.type === "video" ? (
@@ -167,7 +167,7 @@ const MediaLibraryPanel = ({ onAddMedia, itemsLength }: {
                       />
                     )
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-white/30">
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                       <Icon className="w-8 h-8" />
                     </div>
                   )}
@@ -196,8 +196,8 @@ const MediaLibraryPanel = ({ onAddMedia, itemsLength }: {
       </ScrollArea>
 
       {/* Footer */}
-      <div className="p-3 border-t border-white/5">
-        <p className="text-[10px] text-white/40 text-center">
+      <div className="p-3 border-t border-border">
+        <p className="text-[10px] text-muted-foreground text-center">
           Arraste para adicionar à timeline
         </p>
       </div>
@@ -232,56 +232,56 @@ const SettingsPanel = ({
       <div className="p-4 space-y-6">
         {/* Stats */}
         <div className="grid grid-cols-3 gap-2">
-          <div className="p-3 rounded-lg bg-white/5 text-center">
-            <p className="text-lg font-semibold text-white">{itemCount}</p>
-            <p className="text-[10px] text-white/50">Itens</p>
+          <div className="p-3 rounded-lg bg-muted text-center">
+            <p className="text-lg font-semibold">{itemCount}</p>
+            <p className="text-[10px] text-muted-foreground">Itens</p>
           </div>
-          <div className="p-3 rounded-lg bg-white/5 text-center">
-            <p className="text-lg font-semibold text-white">{formatDuration(totalDuration)}</p>
-            <p className="text-[10px] text-white/50">Duração</p>
+          <div className="p-3 rounded-lg bg-muted text-center">
+            <p className="text-lg font-semibold">{formatDuration(totalDuration)}</p>
+            <p className="text-[10px] text-muted-foreground">Duração</p>
           </div>
-          <div className="p-3 rounded-lg bg-white/5 text-center">
-            <p className="text-lg font-semibold text-white">{connectedDevicesCount}</p>
-            <p className="text-[10px] text-white/50">Devices</p>
+          <div className="p-3 rounded-lg bg-muted text-center">
+            <p className="text-lg font-semibold">{connectedDevicesCount}</p>
+            <p className="text-[10px] text-muted-foreground">Devices</p>
           </div>
         </div>
 
         {/* Basic Info */}
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label className="text-xs text-white/60">Nome do Projeto</Label>
+            <Label className="text-xs text-muted-foreground">Nome do Projeto</Label>
             <Input
               value={formData.name}
               onChange={(e) => onFormChange({ name: e.target.value })}
               placeholder="Nome da playlist"
-              className="h-9 bg-white/5 border-white/10 text-white text-sm"
+              className="h-9 text-sm"
             />
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs text-white/60">Descrição</Label>
+            <Label className="text-xs text-muted-foreground">Descrição</Label>
             <Textarea
               value={formData.description || ""}
               onChange={(e) => onFormChange({ description: e.target.value || null })}
               placeholder="Opcional"
               rows={2}
-              className="bg-white/5 border-white/10 text-white text-sm resize-none"
+              className="text-sm resize-none"
             />
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs text-white/60">Canal</Label>
+            <Label className="text-xs text-muted-foreground">Canal</Label>
             <Select
               value={formData.channel_id || "none"}
               onValueChange={(v) => onFormChange({ channel_id: v === "none" ? null : v })}
             >
-              <SelectTrigger className="h-9 bg-white/5 border-white/10 text-white text-sm">
+              <SelectTrigger className="h-9 text-sm">
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
-              <SelectContent className="bg-[#27272a] border-white/10">
-                <SelectItem value="none" className="text-white/70">Nenhum</SelectItem>
+              <SelectContent>
+                <SelectItem value="none">Nenhum</SelectItem>
                 {channels.map((channel) => (
-                  <SelectItem key={channel.id} value={channel.id} className="text-white">
+                  <SelectItem key={channel.id} value={channel.id}>
                     {channel.name}
                   </SelectItem>
                 ))}
@@ -292,34 +292,34 @@ const SettingsPanel = ({
 
         {/* Schedule */}
         <div className="space-y-3">
-          <div className="flex items-center gap-2 text-xs text-white/60">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Calendar className="w-3.5 h-3.5" />
             <span>Programação</span>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <Label className="text-[10px] text-white/40">Início</Label>
+              <Label className="text-[10px] text-muted-foreground">Início</Label>
               <Input
                 type="date"
                 value={formData.start_date || ""}
                 onChange={(e) => onFormChange({ start_date: e.target.value || null })}
-                className="h-8 bg-white/5 border-white/10 text-white text-xs"
+                className="h-8 text-xs"
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-[10px] text-white/40">Fim</Label>
+              <Label className="text-[10px] text-muted-foreground">Fim</Label>
               <Input
                 type="date"
                 value={formData.end_date || ""}
                 onChange={(e) => onFormChange({ end_date: e.target.value || null })}
-                className="h-8 bg-white/5 border-white/10 text-white text-xs"
+                className="h-8 text-xs"
               />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-[10px] text-white/40">Dias da Semana</Label>
+            <Label className="text-[10px] text-muted-foreground">Dias da Semana</Label>
             <div className="flex gap-1">
               {DAYS_OF_WEEK.map((day) => (
                 <button
@@ -328,8 +328,8 @@ const SettingsPanel = ({
                   className={cn(
                     "flex-1 h-8 rounded text-xs font-medium transition-colors",
                     formData.days_of_week.includes(day.value)
-                      ? "bg-primary text-white"
-                      : "bg-white/5 text-white/40 hover:text-white/60"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:text-foreground"
                   )}
                 >
                   {day.label}
@@ -340,7 +340,7 @@ const SettingsPanel = ({
 
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <Label className="text-[10px] text-white/40 flex items-center gap-1">
+              <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
                 <Clock className="w-3 h-3" />
                 Horário Início
               </Label>
@@ -348,11 +348,11 @@ const SettingsPanel = ({
                 type="time"
                 value={formData.start_time}
                 onChange={(e) => onFormChange({ start_time: e.target.value })}
-                className="h-8 bg-white/5 border-white/10 text-white text-xs"
+                className="h-8 text-xs"
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-[10px] text-white/40 flex items-center gap-1">
+              <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
                 <Clock className="w-3 h-3" />
                 Horário Fim
               </Label>
@@ -360,7 +360,7 @@ const SettingsPanel = ({
                 type="time"
                 value={formData.end_time}
                 onChange={(e) => onFormChange({ end_time: e.target.value })}
-                className="h-8 bg-white/5 border-white/10 text-white text-xs"
+                className="h-8 text-xs"
               />
             </div>
           </div>
@@ -369,7 +369,7 @@ const SettingsPanel = ({
         {/* Priority & Status */}
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label className="text-xs text-white/60 flex items-center gap-1.5">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
               <Zap className="w-3.5 h-3.5" />
               Prioridade (1-10)
             </Label>
@@ -379,14 +379,14 @@ const SettingsPanel = ({
               max={10}
               value={formData.priority}
               onChange={(e) => onFormChange({ priority: parseInt(e.target.value) || 5 })}
-              className="h-9 bg-white/5 border-white/10 text-white text-sm"
+              className="h-9 text-sm"
             />
           </div>
 
-          <div className="flex items-center justify-between p-3 rounded-lg bg-white/5">
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted">
             <div>
-              <p className="text-sm text-white font-medium">Ativa</p>
-              <p className="text-[10px] text-white/40">Exibir nos dispositivos</p>
+              <p className="text-sm font-medium">Ativa</p>
+              <p className="text-[10px] text-muted-foreground">Exibir nos dispositivos</p>
             </div>
             <Switch
               checked={formData.is_active}
@@ -411,10 +411,10 @@ export const EditorPropertiesPanel = ({
   itemsLength,
 }: EditorPropertiesPanelProps) => {
   return (
-    <div className="w-72 flex flex-col bg-[#18181b] border-r border-white/10">
+    <div className="w-72 flex flex-col bg-muted/50 border-r border-border">
       {/* Panel Header */}
-      <div className="h-10 flex items-center justify-between px-4 border-b border-white/5">
-        <span className="text-xs font-medium text-white/70">
+      <div className="h-10 flex items-center justify-between px-4 border-b border-border">
+        <span className="text-xs font-medium text-muted-foreground">
           {activePanel === "media" ? "Biblioteca de Mídias" : "Configurações"}
         </span>
       </div>

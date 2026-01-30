@@ -152,27 +152,27 @@ export const EditorTimeline = ({
   return (
     <div 
       className={cn(
-        "flex flex-col bg-[#18181b] border-t border-white/10 transition-all",
+        "flex flex-col bg-muted/50 border-t border-border transition-all",
         isExpanded ? "h-48" : "h-12"
       )}
     >
       {/* Timeline Header */}
-      <div className="h-10 flex items-center justify-between px-4 border-b border-white/5">
+      <div className="h-10 flex items-center justify-between px-4 border-b border-border">
         <div className="flex items-center gap-4">
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="flex items-center gap-2 text-white/70 hover:text-white transition-colors"
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
             <span className="text-xs font-medium">Timeline</span>
           </button>
           
-          <div className="flex items-center gap-2 text-xs text-white/50">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
               <Clock className="w-3 h-3" />
               {formatDuration(totalDuration)}
             </span>
-            <span className="text-white/30">•</span>
+            <span className="opacity-50">•</span>
             <span>{items.length} {items.length === 1 ? "item" : "itens"}</span>
           </div>
         </div>
@@ -194,11 +194,11 @@ export const EditorTimeline = ({
               <div 
                 className={cn(
                   "flex flex-col items-center gap-2 px-8 py-4 rounded-xl border-2 border-dashed transition-colors",
-                  isDragOver ? "border-primary bg-primary/10" : "border-white/10"
+                  isDragOver ? "border-primary bg-primary/10" : "border-border"
                 )}
               >
-                <Plus className="w-8 h-8 text-white/30" />
-                <p className="text-xs text-white/40">Arraste mídias aqui</p>
+                <Plus className="w-8 h-8 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground">Arraste mídias aqui</p>
               </div>
             </div>
           ) : (
@@ -227,13 +227,13 @@ export const EditorTimeline = ({
                       className={cn(
                         "group relative flex-shrink-0 rounded-lg overflow-hidden cursor-pointer transition-all",
                         "border-2",
-                        isSelected ? "border-primary" : isCurrent ? "border-white/30" : "border-transparent",
+                        isSelected ? "border-primary" : isCurrent ? "border-foreground/30" : "border-transparent",
                         draggedIndex === index ? "opacity-50" : ""
                       )}
                       style={{ width: `${width}px`, height: "100%" }}
                     >
                       {/* Thumbnail */}
-                      <div className="absolute inset-0 bg-[#27272a]">
+                      <div className="absolute inset-0 bg-muted">
                         {item.media?.file_url && (
                           item.media.type === "video" ? (
                             <video
@@ -273,13 +273,12 @@ export const EditorTimeline = ({
                                 <MoreVertical className="w-3 h-3" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="bg-[#27272a] border-white/10">
+                            <DropdownMenuContent align="end">
                               <DropdownMenuItem 
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   onDuplicateItem(item);
                                 }}
-                                className="text-white/70 hover:text-white focus:text-white focus:bg-white/10"
                               >
                                 <Copy className="w-4 h-4 mr-2" />
                                 Duplicar
@@ -289,7 +288,7 @@ export const EditorTimeline = ({
                                   e.stopPropagation();
                                   onRemoveItem(item.id);
                                 }}
-                                className="text-red-400 hover:text-red-300 focus:text-red-300 focus:bg-red-500/10"
+                                className="text-destructive focus:text-destructive"
                               >
                                 <Trash2 className="w-4 h-4 mr-2" />
                                 Remover
@@ -325,15 +324,15 @@ export const EditorTimeline = ({
                 <div
                   className={cn(
                     "flex-shrink-0 w-16 rounded-lg border-2 border-dashed flex items-center justify-center transition-colors",
-                    isDragOver ? "border-primary bg-primary/10" : "border-white/10 hover:border-white/20"
+                    isDragOver ? "border-primary bg-primary/10" : "border-border hover:border-muted-foreground"
                   )}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => handleItemDrop(e, items.length)}
                 >
-                  <Plus className="w-5 h-5 text-white/30" />
+                  <Plus className="w-5 h-5 text-muted-foreground" />
                 </div>
               </div>
-              <ScrollBar orientation="horizontal" className="bg-white/5" />
+              <ScrollBar orientation="horizontal" />
             </ScrollArea>
           )}
         </div>

@@ -69,7 +69,7 @@ export const EditorCanvas = ({
   const scaleValue = zoom / 100;
 
   return (
-    <div className="flex-1 flex flex-col bg-[#0a0a0b] min-h-0">
+    <div className="flex-1 flex flex-col bg-background min-h-0">
       {/* Canvas Area */}
       <div 
         ref={canvasRef}
@@ -80,8 +80,8 @@ export const EditorCanvas = ({
           className="absolute inset-0 opacity-5"
           style={{
             backgroundImage: `
-              linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)
+              linear-gradient(hsl(var(--muted-foreground) / 0.3) 1px, transparent 1px),
+              linear-gradient(90deg, hsl(var(--muted-foreground) / 0.3) 1px, transparent 1px)
             `,
             backgroundSize: '20px 20px'
           }}
@@ -164,13 +164,13 @@ export const EditorCanvas = ({
       </div>
 
       {/* Controls Bar */}
-      <div className="h-14 flex items-center justify-between px-4 bg-[#18181b] border-t border-white/10">
+      <div className="h-14 flex items-center justify-between px-4 bg-muted/50 border-t border-border">
         {/* Left - Zoom Controls */}
         <div className="flex items-center gap-2 w-48">
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-white/60 hover:text-white hover:bg-white/10"
+            className="h-8 w-8"
             onClick={() => onZoomChange(Math.max(50, zoom - 10))}
           >
             <ZoomOut className="w-4 h-4" />
@@ -186,12 +186,12 @@ export const EditorCanvas = ({
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-white/60 hover:text-white hover:bg-white/10"
+            className="h-8 w-8"
             onClick={() => onZoomChange(Math.min(150, zoom + 10))}
           >
             <ZoomIn className="w-4 h-4" />
           </Button>
-          <span className="text-xs text-white/40 w-10">{zoom}%</span>
+          <span className="text-xs text-muted-foreground w-10">{zoom}%</span>
         </div>
 
         {/* Center - Playback Controls */}
@@ -199,7 +199,7 @@ export const EditorCanvas = ({
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 text-white/70 hover:text-white hover:bg-white/10"
+            className="h-9 w-9"
             onClick={onPrevious}
             disabled={currentIndex <= 0}
           >
@@ -211,8 +211,8 @@ export const EditorCanvas = ({
             className={cn(
               "h-10 w-10 rounded-full transition-all",
               isPlaying 
-                ? "bg-white text-black hover:bg-white/90" 
-                : "bg-primary text-white hover:bg-primary/90"
+                ? "bg-foreground text-background hover:bg-foreground/90" 
+                : "bg-primary text-primary-foreground hover:bg-primary/90"
             )}
             onClick={onTogglePlay}
             disabled={totalItems === 0}
@@ -227,7 +227,7 @@ export const EditorCanvas = ({
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 text-white/70 hover:text-white hover:bg-white/10"
+            className="h-9 w-9"
             onClick={onNext}
             disabled={currentIndex >= totalItems - 1}
           >
@@ -237,7 +237,7 @@ export const EditorCanvas = ({
 
         {/* Right - Item Counter */}
         <div className="flex items-center gap-2 w-48 justify-end">
-          <span className="text-xs text-white/40">
+          <span className="text-xs text-muted-foreground">
             {totalItems > 0 ? `${currentIndex + 1} / ${totalItems}` : "0 itens"}
           </span>
         </div>
