@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { toast } from 'sonner';
-import { Database, Loader2, ArrowLeft } from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
+import logoHorizontal from '@/assets/logo_horizontal.svg';
 import { z } from 'zod';
 
 const emailSchema = z.string().email('Email inválido').max(255);
@@ -80,11 +81,8 @@ export default function Auth() {
         <Card className="w-full max-w-md animate-fade-in">
           <CardHeader className="text-center space-y-4">
             <div className="flex justify-center">
-              <div className="p-3 rounded-xl gradient-primary">
-                <Database className="h-8 w-8 text-primary-foreground" />
-              </div>
+              <img src={logoHorizontal} alt="MupaMídias" className="h-12" />
             </div>
-            <CardTitle className="text-2xl font-bold">SignageAI</CardTitle>
             <CardDescription>Entre com suas credenciais para acessar o sistema</CardDescription>
           </CardHeader>
           <CardContent>
