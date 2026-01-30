@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,10 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { toast } from 'sonner';
-import { Loader2, Monitor, Building2, Layers, CheckCircle, LogOut } from 'lucide-react';
+import { Loader2, Monitor, Building2, Layers, CheckCircle, LogOut, Search, ChevronsUpDown, Check } from 'lucide-react';
 import { z } from 'zod';
+import { cn } from '@/lib/utils';
 
 const emailSchema = z.string().email('Email inválido').max(255);
 const passwordSchema = z.string().min(6, 'Mínimo 6 caracteres').max(72);
@@ -49,6 +52,8 @@ export default function DeviceSetup() {
   const [deviceGroups, setDeviceGroups] = useState<DeviceGroup[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [isLoadingData, setIsLoadingData] = useState(false);
+  const [storeSearchOpen, setStoreSearchOpen] = useState(false);
+  const [storeSearchQuery, setStoreSearchQuery] = useState('');
   
   // Device state
   const [deviceName, setDeviceName] = useState('');
@@ -397,19 +402,73 @@ export default function DeviceSetup() {
                   <>
                     <div className="space-y-2">
                       <Label>Loja</Label>
-                      <Select value={selectedStoreId} onValueChange={setSelectedStoreId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione uma loja" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {stores.map((store) => (
-                            <SelectItem key={store.id} value={store.id}>
-                              <span className="font-medium">{store.code}</span>
-                              <span className="text-muted-foreground ml-2">- {store.name}</span>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Popover open={storeSearchOpen} onOpenChange={setStoreSearchOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={storeSearchOpen}
+                            className="w-full justify-between font-normal"
+                          >
+                            {selectedStoreId ? (
+                              <span>
+                                <span className="font-medium">{stores.find(s => s.id === selectedStoreId)?.code}</span>
+                                <span className="text-muted-foreground ml-2">- {stores.find(s => s.id === selectedStoreId)?.name}</span>
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">Buscar loja por código ou nome...</span>
+                            )}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                          <Command shouldFilter={false}>
+                            <CommandInput 
+                              placeholder="Digite código ou nome da loja..." 
+                              value={storeSearchQuery}
+                              onValueChange={setStoreSearchQuery}
+                            />
+                            <CommandList>
+                              <CommandEmpty>Nenhuma loja encontrada.</CommandEmpty>
+                              <CommandGroup>
+                                {stores
+                                  .filter(store => {
+                                    if (!storeSearchQuery) return true;
+                                    const query = storeSearchQuery.toLowerCase();
+                                    return store.code.toLowerCase().includes(query) || 
+                                           store.name.toLowerCase().includes(query);
+                                  })
+                                  .slice(0, 50) // Limit results for performance
+                                  .map((store) => (
+                                    <CommandItem
+                                      key={store.id}
+                                      value={store.id}
+                                      onSelect={() => {
+                                        setSelectedStoreId(store.id);
+                                        setStoreSearchOpen(false);
+                                        setStoreSearchQuery('');
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          selectedStoreId === store.id ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      <span className="font-medium">{store.code}</span>
+                                      <span className="text-muted-foreground ml-2">- {store.name}</span>
+                                    </CommandItem>
+                                  ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      {stores.length > 50 && (
+                        <p className="text-xs text-muted-foreground">
+                          {stores.length} lojas disponíveis. Use a busca para filtrar.
+                        </p>
+                      )}
                     </div>
 
                     <div className="space-y-2">
