@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { usePlaylists } from "@/hooks/usePlaylists";
 import { usePlaylistItems } from "@/hooks/usePlaylistItems";
 import { useChannels } from "@/hooks/useChannels";
+import { useDevices } from "@/hooks/useDevices";
 import { MediaItem } from "@/hooks/useMediaItems";
 import { MediaLibrary } from "./MediaLibrary";
 import { PlaylistTimeline } from "./PlaylistTimeline";
@@ -11,6 +12,7 @@ import { PlaylistPreview } from "./PlaylistPreview";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   ArrowLeft, 
   Save, 
@@ -18,7 +20,9 @@ import {
   EyeOff,
   Loader2,
   Radio,
-  AlertCircle
+  AlertCircle,
+  RefreshCw,
+  Monitor
 } from "lucide-react";
 
 interface PlaylistFormData {
@@ -41,6 +45,7 @@ export const PlaylistEditor = () => {
   
   const { playlists, updatePlaylist, createPlaylist } = usePlaylists();
   const { channels } = useChannels();
+  const { devices } = useDevices();
   const [createdPlaylistId, setCreatedPlaylistId] = useState<string | null>(null);
   
   // Use created playlist ID if we just created one, otherwise use URL param
@@ -60,11 +65,15 @@ export const PlaylistEditor = () => {
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUpdatingDevices, setIsUpdatingDevices] = useState(false);
   const [draggingMedia, setDraggingMedia] = useState<MediaItem | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const existingPlaylist = playlists.find((p) => p.id === activePlaylistId);
   const isNewPlaylist = !playlistId && !createdPlaylistId;
+
+  // Get devices connected to this playlist
+  const connectedDevices = devices.filter(d => d.current_playlist_id === activePlaylistId);
 
   const [formData, setFormData] = useState<PlaylistFormData>({
     name: "",
@@ -218,13 +227,45 @@ export const PlaylistEditor = () => {
     }
   };
 
+  const handleUpdateDevices = async () => {
+    if (!activePlaylistId || connectedDevices.length === 0) {
+      toast({ 
+        title: "Nenhum dispositivo conectado", 
+        description: "Esta playlist não está vinculada a nenhum dispositivo.",
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    setIsUpdatingDevices(true);
+
+    try {
+      // Update the updated_at timestamp to trigger device refresh
+      const { error } = await supabase
+        .from("devices")
+        .update({ updated_at: new Date().toISOString() })
+        .in("id", connectedDevices.map(d => d.id));
+
+      if (error) throw error;
+
+      toast({ 
+        title: "Dispositivos atualizados!", 
+        description: `${connectedDevices.length} dispositivo(s) receberão a atualização.` 
+      });
+    } catch (error) {
+      toast({ title: "Erro ao atualizar dispositivos", variant: "destructive" });
+    } finally {
+      setIsUpdatingDevices(false);
+    }
+  };
+
   const totalDuration = getTotalDuration();
   const selectedChannel = channels.find(c => c.id === formData.channel_id);
 
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b bg-card">
+      <div className="flex items-center justify-between px-6 py-3 border-b bg-card">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
@@ -266,6 +307,14 @@ export const PlaylistEditor = () => {
               Sem canal
             </Badge>
           )}
+
+          {/* Connected devices indicator */}
+          {connectedDevices.length > 0 && (
+            <Badge variant="outline" className="gap-1">
+              <Monitor className="w-3 h-3" />
+              {connectedDevices.length} dispositivo(s)
+            </Badge>
+          )}
           
           <Button
             variant="outline"
@@ -285,6 +334,20 @@ export const PlaylistEditor = () => {
             )}
           </Button>
 
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handleUpdateDevices}
+            disabled={isUpdatingDevices || connectedDevices.length === 0}
+          >
+            {isUpdatingDevices ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4 mr-2" />
+            )}
+            Atualizar Dispositivos
+          </Button>
+
           <Button onClick={handleSave} disabled={isSaving || !formData.name}>
             {isSaving ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -296,41 +359,42 @@ export const PlaylistEditor = () => {
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* Main Content - Improved Layout */}
       <div className="flex-1 flex overflow-hidden">
         {/* Media Library - Left */}
-        <div className="w-72 flex-shrink-0">
+        <div className="w-80 flex-shrink-0 border-r">
           <MediaLibrary onDragStart={setDraggingMedia} />
         </div>
 
-        {/* Center Content */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Preview */}
-          {showPreview && (
-            <div className="p-4 border-b bg-muted/30">
-              <div className="max-w-md mx-auto">
+        {/* Center Content - Preview + Timeline */}
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+          {/* Preview + Timeline Row */}
+          <div className="flex-1 flex overflow-hidden">
+            {/* Timeline takes most space */}
+            <div className="flex-1 overflow-hidden">
+              <PlaylistTimeline
+                items={items}
+                selectedItemId={selectedItemId}
+                onSelectItem={setSelectedItemId}
+                onAddMedia={handleAddMedia}
+                onRemoveItem={handleRemoveItem}
+                onDuplicateItem={handleDuplicateItem}
+                onUpdateDuration={handleUpdateDuration}
+                onReorderItems={handleReorderItems}
+                totalDuration={totalDuration}
+              />
+            </div>
+
+            {/* Preview on the right of timeline when visible */}
+            {showPreview && (
+              <div className="w-96 flex-shrink-0 p-4 border-l bg-muted/30 overflow-y-auto">
                 <PlaylistPreview
                   items={items}
                   isPlaying={isPreviewPlaying}
                   onTogglePlay={() => setIsPreviewPlaying(!isPreviewPlaying)}
                 />
               </div>
-            </div>
-          )}
-
-          {/* Timeline */}
-          <div className="flex-1 overflow-hidden">
-            <PlaylistTimeline
-              items={items}
-              selectedItemId={selectedItemId}
-              onSelectItem={setSelectedItemId}
-              onAddMedia={handleAddMedia}
-              onRemoveItem={handleRemoveItem}
-              onDuplicateItem={handleDuplicateItem}
-              onUpdateDuration={handleUpdateDuration}
-              onReorderItems={handleReorderItems}
-              totalDuration={totalDuration}
-            />
+            )}
           </div>
         </div>
 
@@ -342,6 +406,7 @@ export const PlaylistEditor = () => {
             itemCount={items.length}
             totalDuration={totalDuration}
             onChange={handleFormChange}
+            connectedDevicesCount={connectedDevices.length}
           />
         </div>
       </div>

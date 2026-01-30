@@ -15,7 +15,8 @@ import {
   Settings, 
   AlertTriangle, 
   CheckCircle,
-  Zap
+  Zap,
+  Monitor
 } from "lucide-react";
 import { format, parseISO, isBefore, addDays } from "date-fns";
 
@@ -46,6 +47,7 @@ interface PlaylistSettingsProps {
   itemCount: number;
   totalDuration: number;
   onChange: (updates: Partial<PlaylistSettingsProps["playlist"]>) => void;
+  connectedDevicesCount?: number;
 }
 
 const formatDuration = (seconds: number) => {
@@ -68,6 +70,7 @@ export const PlaylistSettings = ({
   itemCount,
   totalDuration,
   onChange,
+  connectedDevicesCount = 0,
 }: PlaylistSettingsProps) => {
   const toggleDayOfWeek = (day: number) => {
     const newDays = playlist.days_of_week.includes(day)
@@ -122,6 +125,13 @@ export const PlaylistSettings = ({
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Duração total</span>
               <Badge variant="outline">{formatDuration(totalDuration)}</Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Dispositivos</span>
+              <Badge variant="outline" className="gap-1">
+                <Monitor className="w-3 h-3" />
+                {connectedDevicesCount}
+              </Badge>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Status</span>
