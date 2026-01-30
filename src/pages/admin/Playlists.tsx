@@ -6,14 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Search, ListVideo, Edit, Trash2, Calendar, Clock, AlertTriangle, CheckCircle, Layers } from "lucide-react";
+import { Plus, Search, ListVideo, Edit, Trash2, Calendar, Clock, AlertTriangle, Layers } from "lucide-react";
 import { format, parseISO, isAfter, isBefore, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -202,10 +202,9 @@ const PlaylistForm = ({ formData, setFormData, channels, onSubmit, submitLabel }
 
 const PlaylistsPage = () => {
   const navigate = useNavigate();
-  const { playlists, isLoading, createPlaylist, updatePlaylist, deletePlaylist } = usePlaylists();
+  const { playlists, isLoading, updatePlaylist, deletePlaylist } = usePlaylists();
   const { channels } = useChannels();
   const [searchTerm, setSearchTerm] = useState("");
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<PlaylistWithChannel | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -227,33 +226,6 @@ const PlaylistsPage = () => {
       playlist.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       playlist.channel?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  const handleCreate = () => {
-    const schedule = {
-      start_date: formData.start_date,
-      end_date: formData.end_date,
-      days_of_week: formData.days_of_week,
-      start_time: formData.start_time,
-      end_time: formData.end_time,
-      priority: formData.priority,
-    };
-
-    createPlaylist.mutate(
-      {
-        name: formData.name,
-        description: formData.description,
-        channel_id: formData.channel_id,
-        is_active: formData.is_active,
-        schedule,
-      },
-      {
-        onSuccess: () => {
-          setIsCreateOpen(false);
-          resetForm();
-        },
-      }
-    );
-  };
 
   const handleUpdate = () => {
     if (!editingPlaylist) return;
@@ -359,20 +331,10 @@ const PlaylistsPage = () => {
           <h1 className="text-3xl font-bold">Playlists</h1>
           <p className="text-muted-foreground">Gerencie as playlists e programação de conteúdo</p>
         </div>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={resetForm}>
-              <Plus className="w-4 h-4 mr-2" />
-              Nova Playlist
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Criar Playlist</DialogTitle>
-            </DialogHeader>
-            <PlaylistForm formData={formData} setFormData={setFormData} channels={channels} onSubmit={handleCreate} submitLabel="Criar" />
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => navigate("/admin/playlists/new")}>
+          <Plus className="w-4 h-4 mr-2" />
+          Nova Playlist
+        </Button>
       </div>
 
       <div className="flex items-center space-x-4">

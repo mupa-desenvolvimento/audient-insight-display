@@ -9,13 +9,16 @@ import { PlaylistTimeline } from "./PlaylistTimeline";
 import { PlaylistSettings } from "./PlaylistSettings";
 import { PlaylistPreview } from "./PlaylistPreview";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { 
   ArrowLeft, 
   Save, 
   Eye, 
   EyeOff,
-  Loader2
+  Loader2,
+  Radio,
+  AlertCircle
 } from "lucide-react";
 
 interface PlaylistFormData {
@@ -38,6 +41,11 @@ export const PlaylistEditor = () => {
   
   const { playlists, updatePlaylist, createPlaylist } = usePlaylists();
   const { channels } = useChannels();
+  const [createdPlaylistId, setCreatedPlaylistId] = useState<string | null>(null);
+  
+  // Use created playlist ID if we just created one, otherwise use URL param
+  const activePlaylistId = createdPlaylistId || playlistId || null;
+  
   const { 
     items, 
     isLoading: itemsLoading, 
@@ -46,15 +54,17 @@ export const PlaylistEditor = () => {
     updateItem, 
     reorderItems,
     getTotalDuration 
-  } = usePlaylistItems(playlistId || null);
+  } = usePlaylistItems(activePlaylistId);
 
   const [showPreview, setShowPreview] = useState(true);
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [draggingMedia, setDraggingMedia] = useState<MediaItem | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  const existingPlaylist = playlists.find((p) => p.id === playlistId);
+  const existingPlaylist = playlists.find((p) => p.id === activePlaylistId);
+  const isNewPlaylist = !playlistId && !createdPlaylistId;
 
   const [formData, setFormData] = useState<PlaylistFormData>({
     name: "",
@@ -90,18 +100,55 @@ export const PlaylistEditor = () => {
 
   const handleFormChange = useCallback((updates: Partial<PlaylistFormData>) => {
     setFormData((prev) => ({ ...prev, ...updates }));
+    setHasUnsavedChanges(true);
   }, []);
 
-  const handleAddMedia = useCallback((media: MediaItem, position: number) => {
-    if (!playlistId) return;
+  // Create playlist on first media add if new
+  const ensurePlaylistExists = async (): Promise<string | null> => {
+    if (activePlaylistId) return activePlaylistId;
+    
+    // Create a new playlist with temporary name
+    const tempName = formData.name || `Nova Playlist ${new Date().toLocaleString("pt-BR")}`;
+    
+    const schedule = {
+      start_date: formData.start_date,
+      end_date: formData.end_date,
+      days_of_week: formData.days_of_week,
+      start_time: formData.start_time,
+      end_time: formData.end_time,
+      priority: formData.priority,
+    };
+
+    const playlistData = {
+      name: tempName,
+      description: formData.description,
+      channel_id: formData.channel_id,
+      is_active: formData.is_active,
+      schedule,
+    };
+
+    try {
+      const result = await createPlaylist.mutateAsync(playlistData);
+      setCreatedPlaylistId(result.id);
+      setFormData(prev => ({ ...prev, name: tempName }));
+      return result.id;
+    } catch (error) {
+      toast({ title: "Erro ao criar playlist", variant: "destructive" });
+      return null;
+    }
+  };
+
+  const handleAddMedia = useCallback(async (media: MediaItem, position: number) => {
+    const id = await ensurePlaylistExists();
+    if (!id) return;
     
     addItem.mutate({
-      playlist_id: playlistId,
+      playlist_id: id,
       media_id: media.id,
       position,
       duration_override: media.duration,
     });
-  }, [playlistId, addItem]);
+  }, [activePlaylistId, addItem, formData, createPlaylist]);
 
   const handleRemoveItem = useCallback((id: string) => {
     removeItem.mutate(id);
@@ -110,16 +157,17 @@ export const PlaylistEditor = () => {
     }
   }, [removeItem, selectedItemId]);
 
-  const handleDuplicateItem = useCallback((item: typeof items[0]) => {
-    if (!playlistId) return;
+  const handleDuplicateItem = useCallback(async (item: typeof items[0]) => {
+    const id = await ensurePlaylistExists();
+    if (!id) return;
     
     addItem.mutate({
-      playlist_id: playlistId,
+      playlist_id: id,
       media_id: item.media_id,
       position: items.length,
       duration_override: item.duration_override,
     });
-  }, [playlistId, items.length, addItem]);
+  }, [items.length, addItem, ensurePlaylistExists]);
 
   const handleUpdateDuration = useCallback((id: string, duration: number) => {
     updateItem.mutate({ id, duration_override: duration });
@@ -155,11 +203,13 @@ export const PlaylistEditor = () => {
     };
 
     try {
-      if (playlistId) {
-        await updatePlaylist.mutateAsync({ id: playlistId, ...playlistData });
+      if (activePlaylistId) {
+        await updatePlaylist.mutateAsync({ id: activePlaylistId, ...playlistData });
       } else {
-        await createPlaylist.mutateAsync(playlistData);
+        const result = await createPlaylist.mutateAsync(playlistData);
+        setCreatedPlaylistId(result.id);
       }
+      setHasUnsavedChanges(false);
       toast({ title: "Playlist salva com sucesso!" });
     } catch (error) {
       toast({ title: "Erro ao salvar playlist", variant: "destructive" });
@@ -169,6 +219,7 @@ export const PlaylistEditor = () => {
   };
 
   const totalDuration = getTotalDuration();
+  const selectedChannel = channels.find(c => c.id === formData.channel_id);
 
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col">
@@ -183,16 +234,39 @@ export const PlaylistEditor = () => {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-xl font-semibold">
-              {playlistId ? "Editar Playlist" : "Nova Playlist"}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {formData.name || "Sem nome"}
-            </p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-semibold">
+                {isNewPlaylist ? "Nova Playlist" : "Editar Playlist"}
+              </h1>
+              {hasUnsavedChanges && (
+                <Badge variant="outline" className="text-yellow-600 border-yellow-300 bg-yellow-50">
+                  Alterações não salvas
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>{formData.name || "Sem nome"}</span>
+              {selectedChannel && (
+                <>
+                  <span>•</span>
+                  <Badge variant="secondary" className="gap-1 text-xs">
+                    <Radio className="w-3 h-3" />
+                    {selectedChannel.name}
+                  </Badge>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          {!formData.channel_id && (
+            <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50 gap-1">
+              <AlertCircle className="w-3 h-3" />
+              Sem canal
+            </Badge>
+          )}
+          
           <Button
             variant="outline"
             size="sm"
