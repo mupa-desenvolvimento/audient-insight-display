@@ -11,7 +11,8 @@ import {
   AlertCircle,
   Maximize,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  Bell
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
@@ -37,6 +38,7 @@ interface Playlist {
   name: string;
   is_active: boolean;
   priority: number;
+  content_scale: 'cover' | 'contain' | 'fill';
   items: PlaylistItem[];
 }
 
@@ -44,6 +46,7 @@ interface DeviceInfo {
   id: string;
   name: string;
   store_id: string | null;
+  current_playlist_id: string | null;
 }
 
 const SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutos
@@ -80,11 +83,14 @@ const WebViewPlayer = () => {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [isReady, setIsReady] = useState(false);
   const [transitionState, setTransitionState] = useState<'visible' | 'fading'>('visible');
+  const [showUpdateNotification, setShowUpdateNotification] = useState(false);
+  const [updateMessage, setUpdateMessage] = useState('');
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const nextVideoRef = useRef<HTMLVideoElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const notificationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Obtém playlist ativa
   const getActivePlaylist = useCallback((): Playlist | null => {
@@ -138,7 +144,7 @@ const WebViewPlayer = () => {
       // Busca dispositivo
       const { data: deviceData, error: deviceError } = await supabase
         .from('devices')
-        .select('id, name, store_id')
+        .select('id, name, store_id, current_playlist_id')
         .eq('device_code', deviceCode)
         .single();
 
@@ -153,6 +159,7 @@ const WebViewPlayer = () => {
           name,
           is_active,
           priority,
+          content_scale,
           playlist_items(
             id,
             media_id,
@@ -172,6 +179,7 @@ const WebViewPlayer = () => {
         name: p.name,
         is_active: p.is_active,
         priority: p.priority || 0,
+        content_scale: (p.content_scale as 'cover' | 'contain' | 'fill') || 'cover',
         items: (p.playlist_items || [])
           .filter((item: any) => item.media?.file_url)
           .map((item: any) => ({
@@ -264,6 +272,51 @@ const WebViewPlayer = () => {
       if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
     };
   }, [syncWithServer, isOnline]);
+
+  // Realtime subscription para atualizações de playlists
+  useEffect(() => {
+    if (!device?.current_playlist_id) return;
+
+    const channel = supabase
+      .channel(`playlist-updates-${device.current_playlist_id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'playlists',
+          filter: `id=eq.${device.current_playlist_id}`,
+        },
+        (payload) => {
+          console.log('Playlist updated:', payload);
+          setUpdateMessage('Playlist atualizada! Sincronizando...');
+          setShowUpdateNotification(true);
+          
+          // Clear previous timeout
+          if (notificationTimeoutRef.current) {
+            clearTimeout(notificationTimeoutRef.current);
+          }
+          
+          // Resync after receiving update
+          syncWithServer().then(() => {
+            setIsReady(false); // Force re-preload
+            setUpdateMessage('Conteúdo atualizado com sucesso!');
+            
+            notificationTimeoutRef.current = setTimeout(() => {
+              setShowUpdateNotification(false);
+            }, 4000);
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+      if (notificationTimeoutRef.current) {
+        clearTimeout(notificationTimeoutRef.current);
+      }
+    };
+  }, [device?.current_playlist_id, syncWithServer]);
 
   // Controle de transição de mídia
   useEffect(() => {
@@ -425,9 +478,35 @@ const WebViewPlayer = () => {
   const mediaUrl = getPreloadedUrl(currentMedia.id, currentMedia.file_url);
   const duration = currentItem?.duration_override || currentMedia.duration || 10;
   const progressPercent = ((duration * 1000 - timeRemaining) / (duration * 1000)) * 100;
+  
+  // Determina a classe de object-fit com base na configuração
+  const getObjectFitClass = () => {
+    switch (activePlaylist?.content_scale) {
+      case 'contain':
+        return 'object-contain';
+      case 'fill':
+        return 'object-fill';
+      case 'cover':
+      default:
+        return 'object-cover';
+    }
+  };
 
   return (
     <div className="relative min-h-screen bg-black overflow-hidden select-none">
+      {/* Notificação de atualização */}
+      <div className={cn(
+        "absolute top-4 left-1/2 -translate-x-1/2 z-50 transition-all duration-500",
+        showUpdateNotification 
+          ? 'opacity-100 translate-y-0' 
+          : 'opacity-0 -translate-y-4 pointer-events-none'
+      )}>
+        <div className="flex items-center gap-3 bg-primary/90 backdrop-blur-md text-primary-foreground px-6 py-3 rounded-full shadow-2xl">
+          <Bell className="w-5 h-5 animate-pulse" />
+          <span className="font-medium">{updateMessage}</span>
+        </div>
+      </div>
+
       {/* Mídia atual */}
       <div className="relative w-full h-screen">
         {currentMedia.type === 'video' ? (
@@ -435,7 +514,8 @@ const WebViewPlayer = () => {
             ref={videoRef}
             src={mediaUrl}
             className={cn(
-              "w-full h-full object-contain transition-opacity duration-500",
+              "w-full h-full transition-opacity duration-500",
+              getObjectFitClass(),
               transitionState === 'fading' ? 'opacity-0' : 'opacity-100'
             )}
             autoPlay
@@ -448,7 +528,8 @@ const WebViewPlayer = () => {
             src={mediaUrl}
             alt={currentMedia.name}
             className={cn(
-              "w-full h-full object-contain transition-opacity duration-500",
+              "w-full h-full transition-opacity duration-500",
+              getObjectFitClass(),
               transitionState === 'fading' ? 'opacity-0' : 'opacity-100'
             )}
             onError={(e) => {

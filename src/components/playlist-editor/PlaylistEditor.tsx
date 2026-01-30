@@ -24,6 +24,7 @@ interface PlaylistFormData {
   start_time: string;
   end_time: string;
   priority: number;
+  content_scale: 'cover' | 'contain' | 'fill';
 }
 
 export const PlaylistEditor = () => {
@@ -72,11 +73,13 @@ export const PlaylistEditor = () => {
     start_time: "00:00",
     end_time: "23:59",
     priority: 5,
+    content_scale: 'cover',
   });
 
   useEffect(() => {
     if (existingPlaylist) {
       const schedule = existingPlaylist.schedule as Record<string, unknown> | null;
+      const contentScale = (existingPlaylist as any).content_scale as 'cover' | 'contain' | 'fill' | null;
       setFormData({
         name: existingPlaylist.name,
         description: existingPlaylist.description,
@@ -88,6 +91,7 @@ export const PlaylistEditor = () => {
         start_time: (schedule?.start_time as string) || "00:00",
         end_time: (schedule?.end_time as string) || "23:59",
         priority: (schedule?.priority as number) || 5,
+        content_scale: contentScale || 'cover',
       });
     }
   }, [existingPlaylist]);
@@ -117,6 +121,7 @@ export const PlaylistEditor = () => {
       channel_id: formData.channel_id,
       is_active: formData.is_active,
       schedule,
+      content_scale: formData.content_scale,
     };
 
     try {
@@ -192,6 +197,7 @@ export const PlaylistEditor = () => {
       channel_id: formData.channel_id,
       is_active: formData.is_active,
       schedule,
+      content_scale: formData.content_scale,
     };
 
     try {
