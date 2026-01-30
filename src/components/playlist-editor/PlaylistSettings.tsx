@@ -16,8 +16,16 @@ import {
   AlertTriangle, 
   CheckCircle,
   Zap,
-  Monitor
+  Monitor,
+  Maximize,
+  Move
 } from "lucide-react";
+
+const SCALE_OPTIONS = [
+  { value: 'cover', label: 'Preencher Tela', description: 'Expande para cobrir toda a tela (pode cortar)' },
+  { value: 'contain', label: 'Tamanho Original', description: 'Mantém proporção, pode ter barras' },
+  { value: 'fill', label: 'Esticar', description: 'Estica para preencher toda a tela' },
+] as const;
 import { format, parseISO, isBefore, addDays } from "date-fns";
 
 const DAYS_OF_WEEK = [
@@ -42,6 +50,7 @@ interface PlaylistSettingsProps {
     start_time: string;
     end_time: string;
     priority: number;
+    content_scale: 'cover' | 'contain' | 'fill';
   };
   channels: Channel[];
   itemCount: number;
@@ -282,6 +291,46 @@ export const PlaylistSettings = ({
                   onChange={(e) => onChange({ end_time: e.target.value })}
                   className="h-9"
                 />
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Display Settings */}
+          <div className="space-y-4">
+            <h4 className="font-medium flex items-center gap-2 text-sm">
+              <Maximize className="w-4 h-4" />
+              Exibição
+            </h4>
+
+            <div className="space-y-2">
+              <Label className="text-xs">Escala do Conteúdo</Label>
+              <div className="space-y-2">
+                {SCALE_OPTIONS.map((option) => (
+                  <label
+                    key={option.value}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      playlist.content_scale === option.value
+                        ? "bg-primary/10 border-primary"
+                        : "bg-background hover:bg-accent"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="content_scale"
+                      value={option.value}
+                      checked={playlist.content_scale === option.value}
+                      onChange={(e) => onChange({ content_scale: e.target.value as 'cover' | 'contain' | 'fill' })}
+                      className="sr-only"
+                    />
+                    <Move className={`w-4 h-4 ${playlist.content_scale === option.value ? 'text-primary' : 'text-muted-foreground'}`} />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{option.label}</p>
+                      <p className="text-xs text-muted-foreground">{option.description}</p>
+                    </div>
+                  </label>
+                ))}
               </div>
             </div>
           </div>

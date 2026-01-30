@@ -551,6 +551,7 @@ export type Database = {
       playlists: {
         Row: {
           channel_id: string | null
+          content_scale: string | null
           created_at: string
           days_of_week: number[] | null
           description: string | null
@@ -568,6 +569,7 @@ export type Database = {
         }
         Insert: {
           channel_id?: string | null
+          content_scale?: string | null
           created_at?: string
           days_of_week?: number[] | null
           description?: string | null
@@ -585,6 +587,7 @@ export type Database = {
         }
         Update: {
           channel_id?: string | null
+          content_scale?: string | null
           created_at?: string
           days_of_week?: number[] | null
           description?: string | null
