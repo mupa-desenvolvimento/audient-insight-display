@@ -6,14 +6,55 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Allowed file types
-const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
-const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime']
+// Allowed file types - expanded to support more formats
+const ALLOWED_IMAGE_TYPES = [
+  'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif',
+  'image/svg+xml', 'image/bmp', 'image/tiff'
+]
+const ALLOWED_VIDEO_TYPES = [
+  'video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo',
+  'video/x-matroska', 'video/ogg', 'video/3gpp'
+]
+const ALLOWED_AUDIO_TYPES = [
+  'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/aac',
+  'audio/flac', 'audio/x-m4a'
+]
+const ALLOWED_DOCUMENT_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain',
+  'text/csv',
+  'application/json',
+  'application/xml',
+  'text/html',
+  'text/markdown'
+]
+
+const ALL_ALLOWED_TYPES = [
+  ...ALLOWED_IMAGE_TYPES,
+  ...ALLOWED_VIDEO_TYPES,
+  ...ALLOWED_AUDIO_TYPES,
+  ...ALLOWED_DOCUMENT_TYPES
+]
+
 const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
 
 // Thumbnail settings
 const THUMBNAIL_WIDTH = 1280
 const THUMBNAIL_HEIGHT = 720
+
+// Helper to determine media type category
+function getMediaType(mimeType: string): string {
+  if (ALLOWED_IMAGE_TYPES.includes(mimeType)) return 'image'
+  if (ALLOWED_VIDEO_TYPES.includes(mimeType)) return 'video'
+  if (ALLOWED_AUDIO_TYPES.includes(mimeType)) return 'audio'
+  return 'document'
+}
 
 Deno.serve(async (req) => {
   console.log('=== upload-media function called ===')
@@ -84,15 +125,19 @@ Deno.serve(async (req) => {
     console.log('File details:', { name: fileName, type: fileType, size: file.size })
 
     // Validate file type
-    const isImage = ALLOWED_IMAGE_TYPES.includes(fileType.toLowerCase())
-    const isVideo = ALLOWED_VIDEO_TYPES.includes(fileType.toLowerCase())
+    const fileTypeLower = fileType.toLowerCase()
+    const isImage = ALLOWED_IMAGE_TYPES.includes(fileTypeLower)
+    const isVideo = ALLOWED_VIDEO_TYPES.includes(fileTypeLower)
+    const isAudio = ALLOWED_AUDIO_TYPES.includes(fileTypeLower)
+    const isDocument = ALLOWED_DOCUMENT_TYPES.includes(fileTypeLower)
+    const isAllowed = ALL_ALLOWED_TYPES.includes(fileTypeLower)
     
-    if (!isImage && !isVideo) {
+    if (!isAllowed) {
       console.error('Invalid file type:', fileType)
       return new Response(
         JSON.stringify({ 
           error: 'Tipo de arquivo não permitido', 
-          details: `Tipos permitidos: ${[...ALLOWED_IMAGE_TYPES, ...ALLOWED_VIDEO_TYPES].join(', ')}`,
+          details: 'Formatos aceitos: imagens, vídeos, áudios, PDFs, documentos e planilhas',
           received: fileType
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -112,7 +157,8 @@ Deno.serve(async (req) => {
       )
     }
 
-    console.log('File validation passed:', { isImage, isVideo })
+    const mediaType = getMediaType(fileTypeLower)
+    console.log('File validation passed:', { isImage, isVideo, isAudio, isDocument, mediaType })
 
     // Generate unique file keys
     const timestamp = Date.now()
@@ -170,11 +216,14 @@ Deno.serve(async (req) => {
     }
     
     const publicFileUrl = `${publicBaseUrl}/${fileKey}`
-    // For images, use the main file as thumbnail; for videos, we'll leave it null
+    // For images, use the main file as thumbnail; for others, null
     const publicThumbnailUrl = isImage ? publicFileUrl : null
     const thumbnailGenerated = isImage
     let resolution: string | null = null
     let duration: number | null = null
+    
+    // Default duration based on type
+    const defaultDuration = isImage ? 10 : (isDocument ? 30 : null) // 10s images, 30s documents
     
     console.log('Public file URL:', publicFileUrl)
     console.log('Public thumbnail URL:', publicThumbnailUrl)
@@ -194,7 +243,6 @@ Deno.serve(async (req) => {
 
     // Step 6: Save to database
     console.log('Step 6: Saving media record to database...')
-    const mediaType = isVideo ? 'video' : 'image'
 
     const supabaseAdmin = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
       auth: { autoRefreshToken: false, persistSession: false }
@@ -207,7 +255,7 @@ Deno.serve(async (req) => {
         type: mediaType,
         file_url: publicFileUrl,
         file_size: file.size,
-        duration: duration || (isImage ? 10 : null), // Default 10s for images
+        duration: duration || defaultDuration,
         resolution: resolution,
         status: 'active', // Always active once uploaded successfully
         thumbnail_url: publicThumbnailUrl,
