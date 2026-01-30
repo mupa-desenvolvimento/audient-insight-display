@@ -209,7 +209,7 @@ Deno.serve(async (req) => {
         file_size: file.size,
         duration: duration || (isImage ? 10 : null), // Default 10s for images
         resolution: resolution,
-        status: thumbnailGenerated ? 'active' : 'processing',
+        status: 'active', // Always active once uploaded successfully
         thumbnail_url: publicThumbnailUrl,
         metadata: {
           r2_key: fileKey,
