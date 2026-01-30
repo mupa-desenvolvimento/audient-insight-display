@@ -18,6 +18,7 @@ import DevicePlayer from "./pages/DevicePlayer";
 import DeviceSetup from "./pages/DeviceSetup";
 import DeviceDetector from "./pages/DeviceDetector";
 import OfflinePlayer from "./pages/OfflinePlayer";
+import WebViewPlayer from "./pages/WebViewPlayer";
 import Camera from "./pages/Camera";
 import CameraFullscreen from "./pages/CameraFullscreen";
 import LiveMonitoring from "./pages/LiveMonitoring";
@@ -69,6 +70,7 @@ function AppContent() {
           <Route path="/setup/:deviceId" element={<DeviceSetup />} />
           <Route path="/detect/:deviceCode" element={<DeviceDetector />} />
           <Route path="/play/:deviceCode" element={<OfflinePlayer />} />
+          <Route path="/webview/:deviceCode" element={<WebViewPlayer />} />
           <Route path="/camera" element={<Camera />} />
           <Route path="/camera-fullscreen" element={<CameraFullscreen />} />
           <Route
