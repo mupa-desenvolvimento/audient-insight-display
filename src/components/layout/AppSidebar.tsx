@@ -4,7 +4,6 @@ import {
   Image,
   Settings,
   Grid2x2,
-  Database,
   Camera,
   Eye,
   Store,
@@ -15,6 +14,7 @@ import {
   Layers,
   Building2,
 } from "lucide-react";
+import logoHorizontal from "@/assets/logo_horizontal.svg";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
@@ -61,17 +61,9 @@ const AppSidebar = () => {
 
   return (
     <Sidebar className="border-r border-border">
-      <SidebarHeader className="p-6">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 gradient-primary rounded-lg flex items-center justify-center">
-            <Database className="w-4 h-4 text-white" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-              MupaMídias
-            </h1>
-            <p className="text-xs text-muted-foreground">Digital Signage Pro</p>
-          </div>
+      <SidebarHeader className="p-4">
+        <div className="flex items-center justify-center">
+          <img src={logoHorizontal} alt="MupaMídias" className="h-10" />
         </div>
       </SidebarHeader>
 

@@ -32,7 +32,7 @@ const Settings = () => {
             <CardContent className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="system-name">Nome do Sistema</Label>
-                <Input id="system-name" defaultValue="SignageAI Pro" />
+                <Input id="system-name" defaultValue="MupaMídias Pro" />
               </div>
               
               <div className="space-y-2">

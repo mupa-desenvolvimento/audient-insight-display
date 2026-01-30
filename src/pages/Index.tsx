@@ -1,11 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import logoHorizontal from "@/assets/logo_horizontal.svg";
 import { 
   Monitor, 
   BarChart3, 
   Image, 
-  Database, 
   Users, 
   Play, 
   Calendar, 
@@ -96,12 +96,9 @@ const Index = () => {
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/80 backdrop-blur-sm">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
-              <Database className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <span className="text-xl font-bold text-foreground">SignageAI</span>
-          </div>
+          <Link to="/" className="flex items-center">
+            <img src={logoHorizontal} alt="MupaMídias" className="h-10" />
+          </Link>
           <div className="flex items-center space-x-4">
             <ThemeToggle />
             <Link to="/auth">
@@ -214,14 +211,11 @@ const Index = () => {
       {/* Footer */}
       <footer className="py-8 px-4 border-t border-border bg-card">
         <div className="container mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 gradient-primary rounded-lg flex items-center justify-center">
-              <Database className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-foreground">SignageAI</span>
-          </div>
+          <Link to="/" className="flex items-center">
+            <img src={logoHorizontal} alt="MupaMídias" className="h-8" />
+          </Link>
           <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} SignageAI. Todos os direitos reservados.
+            © {new Date().getFullYear()} MupaMídias. Todos os direitos reservados.
           </p>
         </div>
       </footer>
