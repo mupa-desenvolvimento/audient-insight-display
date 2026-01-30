@@ -110,27 +110,33 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     if (!country) {
-      // Use upsert to handle concurrent imports and existing records
-      const { data: upsertedCountry, error: countryError } = await supabase
+      // Try to insert - constraint countries_code_tenant_unique will handle duplicates
+      const { data: newCountry, error: countryError } = await supabase
         .from('countries')
-        .upsert(
-          { code: 'BR', name: 'Brasil', tenant_id: tenantId },
-          { onConflict: 'code,tenant_id', ignoreDuplicates: false }
-        )
+        .insert({ code: 'BR', name: 'Brasil', tenant_id: tenantId })
         .select('id')
         .single()
       
       if (countryError) {
-        // Try to fetch again in case of race condition
-        const { data: existingCountry } = await supabase
-          .from('countries')
-          .select('id')
-          .eq('code', 'BR')
-          .eq('tenant_id', tenantId)
-          .maybeSingle()
-        
-        if (existingCountry) {
-          country = existingCountry
+        // If duplicate key error, fetch the existing record
+        if (countryError.code === '23505') {
+          const { data: existingCountry } = await supabase
+            .from('countries')
+            .select('id')
+            .eq('code', 'BR')
+            .eq('tenant_id', tenantId)
+            .single()
+          
+          if (existingCountry) {
+            country = existingCountry
+          } else {
+            console.error('Error fetching existing country:', countryError)
+            await updateImportLogError(supabase, import_log_id, 'Erro ao buscar país Brasil')
+            return new Response(
+              JSON.stringify({ error: 'Erro ao buscar país Brasil' }),
+              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
         } else {
           console.error('Error creating country:', countryError)
           await updateImportLogError(supabase, import_log_id, 'Erro ao criar país Brasil')
@@ -140,7 +146,7 @@ Deno.serve(async (req) => {
           )
         }
       } else {
-        country = upsertedCountry
+        country = newCountry
       }
     }
 
