@@ -253,7 +253,8 @@ export default function DeviceSetup() {
   };
 
   const handleStartPlayer = () => {
-    navigate(`/play/${deviceId}`);
+    // Usa o player otimizado para WebView (Kodular/Android)
+    navigate(`/webview/${deviceId}`);
   };
 
   if (authLoading) {
