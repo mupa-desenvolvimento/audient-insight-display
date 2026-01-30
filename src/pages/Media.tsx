@@ -30,7 +30,7 @@ const Media = () => {
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
   
   const queryClient = useQueryClient();
-  const { mediaItems, isLoading: loadingMedia, updateMediaItem, deleteMediaItem } = useMediaItems();
+  const { mediaItems, isLoading: loadingMedia, updateMediaItem, deleteMediaItem, refetch } = useMediaItems();
   const { playlists, isLoading: loadingPlaylists } = usePlaylists();
 
   const filteredMedia = mediaItems.filter(media =>
@@ -110,7 +110,10 @@ const Media = () => {
       <MediaUploadDialog 
         open={uploadDialogOpen} 
         onOpenChange={setUploadDialogOpen}
-        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["media-items"] })}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["media-items"] });
+          refetch();
+        }}
       />
 
       <MediaLightbox

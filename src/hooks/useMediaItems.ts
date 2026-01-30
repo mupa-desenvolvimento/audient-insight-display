@@ -54,15 +54,18 @@ export const useMediaItems = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: mediaItems = [], isLoading, error } = useQuery({
+  const { data: mediaItems = [], isLoading, error, refetch } = useQuery({
     queryKey: ["media-items"],
     queryFn: async () => {
+      console.log('[useMediaItems] Fetching media items...');
       const { data, error } = await supabase
         .from("media_items")
         .select("*")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
+      
+      console.log('[useMediaItems] Fetched', data?.length || 0, 'items');
       
       // Transform URLs to public format
       return (data as MediaItem[]).map(item => ({
@@ -71,6 +74,8 @@ export const useMediaItems = () => {
         thumbnail_url: getPublicUrl(item.thumbnail_url),
       }));
     },
+    staleTime: 0, // Always consider data stale to ensure fresh fetches
+    refetchOnWindowFocus: true,
   });
 
   const createMediaItem = useMutation({
@@ -156,6 +161,7 @@ export const useMediaItems = () => {
     mediaItems,
     isLoading,
     error,
+    refetch,
     createMediaItem,
     updateMediaItem,
     deleteMediaItem,
