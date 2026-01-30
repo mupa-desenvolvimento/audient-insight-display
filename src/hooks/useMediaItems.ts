@@ -42,11 +42,9 @@ const getPublicUrl = (url: string | null): string | null => {
   // To: https://{public_domain}/{key}
   const r2Match = url.match(/https:\/\/[^/]+\.r2\.cloudflarestorage\.com\/[^/]+\/(.+)/);
   if (r2Match) {
-    // Use environment variable or fallback
-    const publicDomain = import.meta.env.VITE_R2_PUBLIC_URL;
-    if (publicDomain) {
-      return `${publicDomain}/${r2Match[1]}`;
-    }
+    // Hardcoded public domain for this project
+    const publicDomain = 'https://pub-0e15cc358ba84ff2a24226b12278433b.r2.dev';
+    return `${publicDomain}/${r2Match[1]}`;
   }
   
   return url;
