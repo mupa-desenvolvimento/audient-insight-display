@@ -245,7 +245,7 @@ export const PlaylistEditor = () => {
   const currentPreviewItem = items[currentPreviewIndex];
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-[#0a0a0b] text-white overflow-hidden">
+    <div className="h-full flex flex-col bg-background text-foreground overflow-hidden">
       {/* Header */}
       <EditorHeader
         projectName={formData.name || "Novo Projeto"}
