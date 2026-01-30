@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { PlaylistItem } from "@/hooks/usePlaylistItems";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -41,9 +41,74 @@ export const EditorCanvas = ({
 }: EditorCanvasProps) => {
   const [isMuted, setIsMuted] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [progress, setProgress] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const progressRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Get current item duration
+  const currentDuration = currentItem?.duration_override || currentItem?.media?.duration || 10;
+
+  // Handle auto-advance for images
+  const startImageTimer = useCallback(() => {
+    // Clear existing timers
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (progressRef.current) clearInterval(progressRef.current);
+    
+    if (!isPlaying || !currentItem || currentItem.media?.type === "video") return;
+
+    // Progress update every 100ms
+    const startTime = Date.now();
+    progressRef.current = setInterval(() => {
+      const elapsed = (Date.now() - startTime) / 1000;
+      const progressPercent = Math.min((elapsed / currentDuration) * 100, 100);
+      setProgress(progressPercent);
+    }, 100);
+
+    // Advance to next item after duration
+    timerRef.current = setTimeout(() => {
+      if (currentIndex < totalItems - 1) {
+        onNext();
+      } else {
+        // Loop back to start
+        onNext(); // This will be handled by PlaylistEditor
+      }
+    }, currentDuration * 1000);
+  }, [isPlaying, currentItem, currentDuration, currentIndex, totalItems, onNext]);
+
+  // Handle video ended event
+  const handleVideoEnded = useCallback(() => {
+    if (isPlaying) {
+      if (currentIndex < totalItems - 1) {
+        onNext();
+      } else {
+        // Loop back to start - handled by parent
+        onNext();
+      }
+    }
+  }, [isPlaying, currentIndex, totalItems, onNext]);
+
+  // Start/stop timers based on playing state and current item
+  useEffect(() => {
+    setProgress(0);
+    
+    if (isPlaying && currentItem) {
+      if (currentItem.media?.type !== "video") {
+        startImageTimer();
+      }
+    } else {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      if (progressRef.current) clearInterval(progressRef.current);
+    }
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      if (progressRef.current) clearInterval(progressRef.current);
+    };
+  }, [currentItem?.id, isPlaying, startImageTimer]);
+
+  // Handle video playback
   useEffect(() => {
     if (videoRef.current) {
       videoRef.current.currentTime = 0;
@@ -104,8 +169,14 @@ export const EditorCanvas = ({
                 src={currentItem.media.file_url}
                 className="w-full h-full object-contain"
                 muted={isMuted}
-                loop
                 autoPlay={isPlaying}
+                onEnded={handleVideoEnded}
+                onTimeUpdate={(e) => {
+                  const video = e.currentTarget;
+                  if (video.duration) {
+                    setProgress((video.currentTime / video.duration) * 100);
+                  }
+                }}
               />
             ) : (
               <img
@@ -160,6 +231,16 @@ export const EditorCanvas = ({
           >
             <Maximize2 className="w-4 h-4" />
           </Button>
+
+          {/* Progress bar */}
+          {isPlaying && currentItem && (
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50">
+              <div 
+                className="h-full bg-primary transition-all duration-100"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          )}
         </div>
       </div>
 

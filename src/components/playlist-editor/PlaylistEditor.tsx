@@ -211,9 +211,9 @@ export const PlaylistEditor = () => {
   };
 
   const handleUpdateDevices = async () => {
-    if (!activePlaylistId || connectedDevices.length === 0) {
+    if (!activePlaylistId) {
       toast({ 
-        title: "Nenhum dispositivo conectado", 
+        title: "Salve a playlist primeiro", 
         variant: "destructive" 
       });
       return;
@@ -222,18 +222,39 @@ export const PlaylistEditor = () => {
     setIsUpdatingDevices(true);
 
     try {
-      const { error } = await supabase
-        .from("devices")
+      // First, update the playlist's updated_at to signal changes
+      const { error: playlistError } = await supabase
+        .from("playlists")
         .update({ updated_at: new Date().toISOString() })
-        .in("id", connectedDevices.map(d => d.id));
+        .eq("id", activePlaylistId);
 
-      if (error) throw error;
+      if (playlistError) throw playlistError;
+
+      // Then update all devices connected to this playlist
+      const { data: devicesData, error: fetchError } = await supabase
+        .from("devices")
+        .select("id")
+        .eq("current_playlist_id", activePlaylistId);
+
+      if (fetchError) throw fetchError;
+
+      const deviceIds = devicesData?.map(d => d.id) || [];
+
+      if (deviceIds.length > 0) {
+        const { error: updateError } = await supabase
+          .from("devices")
+          .update({ updated_at: new Date().toISOString() })
+          .in("id", deviceIds);
+
+        if (updateError) throw updateError;
+      }
 
       toast({ 
-        title: "Dispositivos sincronizados!", 
-        description: `${connectedDevices.length} dispositivo(s)` 
+        title: "Sincronização enviada!", 
+        description: `${deviceIds.length} dispositivo(s) serão atualizados` 
       });
     } catch (error) {
+      console.error("Error updating devices:", error);
       toast({ title: "Erro ao sincronizar", variant: "destructive" });
     } finally {
       setIsUpdatingDevices(false);
@@ -288,7 +309,14 @@ export const PlaylistEditor = () => {
             isPlaying={isPreviewPlaying}
             onTogglePlay={() => setIsPreviewPlaying(!isPreviewPlaying)}
             onPrevious={() => setCurrentPreviewIndex(Math.max(0, currentPreviewIndex - 1))}
-            onNext={() => setCurrentPreviewIndex(Math.min(items.length - 1, currentPreviewIndex + 1))}
+            onNext={() => {
+              if (currentPreviewIndex >= items.length - 1) {
+                // Loop back to start
+                setCurrentPreviewIndex(0);
+              } else {
+                setCurrentPreviewIndex(currentPreviewIndex + 1);
+              }
+            }}
             currentIndex={currentPreviewIndex}
             totalItems={items.length}
             zoom={zoom}
