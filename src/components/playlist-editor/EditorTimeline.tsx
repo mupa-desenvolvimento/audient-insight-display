@@ -152,12 +152,12 @@ export const EditorTimeline = ({
   return (
     <div 
       className={cn(
-        "flex flex-col bg-muted/50 border-t border-border transition-all",
-        isExpanded ? "h-48" : "h-12"
+        "flex flex-col bg-muted/50 border-t border-border transition-all flex-shrink-0",
+        isExpanded ? "h-40" : "h-10"
       )}
     >
       {/* Timeline Header */}
-      <div className="h-10 flex items-center justify-between px-4 border-b border-border">
+      <div className="h-8 flex items-center justify-between px-4 border-b border-border flex-shrink-0">
         <div className="flex items-center gap-4">
           <button
             onClick={() => setIsExpanded(!isExpanded)}
@@ -203,15 +203,15 @@ export const EditorTimeline = ({
             </div>
           ) : (
             <ScrollArea className="h-full">
-              <div className="flex items-stretch gap-1 p-3 min-w-max">
+              <div className="flex items-center gap-1.5 p-2 min-w-max h-full">
                 {items.map((item, index) => {
                   const duration = item.duration_override || item.media?.duration || 10;
                   const isSelected = selectedItemId === item.id;
                   const isCurrent = currentPreviewIndex === index;
                   const Icon = getMediaIcon(item.media?.type || "image");
                   
-                  // Calculate width based on duration (min 80px, 8px per second)
-                  const width = Math.max(80, duration * 8);
+                  // Calculate width based on duration (min 100px, 10px per second)
+                  const width = Math.max(100, duration * 10);
 
                   return (
                     <div
@@ -225,12 +225,12 @@ export const EditorTimeline = ({
                         onSetPreviewIndex(index);
                       }}
                       className={cn(
-                        "group relative flex-shrink-0 rounded-lg overflow-hidden cursor-pointer transition-all",
+                        "group relative flex-shrink-0 rounded-lg overflow-hidden cursor-pointer transition-all h-full",
                         "border-2",
                         isSelected ? "border-primary" : isCurrent ? "border-foreground/30" : "border-transparent",
                         draggedIndex === index ? "opacity-50" : ""
                       )}
-                      style={{ width: `${width}px`, height: "100%" }}
+                      style={{ width: `${width}px` }}
                     >
                       {/* Thumbnail */}
                       <div className="absolute inset-0 bg-muted">
