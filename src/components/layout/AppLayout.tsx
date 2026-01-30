@@ -11,10 +11,8 @@ const AppLayout = ({
       <AppSidebar />
       <main className="flex-1 flex flex-col overflow-hidden">
         <Header />
-        <div className="flex-1 overflow-auto p-6 px-[10px] py-[10px]">
-          <div className="max-w-7xl mx-auto">
-            {children}
-          </div>
+        <div className="flex-1 overflow-auto">
+          {children}
         </div>
       </main>
     </>;
