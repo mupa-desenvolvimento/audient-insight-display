@@ -22,7 +22,7 @@ const getMediaIcon = (type: string) => {
 };
 
 const formatDuration = (seconds: number | null) => {
-  if (!seconds) return "10s";
+  if (!seconds) return "8s";
   if (seconds < 60) return `${seconds}s`;
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
