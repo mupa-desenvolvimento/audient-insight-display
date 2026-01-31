@@ -22,6 +22,7 @@ import WebViewPlayer from "./pages/WebViewPlayer";
 import Camera from "./pages/Camera";
 import CameraFullscreen from "./pages/CameraFullscreen";
 import LiveMonitoring from "./pages/LiveMonitoring";
+import DeviceDemo from "./pages/DeviceDemo";
 import Auth from "./pages/Auth";
 import Stores from "./pages/admin/Stores";
 import Regions from "./pages/admin/Regions";
@@ -73,6 +74,7 @@ function AppContent() {
           <Route path="/webview/:deviceCode" element={<WebViewPlayer />} />
           <Route path="/camera" element={<Camera />} />
           <Route path="/camera-fullscreen" element={<CameraFullscreen />} />
+          <Route path="/demo" element={<DeviceDemo />} />
           <Route
             path="/admin/*"
             element={
