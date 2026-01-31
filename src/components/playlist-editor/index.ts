@@ -4,6 +4,8 @@ export { EditorSidebar } from "./EditorSidebar";
 export { EditorCanvas } from "./EditorCanvas";
 export { EditorTimeline } from "./EditorTimeline";
 export { EditorPropertiesPanel } from "./EditorPropertiesPanel";
+export { ChannelsList } from "./ChannelsList";
+export { ChannelEditor } from "./ChannelEditor";
 
 // Legacy exports (for backwards compatibility)
 export { MediaLibrary } from "./MediaLibrary";

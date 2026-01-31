@@ -28,7 +28,7 @@ export interface DeviceGroupInsert {
 export interface DeviceGroupChannel {
   id: string;
   group_id: string;
-  channel_id: string;
+  distribution_channel_id: string;
   position: number;
   created_at: string;
   channel?: { id: string; name: string; type: string };
@@ -115,7 +115,7 @@ export const useDeviceGroups = () => {
       .from("device_group_channels")
       .select(`
         *,
-        channel:channels(id, name, type)
+        channel:distribution_channels(id, name, type)
       `)
       .eq("group_id", groupId)
       .order("position", { ascending: true });
@@ -128,7 +128,7 @@ export const useDeviceGroups = () => {
     mutationFn: async ({ groupId, channelId, position }: { groupId: string; channelId: string; position: number }) => {
       const { data, error } = await supabase
         .from("device_group_channels")
-        .insert([{ group_id: groupId, channel_id: channelId, position }])
+        .insert([{ group_id: groupId, distribution_channel_id: channelId, position }])
         .select()
         .single();
 
@@ -151,7 +151,7 @@ export const useDeviceGroups = () => {
         .from("device_group_channels")
         .delete()
         .eq("group_id", groupId)
-        .eq("channel_id", channelId);
+        .eq("distribution_channel_id", channelId);
 
       if (error) throw error;
     },
