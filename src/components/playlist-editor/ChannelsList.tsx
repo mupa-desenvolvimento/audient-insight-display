@@ -228,9 +228,9 @@ export const ChannelsList = ({
               onClick={() => onSelectChannel(channel)}
             >
               <CardContent className="p-3">
-                <div className="flex items-start gap-3">
+                <div className="flex items-center gap-3">
                   {/* Drag Handle */}
-                  <div className="text-muted-foreground cursor-grab mt-1">
+                  <div className="text-muted-foreground cursor-grab">
                     <GripVertical className="w-4 h-4" />
                   </div>
                   
@@ -248,51 +248,28 @@ export const ChannelsList = ({
                     )}
                   </div>
                   
-                  {/* Main Content */}
-                  <div className="flex-1 min-w-0 space-y-1.5">
-                    {/* Top Row: Badge */}
-                    <div className="flex items-center justify-center">
-                      {getChannelStatusBadge(channel)}
-                    </div>
-                    
-                    {/* Bottom Row: Time, Media Count, Days */}
-                    <div className="flex items-center justify-between gap-2 text-sm">
-                      {/* Time */}
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <Clock className="w-3 h-3" />
-                        <span className="font-medium">
-                          {channel.start_time.slice(0, 5)}
-                        </span>
-                        <span className="text-muted-foreground/50">-</span>
-                        <span className="font-medium">
-                          {channel.end_time.slice(0, 5)}
-                        </span>
-                      </div>
-                      
-                      {/* Media Count */}
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <Edit className="w-3 h-3" />
-                        <span className="font-medium">{channel.item_count || 0}</span>
-                        <span className="text-xs">mídias</span>
-                      </div>
-                      
-                      {/* Days of Week */}
-                      <div className="flex gap-0.5">
-                        {DAYS_OF_WEEK.map((day) => (
-                          <span
-                            key={day.value}
-                            className={cn(
-                              "text-xs font-medium w-4 text-center",
-                              channel.days_of_week.includes(day.value)
-                                ? "text-primary"
-                                : "text-muted-foreground/30"
-                            )}
-                          >
-                            {day.label[0]}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
+                  {/* Badge */}
+                  <div className="shrink-0">
+                    {getChannelStatusBadge(channel)}
+                  </div>
+                  
+                  {/* Time */}
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground shrink-0">
+                    <Clock className="w-3 h-3" />
+                    <span className="font-medium">
+                      {channel.start_time.slice(0, 5)}
+                    </span>
+                    <span className="text-muted-foreground/50">-</span>
+                    <span className="font-medium">
+                      {channel.end_time.slice(0, 5)}
+                    </span>
+                  </div>
+                  
+                  {/* Media Count */}
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground shrink-0">
+                    <Edit className="w-3 h-3" />
+                    <span className="font-medium">{channel.item_count || 0}</span>
+                    <span className="text-xs">mídias</span>
                   </div>
                   
                   {/* Actions */}
@@ -320,6 +297,26 @@ export const ChannelsList = ({
                       <Trash2 className="w-3.5 h-3.5 text-destructive" />
                     </Button>
                     <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                  
+                  {/* Spacer */}
+                  <div className="flex-1" />
+                  
+                  {/* Days of Week - at the end */}
+                  <div className="flex gap-0.5 shrink-0">
+                    {DAYS_OF_WEEK.map((day) => (
+                      <span
+                        key={day.value}
+                        className={cn(
+                          "text-xs font-medium w-4 text-center",
+                          channel.days_of_week.includes(day.value)
+                            ? "text-primary"
+                            : "text-muted-foreground/30"
+                        )}
+                      >
+                        {day.label[0]}
+                      </span>
+                    ))}
                   </div>
                 </div>
               </CardContent>
