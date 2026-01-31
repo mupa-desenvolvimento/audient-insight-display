@@ -2,9 +2,9 @@ import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Camera as CameraIcon, Users, Play, Square, Settings, Eye, Clock } from "lucide-react";
+import { Camera as CameraIcon, Users, Play, Square, Settings, Eye, Clock, Smile } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useFaceDetection } from "@/hooks/useFaceDetection";
+import { useFaceDetection, EmotionType } from "@/hooks/useFaceDetection";
 import { PeopleRegistration } from "@/components/PeopleRegistration";
 import { DetectionHistory } from "@/components/DetectionHistory";
 import AttentionHistory from "@/components/AttentionHistory";
@@ -159,6 +159,45 @@ const Camera = () => {
       default:
         return "bg-gray-500";
     }
+  };
+
+  const getEmotionEmoji = (emotion: EmotionType): string => {
+    const emotionEmojis: Record<EmotionType, string> = {
+      neutral: '😐',
+      happy: '😊',
+      sad: '😢',
+      angry: '😠',
+      fearful: '😨',
+      disgusted: '🤢',
+      surprised: '😲'
+    };
+    return emotionEmojis[emotion] || '😐';
+  };
+
+  const getEmotionLabel = (emotion: EmotionType): string => {
+    const emotionLabels: Record<EmotionType, string> = {
+      neutral: 'Neutro',
+      happy: 'Feliz',
+      sad: 'Triste',
+      angry: 'Irritado',
+      fearful: 'Medo',
+      disgusted: 'Nojo',
+      surprised: 'Surpreso'
+    };
+    return emotionLabels[emotion] || 'Neutro';
+  };
+
+  const getEmotionColor = (emotion: EmotionType): string => {
+    const colors: Record<EmotionType, string> = {
+      neutral: 'bg-gray-500',
+      happy: 'bg-green-500',
+      sad: 'bg-blue-500',
+      angry: 'bg-red-500',
+      fearful: 'bg-purple-500',
+      disgusted: 'bg-yellow-600',
+      surprised: 'bg-orange-500'
+    };
+    return colors[emotion] || 'bg-gray-500';
   };
 
   return (
@@ -326,7 +365,7 @@ const Camera = () => {
                           </div>
                         ) : (
                           <div>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-2 flex-wrap gap-1">
                               <Badge
                                 variant="outline"
                                 className={`${getGenderColor(face.gender)} text-white border-none`}
@@ -338,6 +377,12 @@ const Camera = () => {
                                 className={`${getAgeGroupColor(face.ageGroup)} text-white border-none`}
                               >
                                 {face.age} anos
+                              </Badge>
+                              <Badge
+                                variant="outline"
+                                className={`${getEmotionColor(face.emotion.emotion)} text-white border-none`}
+                              >
+                                {getEmotionEmoji(face.emotion.emotion)} {getEmotionLabel(face.emotion.emotion)}
                               </Badge>
                             </div>
                             <p className="text-xs text-muted-foreground mt-1">Pessoa não cadastrada</p>
@@ -351,6 +396,11 @@ const Camera = () => {
                         <span className="font-bold">{face.lookingDuration.toFixed(1)}s</span>
                       </div>
                       <p className="text-xs text-muted-foreground">olhando</p>
+                      {face.emotion.confidence > 0.5 && (
+                        <p className="text-xs text-muted-foreground">
+                          {(face.emotion.confidence * 100).toFixed(0)}% confiança
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))
