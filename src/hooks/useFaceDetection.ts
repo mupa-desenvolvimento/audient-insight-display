@@ -4,6 +4,15 @@ import { usePeopleRegistry } from './usePeopleRegistry';
 import { useDetectionLog } from './useDetectionLog';
 import { useAttentionHistory } from './useAttentionHistory';
 
+// Emotion types from face-api.js
+export type EmotionType = 'neutral' | 'happy' | 'sad' | 'angry' | 'fearful' | 'disgusted' | 'surprised';
+
+export interface EmotionData {
+  emotion: EmotionType;
+  confidence: number;
+  allEmotions: Record<EmotionType, number>;
+}
+
 // Face currently being tracked (looking at camera now)
 export interface ActiveFace {
   trackId: string;
@@ -20,6 +29,7 @@ export interface ActiveFace {
   firstSeenAt: Date;
   lastSeenAt: Date;
   lookingDuration: number;
+  emotion: EmotionData;
 }
 
 interface TrackedFaceData {
@@ -36,6 +46,7 @@ interface TrackedFaceData {
   confidence: number;
   position: { x: number; y: number; width: number; height: number };
   loggedToHistory: boolean;
+  emotion: EmotionData;
 }
 
 const getAgeGroup = (age: number): '0-12' | '13-18' | '19-25' | '26-35' | '36-50' | '51+' => {
@@ -157,11 +168,12 @@ export const useFaceDetection = (
           faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL), // Better accuracy than TinyFace
           faceapi.nets.ageGenderNet.loadFromUri(MODEL_URL),
           faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+          faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL) // Load emotion detection model
         ]);
         
         setIsModelsLoaded(true);
-        console.log('Face-api.js models loaded successfully (SSD MobileNet)');
+        console.log('Face-api.js models loaded successfully (SSD MobileNet + Expressions)');
       } catch (error) {
         console.error('Error loading face-api.js models:', error);
       } finally {
@@ -192,6 +204,13 @@ export const useFaceDetection = (
     return bestMatch?.trackId || null;
   }, []);
 
+  // Default emotion when not detected yet
+  const defaultEmotion: EmotionData = {
+    emotion: 'neutral',
+    confidence: 0,
+    allEmotions: { neutral: 0, happy: 0, sad: 0, angry: 0, fearful: 0, disgusted: 0, surprised: 0 }
+  };
+
   // Update active faces state from tracked faces
   const updateActiveFacesState = useCallback(() => {
     const now = Date.now();
@@ -217,7 +236,8 @@ export const useFaceDetection = (
           isRegistered: tracked.isRegistered,
           firstSeenAt: tracked.firstSeenAt,
           lastSeenAt: tracked.lastSeenAt,
-          lookingDuration: duration
+          lookingDuration: duration,
+          emotion: tracked.emotion || defaultEmotion
         });
       }
     });
@@ -286,12 +306,13 @@ export const useFaceDetection = (
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Use SSD MobileNet with higher confidence threshold
+      // Use SSD MobileNet with higher confidence threshold + expressions
       const detections = await faceapi
         .detectAllFaces(video, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }))
         .withFaceLandmarks()
         .withFaceDescriptors()
-        .withAgeAndGender();
+        .withAgeAndGender()
+        .withFaceExpressions();
 
       const now = new Date();
       const currentTrackIds = new Set<string>();
@@ -310,6 +331,26 @@ export const useFaceDetection = (
         const genderString = detection.gender;
         const gender = getGender(genderString, genderProbability);
         const detectionConfidence = detection.detection.score;
+
+        // Extract emotion data
+        const expressions = detection.expressions;
+        const emotionEntries = Object.entries(expressions) as [EmotionType, number][];
+        const sortedEmotions = emotionEntries.sort((a, b) => b[1] - a[1]);
+        const dominantEmotion = sortedEmotions[0];
+        
+        const emotionData: EmotionData = {
+          emotion: dominantEmotion[0],
+          confidence: dominantEmotion[1],
+          allEmotions: {
+            neutral: expressions.neutral,
+            happy: expressions.happy,
+            sad: expressions.sad,
+            angry: expressions.angry,
+            fearful: expressions.fearful,
+            disgusted: expressions.disgusted,
+            surprised: expressions.surprised
+          }
+        };
 
         // Find or create tracked face
         let trackId: string | null = null;
@@ -366,6 +407,8 @@ export const useFaceDetection = (
             existingTracked.personCpf = identifiedPerson.cpf;
             existingTracked.isRegistered = true;
           }
+          // Update emotion data
+          existingTracked.emotion = emotionData;
         } else {
           // Create new tracked face
           trackId = isRegistered ? identifiedPerson!.id : `track_${now.getTime()}_${index}`;
@@ -383,7 +426,8 @@ export const useFaceDetection = (
             ageEstimates: [rawAge],
             confidence: detectionConfidence,
             position: { x: box.x, y: box.y, width: box.width, height: box.height },
-            loggedToHistory: false
+            loggedToHistory: false,
+            emotion: emotionData
           });
         }
 
