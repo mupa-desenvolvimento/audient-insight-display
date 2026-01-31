@@ -14,6 +14,16 @@ interface DetectionPayload {
     is_facing_camera?: boolean;
     detected_at?: string;
     metadata?: Record<string, unknown>;
+    // Novos campos para analytics
+    age?: number;
+    age_group?: string;
+    gender?: string;
+    emotion?: string;
+    emotion_confidence?: number;
+    attention_duration?: number;
+    content_id?: string;
+    content_name?: string;
+    playlist_id?: string;
   }[];
 }
 
@@ -56,7 +66,7 @@ Deno.serve(async (req) => {
         .eq("device_code", payload.device_serial)
         .single();
 
-      // Preparar registros para inserção
+      // Preparar registros para inserção com novos campos
       const detectionLogs = payload.detections.map((detection) => ({
         device_id: device?.id || null,
         device_serial: payload.device_serial,
@@ -66,6 +76,16 @@ Deno.serve(async (req) => {
         is_facing_camera: detection.is_facing_camera ?? true,
         detected_at: detection.detected_at || new Date().toISOString(),
         metadata: detection.metadata || {},
+        // Novos campos de analytics
+        age: detection.age || null,
+        age_group: detection.age_group || null,
+        gender: detection.gender || null,
+        emotion: detection.emotion || null,
+        emotion_confidence: detection.emotion_confidence || null,
+        attention_duration: detection.attention_duration || null,
+        content_id: detection.content_id || null,
+        content_name: detection.content_name || null,
+        playlist_id: detection.playlist_id || null,
       }));
 
       // Inserir registros

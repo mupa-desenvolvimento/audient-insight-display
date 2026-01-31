@@ -143,47 +143,88 @@ export type Database = {
       }
       device_detection_logs: {
         Row: {
+          age: number | null
+          age_group: string | null
+          attention_duration: number | null
           confidence: number | null
+          content_id: string | null
+          content_name: string | null
           created_at: string
           detected_at: string
           device_id: string | null
           device_nickname: string | null
           device_serial: string
+          emotion: string | null
+          emotion_confidence: number | null
           face_descriptor: Json | null
+          gender: string | null
           id: string
           is_facing_camera: boolean | null
           metadata: Json | null
+          playlist_id: string | null
         }
         Insert: {
+          age?: number | null
+          age_group?: string | null
+          attention_duration?: number | null
           confidence?: number | null
+          content_id?: string | null
+          content_name?: string | null
           created_at?: string
           detected_at?: string
           device_id?: string | null
           device_nickname?: string | null
           device_serial: string
+          emotion?: string | null
+          emotion_confidence?: number | null
           face_descriptor?: Json | null
+          gender?: string | null
           id?: string
           is_facing_camera?: boolean | null
           metadata?: Json | null
+          playlist_id?: string | null
         }
         Update: {
+          age?: number | null
+          age_group?: string | null
+          attention_duration?: number | null
           confidence?: number | null
+          content_id?: string | null
+          content_name?: string | null
           created_at?: string
           detected_at?: string
           device_id?: string | null
           device_nickname?: string | null
           device_serial?: string
+          emotion?: string | null
+          emotion_confidence?: number | null
           face_descriptor?: Json | null
+          gender?: string | null
           id?: string
           is_facing_camera?: boolean | null
           metadata?: Json | null
+          playlist_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "device_detection_logs_content_id_fkey"
+            columns: ["content_id"]
+            isOneToOne: false
+            referencedRelation: "media_items"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "device_detection_logs_device_id_fkey"
             columns: ["device_id"]
             isOneToOne: false
             referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "device_detection_logs_playlist_id_fkey"
+            columns: ["playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlists"
             referencedColumns: ["id"]
           },
         ]

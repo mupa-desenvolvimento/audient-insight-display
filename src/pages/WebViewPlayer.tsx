@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useMediaPreloader } from "@/hooks/useMediaPreloader";
+import { usePlayerFaceDetection } from "@/hooks/usePlayerFaceDetection";
 import { 
   Wifi, 
   WifiOff, 
@@ -12,7 +13,9 @@ import {
   Maximize,
   Clock,
   CheckCircle2,
-  Bell
+  Bell,
+  Camera,
+  Users
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
@@ -47,6 +50,7 @@ interface DeviceInfo {
   name: string;
   store_id: string | null;
   current_playlist_id: string | null;
+  camera_enabled: boolean;
 }
 
 const SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutos
@@ -114,6 +118,27 @@ const WebViewPlayer = () => {
   const currentItem = items[currentIndex];
   const currentMedia = currentItem?.media;
 
+  // Memoize current content info for face detection
+  const currentContentInfo = useMemo(() => {
+    if (!currentMedia || !activePlaylist) return null;
+    return {
+      contentId: currentMedia.id,
+      contentName: currentMedia.name,
+      playlistId: activePlaylist.id
+    };
+  }, [currentMedia, activePlaylist]);
+
+  // Face detection - only active if device has camera enabled
+  const { 
+    activeFaces, 
+    totalDetectionsToday,
+    isModelsLoaded: faceModelsLoaded 
+  } = usePlayerFaceDetection(
+    deviceCode || '',
+    !!(device?.camera_enabled && isReady),
+    currentContentInfo
+  );
+
   // Atualiza relógio
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -144,7 +169,7 @@ const WebViewPlayer = () => {
       // Busca dispositivo
       const { data: deviceData, error: deviceError } = await supabase
         .from('devices')
-        .select('id, name, store_id, current_playlist_id')
+        .select('id, name, store_id, current_playlist_id, camera_enabled')
         .eq('device_code', deviceCode)
         .single();
 
@@ -632,6 +657,30 @@ const WebViewPlayer = () => {
         <div className="absolute top-16 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-yellow-500/20 rounded-full px-3 py-1">
           <WifiOff className="w-3 h-3 text-yellow-400" />
           <span className="text-yellow-200 text-xs">Offline</span>
+        </div>
+      )}
+
+      {/* Indicador de detecção facial */}
+      {device?.camera_enabled && (
+        <div className={cn(
+          "absolute bottom-6 right-6 flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-lg p-3 transition-opacity duration-300",
+          showControls ? 'opacity-100' : 'opacity-0'
+        )}>
+          <Camera className={cn(
+            "w-4 h-4",
+            faceModelsLoaded ? "text-green-400" : "text-yellow-400 animate-pulse"
+          )} />
+          {activeFaces.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <Users className="w-4 h-4 text-blue-400" />
+              <span className="text-white text-sm font-medium">{activeFaces.length}</span>
+            </div>
+          )}
+          {totalDetectionsToday > 0 && (
+            <span className="text-white/60 text-xs border-l border-white/20 pl-2">
+              {totalDetectionsToday} hoje
+            </span>
+          )}
         </div>
       )}
 
