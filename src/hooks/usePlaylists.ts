@@ -17,6 +17,7 @@ export interface Playlist {
   end_time: string | null;
   priority: number;
   fallback_media_id: string | null;
+  has_channels: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -39,6 +40,7 @@ export interface PlaylistInsert {
   end_time?: string | null;
   priority?: number;
   fallback_media_id?: string | null;
+  has_channels?: boolean;
 }
 
 export const usePlaylists = () => {
@@ -52,7 +54,7 @@ export const usePlaylists = () => {
         .from("playlists")
         .select(`
           *,
-          channel:channels!playlists_channel_id_fkey(id, name, type)
+          channel:distribution_channels!playlists_distribution_channel_id_fkey(id, name, type)
         `)
         .order("created_at", { ascending: false });
 

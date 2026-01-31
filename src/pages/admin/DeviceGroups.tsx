@@ -56,7 +56,7 @@ const DeviceGroupsPage = () => {
       if (!channelDialogGroup) return [];
       const { data, error } = await supabase
         .from("device_group_channels")
-        .select(`*, channel:channels(id, name, type)`)
+        .select(`*, channel:distribution_channels(id, name, type)`)
         .eq("group_id", channelDialogGroup.id)
         .order("position", { ascending: true });
       if (error) throw error;
@@ -146,7 +146,7 @@ const DeviceGroupsPage = () => {
   };
 
   const availableChannels = channels.filter(
-    (c) => !groupChannels.some((gc) => gc.channel_id === c.id)
+    (c) => !groupChannels.some((gc) => gc.distribution_channel_id === c.id)
   );
 
   return (
@@ -423,7 +423,7 @@ const DeviceGroupsPage = () => {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleRemoveChannel(gc.channel_id)}
+                      onClick={() => handleRemoveChannel(gc.distribution_channel_id)}
                     >
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>

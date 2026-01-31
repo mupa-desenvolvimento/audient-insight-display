@@ -33,10 +33,10 @@ export const useChannels = () => {
   const queryClient = useQueryClient();
 
   const { data: channels = [], isLoading, error } = useQuery({
-    queryKey: ["channels"],
+    queryKey: ["distribution-channels"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("channels")
+        .from("distribution_channels")
         .select("*")
         .order("priority", { ascending: true });
 
@@ -48,7 +48,7 @@ export const useChannels = () => {
   const createChannel = useMutation({
     mutationFn: async (channel: ChannelInsert) => {
       const { data, error } = await supabase
-        .from("channels")
+        .from("distribution_channels")
         .insert([channel])
         .select()
         .single();
@@ -57,7 +57,7 @@ export const useChannels = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["channels"] });
+      queryClient.invalidateQueries({ queryKey: ["distribution-channels"] });
       toast({ title: "Canal criado com sucesso" });
     },
     onError: (error) => {
@@ -68,7 +68,7 @@ export const useChannels = () => {
   const updateChannel = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<ChannelInsert> & { id: string }) => {
       const { data, error } = await supabase
-        .from("channels")
+        .from("distribution_channels")
         .update(updates)
         .eq("id", id)
         .select()
@@ -78,7 +78,7 @@ export const useChannels = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["channels"] });
+      queryClient.invalidateQueries({ queryKey: ["distribution-channels"] });
       toast({ title: "Canal atualizado com sucesso" });
     },
     onError: (error) => {
@@ -88,11 +88,11 @@ export const useChannels = () => {
 
   const deleteChannel = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("channels").delete().eq("id", id);
+      const { error } = await supabase.from("distribution_channels").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["channels"] });
+      queryClient.invalidateQueries({ queryKey: ["distribution-channels"] });
       toast({ title: "Canal excluído com sucesso" });
     },
     onError: (error) => {

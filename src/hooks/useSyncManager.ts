@@ -12,6 +12,8 @@ import { useToast } from './use-toast';
 const MAX_RETRIES = 3;
 const SYNC_INTERVAL = 30000; // 30 seconds
 
+type SyncTableName = 'playlists' | 'media_items' | 'devices' | 'distribution_channels' | 'stores';
+
 export function useSyncManager() {
   const { isOnline, wasOffline, clearWasOffline } = useOnlineStatus();
   const { toast } = useToast();
@@ -45,18 +47,16 @@ export function useSyncManager() {
 
         try {
           const data = item.data as Record<string, unknown>;
-          const tableName = item.table as 'playlists' | 'media_items' | 'devices' | 'channels' | 'stores';
+          const tableName = item.table as SyncTableName;
           
           switch (item.operation) {
             case 'insert':
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              await supabase.from(tableName).insert(data as any);
+              await supabase.from(tableName).insert(data as never);
               break;
             case 'update':
               if ('id' in data) {
                 const { id, ...updateData } = data;
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                await supabase.from(tableName).update(updateData as any).eq('id', id as string);
+                await supabase.from(tableName).update(updateData as never).eq('id', id as string);
               }
               break;
             case 'delete':

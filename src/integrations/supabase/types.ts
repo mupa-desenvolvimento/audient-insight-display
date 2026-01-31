@@ -14,56 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      channels: {
-        Row: {
-          created_at: string
-          description: string | null
-          fallback_playlist_id: string | null
-          id: string
-          is_active: boolean
-          metadata: Json | null
-          name: string
-          priority: number
-          source: string
-          type: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          fallback_playlist_id?: string | null
-          id?: string
-          is_active?: boolean
-          metadata?: Json | null
-          name: string
-          priority?: number
-          source?: string
-          type?: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          fallback_playlist_id?: string | null
-          id?: string
-          is_active?: boolean
-          metadata?: Json | null
-          name?: string
-          priority?: number
-          source?: string
-          type?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "channels_fallback_playlist_id_fkey"
-            columns: ["fallback_playlist_id"]
-            isOneToOne: false
-            referencedRelation: "playlists"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       cities: {
         Row: {
           created_at: string
@@ -231,32 +181,32 @@ export type Database = {
       }
       device_group_channels: {
         Row: {
-          channel_id: string
           created_at: string
+          distribution_channel_id: string
           group_id: string
           id: string
           position: number
         }
         Insert: {
-          channel_id: string
           created_at?: string
+          distribution_channel_id: string
           group_id: string
           id?: string
           position?: number
         }
         Update: {
-          channel_id?: string
           created_at?: string
+          distribution_channel_id?: string
           group_id?: string
           id?: string
           position?: number
         }
         Relationships: [
           {
-            foreignKeyName: "device_group_channels_channel_id_fkey"
-            columns: ["channel_id"]
+            foreignKeyName: "device_group_channels_distribution_channel_id_fkey"
+            columns: ["distribution_channel_id"]
             isOneToOne: false
-            referencedRelation: "channels"
+            referencedRelation: "distribution_channels"
             referencedColumns: ["id"]
           },
           {
@@ -460,6 +410,56 @@ export type Database = {
         }
         Relationships: []
       }
+      distribution_channels: {
+        Row: {
+          created_at: string
+          description: string | null
+          fallback_playlist_id: string | null
+          id: string
+          is_active: boolean
+          metadata: Json | null
+          name: string
+          priority: number
+          source: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          fallback_playlist_id?: string | null
+          id?: string
+          is_active?: boolean
+          metadata?: Json | null
+          name: string
+          priority?: number
+          source?: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          fallback_playlist_id?: string | null
+          id?: string
+          is_active?: boolean
+          metadata?: Json | null
+          name?: string
+          priority?: number
+          source?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channels_fallback_playlist_id_fkey"
+            columns: ["fallback_playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_logs: {
         Row: {
           completed_at: string | null
@@ -547,6 +547,122 @@ export type Database = {
         }
         Relationships: []
       }
+      playlist_channel_items: {
+        Row: {
+          channel_id: string
+          created_at: string
+          days_of_week: number[] | null
+          duration_override: number | null
+          end_date: string | null
+          end_time: string | null
+          id: string
+          is_schedule_override: boolean | null
+          media_id: string
+          position: number
+          start_date: string | null
+          start_time: string | null
+        }
+        Insert: {
+          channel_id: string
+          created_at?: string
+          days_of_week?: number[] | null
+          duration_override?: number | null
+          end_date?: string | null
+          end_time?: string | null
+          id?: string
+          is_schedule_override?: boolean | null
+          media_id: string
+          position?: number
+          start_date?: string | null
+          start_time?: string | null
+        }
+        Update: {
+          channel_id?: string
+          created_at?: string
+          days_of_week?: number[] | null
+          duration_override?: number | null
+          end_date?: string | null
+          end_time?: string | null
+          id?: string
+          is_schedule_override?: boolean | null
+          media_id?: string
+          position?: number
+          start_date?: string | null
+          start_time?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_channel_items_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "playlist_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playlist_channel_items_media_id_fkey"
+            columns: ["media_id"]
+            isOneToOne: false
+            referencedRelation: "media_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playlist_channels: {
+        Row: {
+          created_at: string
+          days_of_week: number[] | null
+          description: string | null
+          end_time: string
+          id: string
+          is_active: boolean
+          is_fallback: boolean
+          metadata: Json | null
+          name: string
+          playlist_id: string
+          position: number
+          start_time: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          days_of_week?: number[] | null
+          description?: string | null
+          end_time?: string
+          id?: string
+          is_active?: boolean
+          is_fallback?: boolean
+          metadata?: Json | null
+          name: string
+          playlist_id: string
+          position?: number
+          start_time?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          days_of_week?: number[] | null
+          description?: string | null
+          end_time?: string
+          id?: string
+          is_active?: boolean
+          is_fallback?: boolean
+          metadata?: Json | null
+          name?: string
+          playlist_id?: string
+          position?: number
+          start_time?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_channels_playlist_id_fkey"
+            columns: ["playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       playlist_items: {
         Row: {
           created_at: string
@@ -617,6 +733,7 @@ export type Database = {
           end_date: string | null
           end_time: string | null
           fallback_media_id: string | null
+          has_channels: boolean
           id: string
           is_active: boolean
           name: string
@@ -635,6 +752,7 @@ export type Database = {
           end_date?: string | null
           end_time?: string | null
           fallback_media_id?: string | null
+          has_channels?: boolean
           id?: string
           is_active?: boolean
           name: string
@@ -653,6 +771,7 @@ export type Database = {
           end_date?: string | null
           end_time?: string | null
           fallback_media_id?: string | null
+          has_channels?: boolean
           id?: string
           is_active?: boolean
           name?: string
@@ -664,10 +783,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "playlists_channel_id_fkey"
+            foreignKeyName: "playlists_distribution_channel_id_fkey"
             columns: ["channel_id"]
             isOneToOne: false
-            referencedRelation: "channels"
+            referencedRelation: "distribution_channels"
             referencedColumns: ["id"]
           },
           {

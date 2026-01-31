@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { usePlaylists } from "@/hooks/usePlaylists";
 import { usePlaylistItems } from "@/hooks/usePlaylistItems";
+import { usePlaylistChannels, PlaylistChannel } from "@/hooks/usePlaylistChannels";
 import { useChannels } from "@/hooks/useChannels";
 import { useDevices } from "@/hooks/useDevices";
 import { MediaItem } from "@/hooks/useMediaItems";
@@ -10,8 +11,13 @@ import { EditorCanvas } from "./EditorCanvas";
 import { EditorTimeline } from "./EditorTimeline";
 import { EditorHeader } from "./EditorHeader";
 import { EditorPropertiesPanel } from "./EditorPropertiesPanel";
+import { ChannelsList } from "./ChannelsList";
+import { ChannelEditor } from "./ChannelEditor";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Radio, Layers } from "lucide-react";
 
 interface PlaylistFormData {
   name: string;
@@ -33,12 +39,22 @@ export const PlaylistEditor = () => {
   const { toast } = useToast();
   
   const { playlists, updatePlaylist, createPlaylist } = usePlaylists();
-  const { channels } = useChannels();
+  const { channels: distributionChannels } = useChannels();
   const { devices } = useDevices();
   const [createdPlaylistId, setCreatedPlaylistId] = useState<string | null>(null);
   
   const activePlaylistId = createdPlaylistId || playlistId || null;
   
+  // Playlist channels (blocos de programação)
+  const {
+    channels: playlistChannels,
+    isLoading: channelsLoading,
+    createChannel,
+    updateChannel,
+    deleteChannel,
+  } = usePlaylistChannels(activePlaylistId);
+  
+  // Legacy playlist items (for backward compatibility)
   const { 
     items, 
     isLoading: itemsLoading, 
@@ -57,10 +73,13 @@ export const PlaylistEditor = () => {
   const [isUpdatingDevices, setIsUpdatingDevices] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [zoom, setZoom] = useState(100);
+  const [activeTab, setActiveTab] = useState<"channels" | "legacy">("channels");
+  const [selectedChannel, setSelectedChannel] = useState<PlaylistChannel | null>(null);
 
   const existingPlaylist = playlists.find((p) => p.id === activePlaylistId);
   const isNewPlaylist = !playlistId && !createdPlaylistId;
   const connectedDevices = devices.filter(d => d.current_playlist_id === activePlaylistId);
+  const hasChannels = playlistChannels.length > 0 || existingPlaylist?.has_channels;
 
   const [formData, setFormData] = useState<PlaylistFormData>({
     name: "",
@@ -93,6 +112,11 @@ export const PlaylistEditor = () => {
         priority: (schedule?.priority as number) || 5,
         content_scale: contentScale || 'cover',
       });
+      
+      // Auto-select channels tab if playlist has channels
+      if (existingPlaylist.has_channels) {
+        setActiveTab("channels");
+      }
     }
   }, [existingPlaylist]);
 
@@ -122,6 +146,7 @@ export const PlaylistEditor = () => {
       is_active: formData.is_active,
       schedule,
       content_scale: formData.content_scale,
+      has_channels: true,
     };
 
     try {
@@ -139,7 +164,6 @@ export const PlaylistEditor = () => {
     const id = await ensurePlaylistExists();
     if (!id) return;
     
-    // For videos, use the actual video duration; for images, use 8 seconds default
     const itemDuration = media.type === 'video' && media.duration ? media.duration : 8;
     
     addItem.mutate({
@@ -189,6 +213,30 @@ export const PlaylistEditor = () => {
     reorderItems.mutate(orderedItems);
   }, [reorderItems]);
 
+  // Channel handlers
+  const handleCreateChannel = useCallback(async (data: Parameters<typeof createChannel.mutate>[0]) => {
+    const id = await ensurePlaylistExists();
+    if (!id) return;
+    
+    createChannel.mutate({ ...data, playlist_id: id });
+    
+    // Update playlist to has_channels = true
+    if (activePlaylistId) {
+      await supabase.from("playlists").update({ has_channels: true }).eq("id", activePlaylistId);
+    }
+  }, [createChannel, ensurePlaylistExists, activePlaylistId]);
+
+  const handleUpdateChannel = useCallback((channelId: string, updates: any) => {
+    updateChannel.mutate({ id: channelId, ...updates });
+  }, [updateChannel]);
+
+  const handleDeleteChannel = useCallback((channelId: string) => {
+    deleteChannel.mutate(channelId);
+    if (selectedChannel?.id === channelId) {
+      setSelectedChannel(null);
+    }
+  }, [deleteChannel, selectedChannel]);
+
   const handleSave = async () => {
     if (!formData.name.trim()) {
       toast({ title: "Nome é obrigatório", variant: "destructive" });
@@ -213,6 +261,7 @@ export const PlaylistEditor = () => {
       is_active: formData.is_active,
       schedule,
       content_scale: formData.content_scale,
+      has_channels: playlistChannels.length > 0,
     };
 
     try {
@@ -243,7 +292,6 @@ export const PlaylistEditor = () => {
     setIsUpdatingDevices(true);
 
     try {
-      // First, update the playlist's updated_at to signal changes
       const { error: playlistError } = await supabase
         .from("playlists")
         .update({ updated_at: new Date().toISOString() })
@@ -251,7 +299,6 @@ export const PlaylistEditor = () => {
 
       if (playlistError) throw playlistError;
 
-      // Then update all devices connected to this playlist
       const { data: devicesData, error: fetchError } = await supabase
         .from("devices")
         .select("id")
@@ -283,8 +330,19 @@ export const PlaylistEditor = () => {
   };
 
   const totalDuration = getTotalDuration();
-  const selectedItem = items.find(i => i.id === selectedItemId);
   const currentPreviewItem = items[currentPreviewIndex];
+
+  // If editing a channel, show channel editor
+  if (selectedChannel) {
+    return (
+      <ChannelEditor
+        channel={selectedChannel}
+        playlistName={formData.name || "Nova Playlist"}
+        onBack={() => setSelectedChannel(null)}
+        onUpdateChannel={(updates) => handleUpdateChannel(selectedChannel.id, updates)}
+      />
+    );
+  }
 
   return (
     <div className="h-full flex flex-col bg-background text-foreground overflow-hidden">
@@ -308,59 +366,108 @@ export const PlaylistEditor = () => {
           onPanelChange={setActivePanel}
         />
 
-        {/* Left Panel - Media Library or Settings */}
+        {/* Left Panel - Content Selection */}
         {activePanel && (
-          <EditorPropertiesPanel
-            activePanel={activePanel}
-            formData={formData}
-            channels={channels}
-            itemCount={items.length}
-            totalDuration={totalDuration}
-            connectedDevicesCount={connectedDevices.length}
-            onFormChange={handleFormChange}
-            onAddMedia={handleAddMedia}
-            itemsLength={items.length}
-          />
+          <div className="w-80 border-r bg-card flex flex-col">
+            {/* Tabs for Channels vs Legacy mode */}
+            <div className="p-3 border-b">
+              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+                <TabsList className="w-full">
+                  <TabsTrigger value="channels" className="flex-1 gap-2">
+                    <Radio className="w-4 h-4" />
+                    Canais
+                  </TabsTrigger>
+                  <TabsTrigger value="legacy" className="flex-1 gap-2">
+                    <Layers className="w-4 h-4" />
+                    Mídias
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+
+            {activeTab === "channels" ? (
+              <div className="flex-1 overflow-auto p-4">
+                <ChannelsList
+                  channels={playlistChannels}
+                  activeChannelId={null}
+                  onSelectChannel={setSelectedChannel}
+                  onCreateChannel={handleCreateChannel}
+                  onUpdateChannel={handleUpdateChannel}
+                  onDeleteChannel={handleDeleteChannel}
+                  playlistId={activePlaylistId || ""}
+                  playlistName={formData.name || "Nova Playlist"}
+                />
+              </div>
+            ) : (
+              <EditorPropertiesPanel
+                activePanel={activePanel}
+                formData={formData}
+                channels={distributionChannels}
+                itemCount={items.length}
+                totalDuration={totalDuration}
+                connectedDevicesCount={connectedDevices.length}
+                onFormChange={handleFormChange}
+                onAddMedia={handleAddMedia}
+                itemsLength={items.length}
+              />
+            )}
+          </div>
         )}
 
-        {/* Center - Canvas/Preview */}
-        <div className="flex-1 flex flex-col min-w-0">
-          <EditorCanvas
-            currentItem={currentPreviewItem}
-            isPlaying={isPreviewPlaying}
-            onTogglePlay={() => setIsPreviewPlaying(!isPreviewPlaying)}
-            onPrevious={() => setCurrentPreviewIndex(Math.max(0, currentPreviewIndex - 1))}
-            onNext={() => {
-              if (currentPreviewIndex >= items.length - 1) {
-                // Loop back to start
-                setCurrentPreviewIndex(0);
-              } else {
-                setCurrentPreviewIndex(currentPreviewIndex + 1);
-              }
-            }}
-            currentIndex={currentPreviewIndex}
-            totalItems={items.length}
-            zoom={zoom}
-            onZoomChange={setZoom}
-          />
+        {/* Center - Canvas/Preview (only show in legacy mode or when no channel is selected) */}
+        {activeTab === "legacy" && (
+          <div className="flex-1 flex flex-col min-w-0">
+            <EditorCanvas
+              currentItem={currentPreviewItem}
+              isPlaying={isPreviewPlaying}
+              onTogglePlay={() => setIsPreviewPlaying(!isPreviewPlaying)}
+              onPrevious={() => setCurrentPreviewIndex(Math.max(0, currentPreviewIndex - 1))}
+              onNext={() => {
+                if (currentPreviewIndex >= items.length - 1) {
+                  setCurrentPreviewIndex(0);
+                } else {
+                  setCurrentPreviewIndex(currentPreviewIndex + 1);
+                }
+              }}
+              currentIndex={currentPreviewIndex}
+              totalItems={items.length}
+              zoom={zoom}
+              onZoomChange={setZoom}
+            />
 
-          {/* Timeline */}
-          <EditorTimeline
-            items={items}
-            selectedItemId={selectedItemId}
-            currentPreviewIndex={currentPreviewIndex}
-            onSelectItem={setSelectedItemId}
-            onSetPreviewIndex={setCurrentPreviewIndex}
-            onAddMedia={handleAddMedia}
-            onRemoveItem={handleRemoveItem}
-            onDuplicateItem={handleDuplicateItem}
-            onUpdateDuration={handleUpdateDuration}
-            onUpdateItemSettings={handleUpdateItemSettings}
-            onReorderItems={handleReorderItems}
-            totalDuration={totalDuration}
-            isPlaying={isPreviewPlaying}
-          />
-        </div>
+            {/* Timeline */}
+            <EditorTimeline
+              items={items}
+              selectedItemId={selectedItemId}
+              currentPreviewIndex={currentPreviewIndex}
+              onSelectItem={setSelectedItemId}
+              onSetPreviewIndex={setCurrentPreviewIndex}
+              onAddMedia={handleAddMedia}
+              onRemoveItem={handleRemoveItem}
+              onDuplicateItem={handleDuplicateItem}
+              onUpdateDuration={handleUpdateDuration}
+              onUpdateItemSettings={handleUpdateItemSettings}
+              onReorderItems={handleReorderItems}
+              totalDuration={totalDuration}
+              isPlaying={isPreviewPlaying}
+            />
+          </div>
+        )}
+
+        {/* Empty state when in channels mode */}
+        {activeTab === "channels" && !selectedChannel && (
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-muted/30">
+            <Radio className="w-16 h-16 text-muted-foreground/50 mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Selecione um Canal</h2>
+            <p className="text-muted-foreground max-w-md mb-6">
+              Clique em um canal na lista à esquerda para editar seus conteúdos, 
+              ou crie um novo canal para começar.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Canais permitem programar blocos de conteúdo por horário do dia.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

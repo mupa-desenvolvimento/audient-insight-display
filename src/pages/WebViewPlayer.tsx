@@ -36,13 +36,26 @@ interface PlaylistItem {
   media: MediaItem;
 }
 
+interface PlaylistChannel {
+  id: string;
+  name: string;
+  start_time: string;
+  end_time: string;
+  days_of_week: number[];
+  is_fallback: boolean;
+  is_active: boolean;
+  items: PlaylistItem[];
+}
+
 interface Playlist {
   id: string;
   name: string;
   is_active: boolean;
   priority: number;
   content_scale: 'cover' | 'contain' | 'fill';
-  items: PlaylistItem[];
+  has_channels: boolean;
+  channels: PlaylistChannel[];
+  items: PlaylistItem[]; // Legacy items for backward compatibility
 }
 
 interface DeviceInfo {
@@ -96,27 +109,60 @@ const WebViewPlayer = () => {
   const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const notificationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Obtém playlist ativa
-  const getActivePlaylist = useCallback((): Playlist | null => {
-    if (playlists.length === 0) return null;
+  // Get active channel based on current time
+  const getActiveChannel = useCallback((playlist: Playlist): PlaylistChannel | null => {
+    if (!playlist.has_channels || playlist.channels.length === 0) {
+      return null;
+    }
     
     const now = new Date();
     const currentDay = now.getDay();
     const currentTime = now.toTimeString().slice(0, 5);
     
-    // Por enquanto, retorna a primeira playlist ativa
-    // TODO: Implementar lógica de agendamento completa
+    // Find channel matching current time and day
+    const activeChannel = playlist.channels.find(channel => {
+      if (!channel.is_active) return false;
+      if (!channel.days_of_week.includes(currentDay)) return false;
+      
+      const startTime = channel.start_time.slice(0, 5);
+      const endTime = channel.end_time.slice(0, 5);
+      
+      // Handle overnight schedules
+      if (startTime > endTime) {
+        return currentTime >= startTime || currentTime <= endTime;
+      }
+      
+      return currentTime >= startTime && currentTime <= endTime;
+    });
+    
+    // Return fallback if no channel matches
+    if (!activeChannel) {
+      return playlist.channels.find(c => c.is_fallback && c.is_active) || null;
+    }
+    
+    return activeChannel;
+  }, []);
+
+  // Obtém playlist ativa
+  const getActivePlaylist = useCallback((): Playlist | null => {
+    if (playlists.length === 0) return null;
+    
+    // Filter and sort by priority
     const active = playlists
-      .filter(p => p.is_active && p.items.length > 0)
+      .filter(p => p.is_active && (p.items.length > 0 || p.channels.some(c => c.items.length > 0)))
       .sort((a, b) => b.priority - a.priority);
     
     return active[0] || null;
   }, [playlists]);
 
   const activePlaylist = getActivePlaylist();
-  const items = activePlaylist?.items || [];
+  const activeChannel = activePlaylist ? getActiveChannel(activePlaylist) : null;
+  
+  // Get items from active channel or legacy playlist items
+  const items = activeChannel?.items || activePlaylist?.items || [];
   const currentItem = items[currentIndex];
   const currentMedia = currentItem?.media;
+
 
   // Memoize current content info for face detection
   const currentContentInfo = useMemo(() => {
@@ -199,12 +245,14 @@ const WebViewPlayer = () => {
       if (playlistsError) throw playlistsError;
 
       // Formata playlists
-      const formattedPlaylists: Playlist[] = (playlistsData || []).map(p => ({
+      const formattedPlaylists: Playlist[] = (playlistsData || []).map((p: any) => ({
         id: p.id,
         name: p.name,
         is_active: p.is_active,
         priority: p.priority || 0,
         content_scale: (p.content_scale as 'cover' | 'contain' | 'fill') || 'cover',
+        has_channels: p.has_channels || false,
+        channels: [], // Will be fetched separately if needed
         items: (p.playlist_items || [])
           .filter((item: any) => item.media?.file_url)
           .map((item: any) => ({
