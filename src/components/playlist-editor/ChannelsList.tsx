@@ -227,76 +227,97 @@ export const ChannelsList = ({
               )}
               onClick={() => onSelectChannel(channel)}
             >
-              <CardContent className="p-4">
-                <div className="flex items-center gap-4">
-                  <div className="text-muted-foreground cursor-grab">
-                    <GripVertical className="w-5 h-5" />
+              <CardContent className="p-3">
+                <div className="flex items-start gap-3">
+                  {/* Drag Handle */}
+                  <div className="text-muted-foreground cursor-grab mt-1">
+                    <GripVertical className="w-4 h-4" />
                   </div>
                   
+                  {/* Status Icon */}
                   <div className={cn(
-                    "w-10 h-10 rounded-lg flex items-center justify-center",
+                    "w-9 h-9 rounded-lg flex items-center justify-center shrink-0",
                     isChannelActive(channel) ? "bg-green-500/20" : "bg-muted"
                   )}>
                     {channel.is_fallback ? (
-                      <Shield className="w-5 h-5 text-yellow-600" />
+                      <Shield className="w-4 h-4 text-yellow-600" />
                     ) : isChannelActive(channel) ? (
-                      <Play className="w-5 h-5 text-green-600" />
+                      <Play className="w-4 h-4 text-green-600" />
                     ) : (
-                      <Clock className="w-5 h-5 text-muted-foreground" />
+                      <Clock className="w-4 h-4 text-muted-foreground" />
                     )}
                   </div>
                   
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-medium truncate">{channel.name}</h3>
+                  {/* Main Content */}
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    {/* Top Row: Badge */}
+                    <div className="flex items-center justify-center">
                       {getChannelStatusBadge(channel)}
                     </div>
-                    <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
-                      <span className="flex items-center gap-1">
+                    
+                    {/* Bottom Row: Time, Media Count, Days */}
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                      {/* Time */}
+                      <div className="flex items-center gap-1 text-muted-foreground">
                         <Clock className="w-3 h-3" />
-                        {channel.start_time.slice(0, 5)} - {channel.end_time.slice(0, 5)}
-                      </span>
-                      <span>•</span>
-                      <span>{channel.item_count || 0} mídias</span>
-                      <span>•</span>
-                      <span className="flex gap-0.5">
+                        <span className="font-medium">
+                          {channel.start_time.slice(0, 5)}
+                        </span>
+                        <span className="text-muted-foreground/50">-</span>
+                        <span className="font-medium">
+                          {channel.end_time.slice(0, 5)}
+                        </span>
+                      </div>
+                      
+                      {/* Media Count */}
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <Edit className="w-3 h-3" />
+                        <span className="font-medium">{channel.item_count || 0}</span>
+                        <span className="text-xs">mídias</span>
+                      </div>
+                      
+                      {/* Days of Week */}
+                      <div className="flex gap-0.5">
                         {DAYS_OF_WEEK.map((day) => (
                           <span
                             key={day.value}
                             className={cn(
-                              "text-xs px-0.5",
+                              "text-xs font-medium w-4 text-center",
                               channel.days_of_week.includes(day.value)
-                                ? "text-primary font-medium"
-                                : "text-muted-foreground/40"
+                                ? "text-primary"
+                                : "text-muted-foreground/30"
                             )}
                           >
                             {day.label[0]}
                           </span>
                         ))}
-                      </span>
+                      </div>
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2">
+                  {/* Actions */}
+                  <div className="flex items-center gap-1 shrink-0">
                     <Button 
                       variant="ghost" 
                       size="icon"
+                      className="h-8 w-8"
                       onClick={(e) => {
                         e.stopPropagation();
                         openEditDialog(channel);
                       }}
                     >
-                      <Edit className="w-4 h-4" />
+                      <Edit className="w-3.5 h-3.5" />
                     </Button>
                     <Button 
                       variant="ghost" 
                       size="icon"
+                      className="h-8 w-8"
                       onClick={(e) => {
                         e.stopPropagation();
                         setDeleteId(channel.id);
                       }}
                     >
-                      <Trash2 className="w-4 h-4 text-destructive" />
+                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
                     </Button>
                     <ChevronRight className="w-4 h-4 text-muted-foreground" />
                   </div>
