@@ -8,6 +8,12 @@ export interface PlaylistItem {
   media_id: string;
   position: number;
   duration_override: number | null;
+  start_date: string | null;
+  end_date: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  days_of_week: number[] | null;
+  is_schedule_override: boolean;
   created_at: string;
   media?: {
     id: string;
@@ -26,6 +32,12 @@ export interface PlaylistItemInsert {
   media_id: string;
   position: number;
   duration_override?: number | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  days_of_week?: number[] | null;
+  is_schedule_override?: boolean;
 }
 
 export const usePlaylistItems = (playlistId: string | null) => {
@@ -126,7 +138,7 @@ export const usePlaylistItems = (playlistId: string | null) => {
 
   const getTotalDuration = () => {
     return items.reduce((total, item) => {
-      const duration = item.duration_override || item.media?.duration || 10;
+      const duration = item.duration_override || item.media?.duration || 8;
       return total + duration;
     }, 0);
   };

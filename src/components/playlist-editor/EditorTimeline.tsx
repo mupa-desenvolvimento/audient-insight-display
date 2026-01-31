@@ -3,6 +3,7 @@ import { PlaylistItem } from "@/hooks/usePlaylistItems";
 import { MediaItem } from "@/hooks/useMediaItems";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import { ItemSettingsDialog } from "./ItemSettingsDialog";
 import { 
   Plus, 
   Clock, 
@@ -14,12 +15,15 @@ import {
   FileText,
   MoreVertical,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  Settings,
+  Calendar
 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
@@ -34,6 +38,15 @@ interface EditorTimelineProps {
   onRemoveItem: (id: string) => void;
   onDuplicateItem: (item: PlaylistItem) => void;
   onUpdateDuration: (id: string, duration: number) => void;
+  onUpdateItemSettings: (id: string, updates: {
+    duration_override: number;
+    is_schedule_override: boolean;
+    start_date: string | null;
+    end_date: string | null;
+    start_time: string | null;
+    end_time: string | null;
+    days_of_week: number[] | null;
+  }) => void;
   onReorderItems: (items: { id: string; position: number }[]) => void;
   totalDuration: number;
   isPlaying: boolean;
@@ -66,6 +79,7 @@ export const EditorTimeline = ({
   onRemoveItem,
   onDuplicateItem,
   onUpdateDuration,
+  onUpdateItemSettings,
   onReorderItems,
   totalDuration,
   isPlaying,
@@ -74,6 +88,7 @@ export const EditorTimeline = ({
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const [isExpanded, setIsExpanded] = useState(true);
+  const [settingsItem, setSettingsItem] = useState<PlaylistItem | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -254,11 +269,12 @@ export const EditorTimeline = ({
             <ScrollArea className="h-full">
               <div className="flex items-center gap-1 p-2 min-w-max h-full">
                 {items.map((item, index) => {
-                  const duration = item.duration_override || item.media?.duration || 10;
+                  const duration = item.duration_override || item.media?.duration || 8;
                   const isSelected = selectedItemId === item.id;
                   const isCurrent = currentPreviewIndex === index;
                   const isDragging = draggedIndex === index;
                   const isDropTarget = dropTargetIndex === index;
+                  const hasScheduleOverride = item.is_schedule_override;
                   const Icon = getMediaIcon(item.media?.type || "image");
                   
                   // Calculate width based on duration (min 100px, 10px per second)
@@ -345,12 +361,22 @@ export const EditorTimeline = ({
                                 <DropdownMenuItem 
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    setSettingsItem(item);
+                                  }}
+                                >
+                                  <Settings className="w-4 h-4 mr-2" />
+                                  Configurações
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
                                     onDuplicateItem(item);
                                   }}
                                 >
                                   <Copy className="w-4 h-4 mr-2" />
                                   Duplicar
                                 </DropdownMenuItem>
+                                <DropdownMenuSeparator />
                                 <DropdownMenuItem 
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -383,6 +409,13 @@ export const EditorTimeline = ({
                         {/* Playing Indicator */}
                         {isCurrent && isPlaying && (
                           <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                        )}
+
+                        {/* Schedule Override Indicator */}
+                        {hasScheduleOverride && !isDragging && (
+                          <div className="absolute top-2 right-8 opacity-80">
+                            <Calendar className="w-3 h-3 text-blue-400" />
+                          </div>
                         )}
 
                         {/* Drag overlay */}
@@ -422,6 +455,14 @@ export const EditorTimeline = ({
           )}
         </div>
       )}
+
+      {/* Settings Dialog */}
+      <ItemSettingsDialog
+        item={settingsItem}
+        open={!!settingsItem}
+        onOpenChange={(open) => !open && setSettingsItem(null)}
+        onSave={onUpdateItemSettings}
+      />
     </div>
   );
 };

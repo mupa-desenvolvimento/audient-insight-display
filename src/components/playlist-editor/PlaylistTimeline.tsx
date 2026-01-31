@@ -2,9 +2,10 @@ import { useState, useRef, useCallback } from "react";
 import { PlaylistItem } from "@/hooks/usePlaylistItems";
 import { MediaItem } from "@/hooks/useMediaItems";
 import { TimelineItem } from "./TimelineItem";
+import { ItemSettingsDialog } from "./ItemSettingsDialog";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Plus, Trash2, AlertCircle } from "lucide-react";
+import { Clock, Plus, AlertCircle } from "lucide-react";
 
 interface PlaylistTimelineProps {
   items: PlaylistItem[];
@@ -14,6 +15,15 @@ interface PlaylistTimelineProps {
   onRemoveItem: (id: string) => void;
   onDuplicateItem: (item: PlaylistItem) => void;
   onUpdateDuration: (id: string, duration: number) => void;
+  onUpdateItemSettings: (id: string, updates: {
+    duration_override: number;
+    is_schedule_override: boolean;
+    start_date: string | null;
+    end_date: string | null;
+    start_time: string | null;
+    end_time: string | null;
+    days_of_week: number[] | null;
+  }) => void;
   onReorderItems: (items: { id: string; position: number }[]) => void;
   totalDuration: number;
 }
@@ -40,11 +50,13 @@ export const PlaylistTimeline = ({
   onRemoveItem,
   onDuplicateItem,
   onUpdateDuration,
+  onUpdateItemSettings,
   onReorderItems,
   totalDuration,
 }: PlaylistTimelineProps) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [settingsItem, setSettingsItem] = useState<PlaylistItem | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -122,135 +134,146 @@ export const PlaylistTimeline = ({
   const hasValidationErrors = items.length === 0;
 
   return (
-    <div className="h-full flex flex-col bg-background">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b bg-card">
-        <div className="flex items-center gap-4">
-          <h3 className="font-semibold">Timeline</h3>
-          <Badge variant="outline" className="gap-1">
-            <Clock className="w-3 h-3" />
-            {formatTotalDuration(totalDuration)}
-          </Badge>
-          <Badge variant="secondary">
-            {items.length} {items.length === 1 ? "item" : "itens"}
-          </Badge>
+    <>
+      <div className="h-full flex flex-col bg-background">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-card">
+          <div className="flex items-center gap-4">
+            <h3 className="font-semibold">Timeline</h3>
+            <Badge variant="outline" className="gap-1">
+              <Clock className="w-3 h-3" />
+              {formatTotalDuration(totalDuration)}
+            </Badge>
+            <Badge variant="secondary">
+              {items.length} {items.length === 1 ? "item" : "itens"}
+            </Badge>
+          </div>
+
+          {hasValidationErrors && (
+            <Badge variant="destructive" className="gap-1">
+              <AlertCircle className="w-3 h-3" />
+              Playlist vazia
+            </Badge>
+          )}
         </div>
 
-        {hasValidationErrors && (
-          <Badge variant="destructive" className="gap-1">
-            <AlertCircle className="w-3 h-3" />
-            Playlist vazia
-          </Badge>
-        )}
-      </div>
-
-      {/* Timeline */}
-      <div
-        className={`flex-1 relative transition-colors ${
-          isDragOver ? "bg-primary/5" : ""
-        }`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        {items.length === 0 ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
-            <div
-              className={`
-                w-64 h-48 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-3
-                transition-colors
-                ${isDragOver ? "border-primary bg-primary/10" : "border-muted-foreground/30"}
-              `}
-            >
-              <Plus className="w-10 h-10" />
-              <p className="text-sm text-center px-4">
-                Arraste mídias da biblioteca para começar
-              </p>
-            </div>
-          </div>
-        ) : (
-          <ScrollArea className="h-full">
-            <div className="p-6">
-              <div className="flex items-center gap-4 pb-4">
-                {items.map((item, index) => (
-                  <TimelineItem
-                    key={item.id}
-                    item={item}
-                    index={index}
-                    isSelected={selectedItemId === item.id}
-                    onSelect={() => onSelectItem(item.id)}
-                    onRemove={() => onRemoveItem(item.id)}
-                    onDuplicate={() => onDuplicateItem(item)}
-                    onDurationChange={(duration) => onUpdateDuration(item.id, duration)}
-                    onDragStart={handleItemDragStart}
-                    onDragOver={handleItemDragOver}
-                    onDrop={handleItemDrop}
-                  />
-                ))}
-
-                {/* Drop zone at end */}
-                <div
-                  className={`
-                    flex-shrink-0 w-36 h-48 rounded-xl border-2 border-dashed
-                    flex flex-col items-center justify-center gap-2 text-muted-foreground
-                    transition-colors
-                    ${isDragOver ? "border-primary bg-primary/10" : "border-muted-foreground/30"}
-                  `}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleItemDrop(e, items.length);
-                  }}
-                >
-                  <Plus className="w-8 h-8" />
-                  <span className="text-xs">Adicionar</span>
-                </div>
+        {/* Timeline */}
+        <div
+          className={`flex-1 relative transition-colors ${
+            isDragOver ? "bg-primary/5" : ""
+          }`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {items.length === 0 ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
+              <div
+                className={`
+                  w-64 h-48 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-3
+                  transition-colors
+                  ${isDragOver ? "border-primary bg-primary/10" : "border-muted-foreground/30"}
+                `}
+              >
+                <Plus className="w-10 h-10" />
+                <p className="text-sm text-center px-4">
+                  Arraste mídias da biblioteca para começar
+                </p>
               </div>
             </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
-        )}
+          ) : (
+            <ScrollArea className="h-full">
+              <div className="p-6">
+                <div className="flex items-center gap-4 pb-4">
+                  {items.map((item, index) => (
+                    <TimelineItem
+                      key={item.id}
+                      item={item}
+                      index={index}
+                      isSelected={selectedItemId === item.id}
+                      onSelect={() => onSelectItem(item.id)}
+                      onRemove={() => onRemoveItem(item.id)}
+                      onDuplicate={() => onDuplicateItem(item)}
+                      onDurationChange={(duration) => onUpdateDuration(item.id, duration)}
+                      onOpenSettings={() => setSettingsItem(item)}
+                      onDragStart={handleItemDragStart}
+                      onDragOver={handleItemDragOver}
+                      onDrop={handleItemDrop}
+                    />
+                  ))}
 
-        {/* Drag overlay */}
-        {isDragOver && items.length > 0 && (
-          <div className="absolute inset-0 bg-primary/5 pointer-events-none flex items-center justify-center">
-            <div className="bg-primary text-primary-foreground px-4 py-2 rounded-lg shadow-lg">
-              Solte para adicionar
+                  {/* Drop zone at end */}
+                  <div
+                    className={`
+                      flex-shrink-0 w-36 h-48 rounded-xl border-2 border-dashed
+                      flex flex-col items-center justify-center gap-2 text-muted-foreground
+                      transition-colors
+                      ${isDragOver ? "border-primary bg-primary/10" : "border-muted-foreground/30"}
+                    `}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleItemDrop(e, items.length);
+                    }}
+                  >
+                    <Plus className="w-8 h-8" />
+                    <span className="text-xs">Adicionar</span>
+                  </div>
+                </div>
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+          )}
+
+          {/* Drag overlay */}
+          {isDragOver && items.length > 0 && (
+            <div className="absolute inset-0 bg-primary/5 pointer-events-none flex items-center justify-center">
+              <div className="bg-primary text-primary-foreground px-4 py-2 rounded-lg shadow-lg">
+                Solte para adicionar
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Time markers */}
+        {items.length > 0 && (
+          <div className="px-6 py-2 border-t bg-muted/30">
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              {items.reduce<{ time: number; items: { position: number; time: string }[] }>(
+                (acc, item, index) => {
+                  const duration = item.duration_override || item.media?.duration || 8;
+                  const startTime = acc.time;
+                  const mins = Math.floor(startTime / 60);
+                  const secs = startTime % 60;
+                  acc.items.push({
+                    position: index,
+                    time: `${mins}:${secs.toString().padStart(2, "0")}`,
+                  });
+                  acc.time += duration;
+                  return acc;
+                },
+                { time: 0, items: [] }
+              ).items.map((marker) => (
+                <span key={marker.position} className="w-36 text-center">
+                  {marker.time}
+                </span>
+              ))}
             </div>
           </div>
         )}
       </div>
 
-      {/* Time markers */}
-      {items.length > 0 && (
-        <div className="px-6 py-2 border-t bg-muted/30">
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-            {items.reduce<{ time: number; items: { position: number; time: string }[] }>(
-              (acc, item, index) => {
-                const duration = item.duration_override || item.media?.duration || 10;
-                const startTime = acc.time;
-                const mins = Math.floor(startTime / 60);
-                const secs = startTime % 60;
-                acc.items.push({
-                  position: index,
-                  time: `${mins}:${secs.toString().padStart(2, "0")}`,
-                });
-                acc.time += duration;
-                return acc;
-              },
-              { time: 0, items: [] }
-            ).items.map((marker) => (
-              <span key={marker.position} className="w-36 text-center">
-                {marker.time}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+      {/* Settings Dialog */}
+      <ItemSettingsDialog
+        item={settingsItem}
+        open={!!settingsItem}
+        onOpenChange={(open) => !open && setSettingsItem(null)}
+        onSave={onUpdateItemSettings}
+      />
+    </>
   );
 };

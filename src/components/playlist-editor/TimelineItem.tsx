@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { PlaylistItem } from "@/hooks/usePlaylistItems";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,12 +14,14 @@ import {
   Clock,
   AlertTriangle,
   MoreVertical,
-  Settings
+  Settings,
+  Calendar
 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -31,6 +33,7 @@ interface TimelineItemProps {
   onRemove: () => void;
   onDuplicate: () => void;
   onDurationChange: (duration: number) => void;
+  onOpenSettings: () => void;
   onDragStart: (e: React.DragEvent, index: number) => void;
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent, index: number) => void;
@@ -62,16 +65,18 @@ export const TimelineItem = ({
   onRemove,
   onDuplicate,
   onDurationChange,
+  onOpenSettings,
   onDragStart,
   onDragOver,
   onDrop,
 }: TimelineItemProps) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [localDuration, setLocalDuration] = useState(
-    item.duration_override || item.media?.duration || 10
+    item.duration_override || item.media?.duration || 8
   );
-  const duration = item.duration_override || item.media?.duration || 10;
+  const duration = item.duration_override || item.media?.duration || 8;
   const hasError = !item.media?.file_url;
+  const hasScheduleOverride = item.is_schedule_override;
 
   const handleDragStart = (e: React.DragEvent) => {
     e.dataTransfer.setData("text/plain", index.toString());
@@ -153,7 +158,12 @@ export const TimelineItem = ({
       </div>
 
       {/* Position badge */}
-      <div className="absolute top-2 right-2">
+      <div className="absolute top-2 right-2 flex items-center gap-1">
+        {hasScheduleOverride && (
+          <Badge variant="secondary" className="bg-blue-500/80 text-white border-0 text-xs px-1">
+            <Calendar className="w-3 h-3" />
+          </Badge>
+        )}
         <Badge variant="secondary" className="bg-black/50 text-white border-0 text-xs">
           {index + 1}
         </Badge>
@@ -197,7 +207,7 @@ export const TimelineItem = ({
                 type="number"
                 min={1}
                 value={localDuration}
-                onChange={(e) => setLocalDuration(parseInt(e.target.value) || 10)}
+                onChange={(e) => setLocalDuration(parseInt(e.target.value) || 8)}
                 onBlur={handleDurationSubmit}
                 onKeyDown={(e) => e.key === "Enter" && handleDurationSubmit()}
                 className="h-8"
@@ -221,10 +231,15 @@ export const TimelineItem = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onOpenSettings(); }}>
+              <Settings className="w-4 h-4 mr-2" />
+              Configurações
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={onDuplicate}>
               <Copy className="w-4 h-4 mr-2" />
               Duplicar
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onRemove} className="text-destructive">
               <X className="w-4 h-4 mr-2" />
               Remover

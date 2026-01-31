@@ -139,11 +139,14 @@ export const PlaylistEditor = () => {
     const id = await ensurePlaylistExists();
     if (!id) return;
     
+    // For videos, use the actual video duration; for images, use 8 seconds default
+    const itemDuration = media.type === 'video' && media.duration ? media.duration : 8;
+    
     addItem.mutate({
       playlist_id: id,
       media_id: media.id,
       position,
-      duration_override: media.duration,
+      duration_override: itemDuration,
     });
   }, [activePlaylistId, addItem, formData, createPlaylist]);
 
@@ -168,6 +171,18 @@ export const PlaylistEditor = () => {
 
   const handleUpdateDuration = useCallback((id: string, duration: number) => {
     updateItem.mutate({ id, duration_override: duration });
+  }, [updateItem]);
+
+  const handleUpdateItemSettings = useCallback((id: string, updates: {
+    duration_override: number;
+    is_schedule_override: boolean;
+    start_date: string | null;
+    end_date: string | null;
+    start_time: string | null;
+    end_time: string | null;
+    days_of_week: number[] | null;
+  }) => {
+    updateItem.mutate({ id, ...updates });
   }, [updateItem]);
 
   const handleReorderItems = useCallback((orderedItems: { id: string; position: number }[]) => {
@@ -340,6 +355,7 @@ export const PlaylistEditor = () => {
             onRemoveItem={handleRemoveItem}
             onDuplicateItem={handleDuplicateItem}
             onUpdateDuration={handleUpdateDuration}
+            onUpdateItemSettings={handleUpdateItemSettings}
             onReorderItems={handleReorderItems}
             totalDuration={totalDuration}
             isPlaying={isPreviewPlaying}

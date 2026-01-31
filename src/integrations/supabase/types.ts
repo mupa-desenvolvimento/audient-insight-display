@@ -509,27 +509,45 @@ export type Database = {
       playlist_items: {
         Row: {
           created_at: string
+          days_of_week: number[] | null
           duration_override: number | null
+          end_date: string | null
+          end_time: string | null
           id: string
+          is_schedule_override: boolean | null
           media_id: string
           playlist_id: string
           position: number
+          start_date: string | null
+          start_time: string | null
         }
         Insert: {
           created_at?: string
+          days_of_week?: number[] | null
           duration_override?: number | null
+          end_date?: string | null
+          end_time?: string | null
           id?: string
+          is_schedule_override?: boolean | null
           media_id: string
           playlist_id: string
           position?: number
+          start_date?: string | null
+          start_time?: string | null
         }
         Update: {
           created_at?: string
+          days_of_week?: number[] | null
           duration_override?: number | null
+          end_date?: string | null
+          end_time?: string | null
           id?: string
+          is_schedule_override?: boolean | null
           media_id?: string
           playlist_id?: string
           position?: number
+          start_date?: string | null
+          start_time?: string | null
         }
         Relationships: [
           {
