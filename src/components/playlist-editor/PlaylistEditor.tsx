@@ -13,6 +13,7 @@ import { EditorHeader } from "./EditorHeader";
 import { EditorPropertiesPanel } from "./EditorPropertiesPanel";
 import { ChannelsList } from "./ChannelsList";
 import { ChannelEditor } from "./ChannelEditor";
+import { ChannelsTimeline } from "./ChannelsTimeline";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,7 @@ export const PlaylistEditor = () => {
     createChannel,
     updateChannel,
     deleteChannel,
+    reorderChannels,
   } = usePlaylistChannels(activePlaylistId);
   
   // Legacy playlist items (for backward compatibility)
@@ -237,6 +239,10 @@ export const PlaylistEditor = () => {
     }
   }, [deleteChannel, selectedChannel]);
 
+  const handleReorderChannels = useCallback((orderedChannels: { id: string; position: number }[]) => {
+    reorderChannels.mutate(orderedChannels);
+  }, [reorderChannels]);
+
   const handleSave = async () => {
     if (!formData.name.trim()) {
       toast({ title: "Nome é obrigatório", variant: "destructive" });
@@ -394,6 +400,7 @@ export const PlaylistEditor = () => {
                   onCreateChannel={handleCreateChannel}
                   onUpdateChannel={handleUpdateChannel}
                   onDeleteChannel={handleDeleteChannel}
+                  onReorderChannels={handleReorderChannels}
                   playlistId={activePlaylistId || ""}
                   playlistName={formData.name || "Nova Playlist"}
                 />
@@ -454,18 +461,36 @@ export const PlaylistEditor = () => {
           </div>
         )}
 
-        {/* Empty state when in channels mode */}
+        {/* Channels Timeline view when in channels mode */}
         {activeTab === "channels" && !selectedChannel && (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-muted/30">
-            <Radio className="w-16 h-16 text-muted-foreground/50 mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Selecione um Canal</h2>
-            <p className="text-muted-foreground max-w-md mb-6">
-              Clique em um canal na lista à esquerda para editar seus conteúdos, 
-              ou crie um novo canal para começar.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Canais permitem programar blocos de conteúdo por horário do dia.
-            </p>
+          <div className="flex-1 flex flex-col min-w-0 p-4 bg-muted/30">
+            <div className="flex-1 flex flex-col gap-4">
+              {/* Timeline visualization */}
+              <ChannelsTimeline
+                channels={playlistChannels}
+                onSelectChannel={setSelectedChannel}
+                activeChannelId={null}
+              />
+              
+              {/* Empty state if no channels */}
+              {playlistChannels.length === 0 && (
+                <div className="flex-1 flex flex-col items-center justify-center text-center">
+                  <Radio className="w-16 h-16 text-muted-foreground/50 mb-4" />
+                  <h2 className="text-xl font-semibold mb-2">Nenhum Canal Criado</h2>
+                  <p className="text-muted-foreground max-w-md mb-6">
+                    Crie seu primeiro canal na lista à esquerda para começar a programar conteúdos por horário.
+                  </p>
+                </div>
+              )}
+              
+              {/* Instructions when channels exist */}
+              {playlistChannels.length > 0 && (
+                <div className="text-center text-muted-foreground text-sm">
+                  <p>Clique em um bloco na timeline ou na lista à esquerda para editar o conteúdo do canal.</p>
+                  <p className="mt-1">Arraste os cards na lista para reordenar a prioridade dos canais.</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
