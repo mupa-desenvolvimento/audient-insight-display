@@ -217,7 +217,7 @@ export const ChannelsList = ({
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {channels.map((channel) => (
             <Card 
               key={channel.id}
@@ -227,100 +227,109 @@ export const ChannelsList = ({
               )}
               onClick={() => onSelectChannel(channel)}
             >
-              <CardContent className="p-3">
-                <div className="flex items-center gap-3">
-                  {/* Drag Handle */}
-                  <div className="text-muted-foreground cursor-grab">
-                    <GripVertical className="w-5 h-5" />
-                  </div>
-                  
-                  {/* Status Icon */}
-                  <div className={cn(
-                    "w-9 h-9 rounded-lg flex items-center justify-center shrink-0",
-                    isChannelActive(channel) ? "bg-green-500/20" : "bg-muted"
-                  )}>
-                    {channel.is_fallback ? (
-                      <Shield className="w-4 h-4 text-yellow-600" />
-                    ) : isChannelActive(channel) ? (
-                      <Play className="w-4 h-4 text-green-600" />
-                    ) : (
-                      <Clock className="w-4 h-4 text-muted-foreground" />
-                    )}
-                  </div>
-                  
-                  {/* Main Content */}
-                  <div className="flex-1 min-w-0 space-y-1">
-                    {/* Top Row: Badge + Time */}
-                    <div className="flex items-center gap-3">
-                      {getChannelStatusBadge(channel)}
+              <CardContent className="p-0">
+                {/* Linha 1: Header - Drag, Icon, Badge, Actions */}
+                <div className="flex items-center justify-between px-3 py-2 border-b border-border/50">
+                  <div className="flex items-center gap-3">
+                    {/* Drag Handle */}
+                    <div className="text-muted-foreground cursor-grab hover:text-foreground transition-colors">
+                      <GripVertical className="w-5 h-5" />
                     </div>
                     
-                    {/* Second Row: Time Range */}
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span className="font-medium">
-                        {channel.start_time.slice(0, 5)} – {channel.end_time.slice(0, 5)}
-                      </span>
+                    {/* Status Icon */}
+                    <div className={cn(
+                      "w-8 h-8 rounded-lg flex items-center justify-center",
+                      channel.is_fallback 
+                        ? "bg-yellow-500/20" 
+                        : isChannelActive(channel) 
+                          ? "bg-green-500/20" 
+                          : "bg-muted"
+                    )}>
+                      {channel.is_fallback ? (
+                        <Shield className="w-4 h-4 text-yellow-500" />
+                      ) : isChannelActive(channel) ? (
+                        <Play className="w-4 h-4 text-green-500" />
+                      ) : (
+                        <Clock className="w-4 h-4 text-muted-foreground" />
+                      )}
                     </div>
                     
-                    {/* Third Row: Days of Week with dots */}
-                    <div className="flex items-center gap-1.5">
-                      {DAYS_OF_WEEK.map((day) => (
-                        <div key={day.value} className="flex flex-col items-center gap-0.5">
-                          <span
-                            className={cn(
-                              "text-xs font-medium leading-none",
-                              channel.days_of_week.includes(day.value)
-                                ? "text-primary"
-                                : "text-muted-foreground/40"
-                            )}
-                          >
-                            {day.label[0]}
-                          </span>
-                          <div
-                            className={cn(
-                              "w-1.5 h-1.5 rounded-full",
-                              channel.days_of_week.includes(day.value)
-                                ? "bg-primary"
-                                : "bg-muted-foreground/20"
-                            )}
-                          />
-                        </div>
-                      ))}
-                    </div>
+                    {/* Badge */}
+                    {getChannelStatusBadge(channel)}
                   </div>
                   
                   {/* Actions */}
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex items-center gap-1">
                     <Button 
                       variant="ghost" 
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-7 w-7"
                       onClick={(e) => {
                         e.stopPropagation();
                         openEditDialog(channel);
                       }}
                     >
-                      <Edit className="w-4 h-4" />
+                      <Edit className="w-3.5 h-3.5" />
                     </Button>
                     <Button 
                       variant="ghost" 
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-7 w-7"
                       onClick={(e) => {
                         e.stopPropagation();
                         setDeleteId(channel.id);
                       }}
                     >
-                      <Trash2 className="w-4 h-4 text-destructive" />
+                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
                     </Button>
-                    <div className="flex flex-col items-center ml-1">
-                      <span className="text-xs text-muted-foreground font-medium">
-                        {channel.item_count || 0} mídias
-                      </span>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground ml-1" />
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
                   </div>
+                </div>
+                
+                {/* Linha 2: Horário */}
+                <div className="px-3 py-3 flex justify-center">
+                  <div className="flex items-center gap-2 text-lg font-semibold">
+                    <Clock className="w-4 h-4 text-muted-foreground" />
+                    <span>
+                      {channel.start_time.slice(0, 5)} – {channel.end_time.slice(0, 5)}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Linha 3: Dias da Semana */}
+                <div className="px-3 pb-3 flex justify-center">
+                  <div className="flex items-center gap-3">
+                    {DAYS_OF_WEEK.map((day) => (
+                      <div key={day.value} className="flex flex-col items-center gap-1">
+                        <span
+                          className={cn(
+                            "text-xs font-medium",
+                            channel.days_of_week.includes(day.value)
+                              ? "text-foreground"
+                              : "text-muted-foreground/40"
+                          )}
+                        >
+                          {day.label[0]}
+                        </span>
+                        <div
+                          className={cn(
+                            "w-2 h-2 rounded-full transition-colors",
+                            channel.days_of_week.includes(day.value)
+                              ? "bg-primary"
+                              : "bg-muted-foreground/20"
+                          )}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Linha 4: Rodapé - Mídias */}
+                <div className="px-3 py-2 border-t border-border/50 flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    {channel.item_count || 0} mídias
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
                 </div>
               </CardContent>
             </Card>
