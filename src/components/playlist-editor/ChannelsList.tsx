@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { PlaylistChannel, PlaylistChannelInsert } from "@/hooks/usePlaylistChannels";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,6 +51,7 @@ interface ChannelsListProps {
   onCreateChannel: (data: PlaylistChannelInsert) => void;
   onUpdateChannel: (id: string, data: Partial<PlaylistChannelInsert>) => void;
   onDeleteChannel: (id: string) => void;
+  onReorderChannels?: (orderedChannels: { id: string; position: number }[]) => void;
   playlistId: string;
   playlistName: string;
 }
@@ -62,12 +63,18 @@ export const ChannelsList = ({
   onCreateChannel,
   onUpdateChannel,
   onDeleteChannel,
+  onReorderChannels,
   playlistId,
   playlistName,
 }: ChannelsListProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingChannel, setEditingChannel] = useState<PlaylistChannel | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  
+  // Drag and drop state
+  const [draggedChannel, setDraggedChannel] = useState<PlaylistChannel | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const dragNodeRef = useRef<HTMLDivElement | null>(null);
   
   const [formData, setFormData] = useState<ChannelFormData>({
     name: "",
@@ -78,6 +85,73 @@ export const ChannelsList = ({
     is_fallback: false,
     is_active: true,
   });
+  
+  // Drag handlers
+  const handleDragStart = useCallback((e: React.DragEvent, channel: PlaylistChannel, index: number) => {
+    setDraggedChannel(channel);
+    dragNodeRef.current = e.target as HTMLDivElement;
+    
+    // Set drag image
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", channel.id);
+    }
+    
+    // Add dragging class after a small delay
+    setTimeout(() => {
+      if (dragNodeRef.current) {
+        dragNodeRef.current.style.opacity = "0.5";
+      }
+    }, 0);
+  }, []);
+  
+  const handleDragEnd = useCallback(() => {
+    if (dragNodeRef.current) {
+      dragNodeRef.current.style.opacity = "1";
+    }
+    setDraggedChannel(null);
+    setDragOverIndex(null);
+    dragNodeRef.current = null;
+  }, []);
+  
+  const handleDragOver = useCallback((e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    
+    if (draggedChannel && dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  }, [draggedChannel, dragOverIndex]);
+  
+  const handleDrop = useCallback((e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    
+    if (!draggedChannel || !onReorderChannels) {
+      handleDragEnd();
+      return;
+    }
+    
+    const dragIndex = channels.findIndex(c => c.id === draggedChannel.id);
+    
+    if (dragIndex === dropIndex) {
+      handleDragEnd();
+      return;
+    }
+    
+    // Calculate new order
+    const newChannels = [...channels];
+    const [removed] = newChannels.splice(dragIndex, 1);
+    newChannels.splice(dropIndex, 0, removed);
+    
+    // Create position updates
+    const orderedChannels = newChannels.map((channel, index) => ({
+      id: channel.id,
+      position: index,
+    }));
+    
+    onReorderChannels(orderedChannels);
+    handleDragEnd();
+  }, [draggedChannel, channels, onReorderChannels, handleDragEnd]);
 
   const resetForm = () => {
     setFormData({
@@ -218,12 +292,19 @@ export const ChannelsList = ({
         </Card>
       ) : (
         <div className="space-y-3">
-          {channels.map((channel) => (
+          {channels.map((channel, index) => (
             <Card 
               key={channel.id}
+              draggable
+              onDragStart={(e) => handleDragStart(e, channel, index)}
+              onDragEnd={handleDragEnd}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDrop={(e) => handleDrop(e, index)}
               className={cn(
                 "cursor-pointer transition-all hover:border-primary/50",
-                activeChannelId === channel.id && "border-primary ring-1 ring-primary"
+                activeChannelId === channel.id && "border-primary ring-1 ring-primary",
+                draggedChannel?.id === channel.id && "opacity-50",
+                dragOverIndex === index && draggedChannel?.id !== channel.id && "border-primary border-dashed"
               )}
               onClick={() => onSelectChannel(channel)}
             >
