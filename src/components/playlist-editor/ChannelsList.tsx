@@ -228,10 +228,10 @@ export const ChannelsList = ({
               onClick={() => onSelectChannel(channel)}
             >
               <CardContent className="p-3">
-                <div className="flex items-start gap-3">
+                <div className="flex items-center gap-3">
                   {/* Drag Handle */}
-                  <div className="text-muted-foreground cursor-grab mt-1">
-                    <GripVertical className="w-4 h-4" />
+                  <div className="text-muted-foreground cursor-grab">
+                    <GripVertical className="w-5 h-5" />
                   </div>
                   
                   {/* Status Icon */}
@@ -249,49 +249,44 @@ export const ChannelsList = ({
                   </div>
                   
                   {/* Main Content */}
-                  <div className="flex-1 min-w-0 space-y-1.5">
-                    {/* Top Row: Badge */}
-                    <div className="flex items-center justify-center">
+                  <div className="flex-1 min-w-0 space-y-1">
+                    {/* Top Row: Badge + Time */}
+                    <div className="flex items-center gap-3">
                       {getChannelStatusBadge(channel)}
                     </div>
                     
-                    {/* Bottom Row: Time, Media Count, Days */}
-                    <div className="flex items-center justify-between gap-2 text-sm">
-                      {/* Time */}
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <Clock className="w-3 h-3" />
-                        <span className="font-medium">
-                          {channel.start_time.slice(0, 5)}
-                        </span>
-                        <span className="text-muted-foreground/50">-</span>
-                        <span className="font-medium">
-                          {channel.end_time.slice(0, 5)}
-                        </span>
-                      </div>
-                      
-                      {/* Media Count */}
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <Edit className="w-3 h-3" />
-                        <span className="font-medium">{channel.item_count || 0}</span>
-                        <span className="text-xs">mídias</span>
-                      </div>
-                      
-                      {/* Days of Week */}
-                      <div className="flex gap-0.5">
-                        {DAYS_OF_WEEK.map((day) => (
+                    {/* Second Row: Time Range */}
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span className="font-medium">
+                        {channel.start_time.slice(0, 5)} – {channel.end_time.slice(0, 5)}
+                      </span>
+                    </div>
+                    
+                    {/* Third Row: Days of Week with dots */}
+                    <div className="flex items-center gap-1.5">
+                      {DAYS_OF_WEEK.map((day) => (
+                        <div key={day.value} className="flex flex-col items-center gap-0.5">
                           <span
-                            key={day.value}
                             className={cn(
-                              "text-xs font-medium w-4 text-center",
+                              "text-xs font-medium leading-none",
                               channel.days_of_week.includes(day.value)
                                 ? "text-primary"
-                                : "text-muted-foreground/30"
+                                : "text-muted-foreground/40"
                             )}
                           >
                             {day.label[0]}
                           </span>
-                        ))}
-                      </div>
+                          <div
+                            className={cn(
+                              "w-1.5 h-1.5 rounded-full",
+                              channel.days_of_week.includes(day.value)
+                                ? "bg-primary"
+                                : "bg-muted-foreground/20"
+                            )}
+                          />
+                        </div>
+                      ))}
                     </div>
                   </div>
                   
@@ -306,7 +301,7 @@ export const ChannelsList = ({
                         openEditDialog(channel);
                       }}
                     >
-                      <Edit className="w-3.5 h-3.5" />
+                      <Edit className="w-4 h-4" />
                     </Button>
                     <Button 
                       variant="ghost" 
@@ -317,9 +312,14 @@ export const ChannelsList = ({
                         setDeleteId(channel.id);
                       }}
                     >
-                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                      <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                    <div className="flex flex-col items-center ml-1">
+                      <span className="text-xs text-muted-foreground font-medium">
+                        {channel.item_count || 0} mídias
+                      </span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground ml-1" />
                   </div>
                 </div>
               </CardContent>
