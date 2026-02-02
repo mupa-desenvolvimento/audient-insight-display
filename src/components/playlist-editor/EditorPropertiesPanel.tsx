@@ -98,7 +98,7 @@ const MediaLibraryPanel = ({ onAddMedia, itemsLength }: {
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col overflow-hidden">
       {/* Search & Filter */}
       <div className="p-3 space-y-2 border-b border-border">
         <div className="relative">
@@ -133,8 +133,8 @@ const MediaLibraryPanel = ({ onAddMedia, itemsLength }: {
         </div>
       </div>
 
-      {/* Media Grid */}
-      <ScrollArea className="flex-1">
+      {/* Media Grid - Scroll local com scrollbar sempre visível */}
+      <ScrollArea className="flex-1 min-h-0" showScrollbar="always">
         {isLoading ? (
           <div className="p-4 text-center text-muted-foreground text-sm">Carregando...</div>
         ) : filteredItems.length === 0 ? (
