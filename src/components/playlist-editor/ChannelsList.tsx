@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Plus, 
   Clock, 
@@ -274,9 +275,9 @@ export const ChannelsList = ({
   };
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* Header - Fixed */}
+      <div className="flex items-center justify-between p-4 border-b shrink-0">
         <div>
           <h2 className="text-base font-semibold flex items-center gap-2">
             <Radio className="w-4 h-4 text-primary" />
@@ -291,27 +292,27 @@ export const ChannelsList = ({
         </Button>
       </div>
 
-      {/* Channels List */}
-      {channels.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="py-6 text-center">
-            <Tv className="w-10 h-10 mx-auto mb-3 text-muted-foreground/50" />
-            <p className="text-sm text-muted-foreground mb-3">
-              Nenhum canal criado
-            </p>
-            <Button onClick={openNewDialog} size="sm">
-              <Plus className="w-4 h-4 mr-2" />
-              Criar Canal
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-2">
-          {channels.map((channel, index) => {
-            const status = getChannelStatus(channel);
-            const isLive = status.type === "live";
+      {/* Channels List - Scrollable */}
+      <ScrollArea className="flex-1 min-h-0" showScrollbar="always">
+        <div className="p-4 space-y-2">
+          {channels.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="py-6 text-center">
+                <Tv className="w-10 h-10 mx-auto mb-3 text-muted-foreground/50" />
+                <p className="text-sm text-muted-foreground mb-3">
+                  Nenhum canal criado
+                </p>
+                <Button onClick={openNewDialog} size="sm">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Criar Canal
+                </Button>
+              </CardContent>
+            </Card>
+          ) : channels.map((channel, index) => {
+              const status = getChannelStatus(channel);
+              const isLive = status.type === "live";
             
-            return (
+              return (
               <Card 
                 key={channel.id}
                 draggable
@@ -446,10 +447,10 @@ export const ChannelsList = ({
                   </div>
                 </CardContent>
               </Card>
-            );
-          })}
+              );
+            })}
         </div>
-      )}
+      </ScrollArea>
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
