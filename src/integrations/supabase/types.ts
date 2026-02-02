@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_integrations: {
+        Row: {
+          auth_type: string
+          base_url: string
+          created_at: string
+          default_settings: Json | null
+          description: string | null
+          endpoints: Json | null
+          id: string
+          is_active: boolean
+          name: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          auth_type?: string
+          base_url: string
+          created_at?: string
+          default_settings?: Json | null
+          description?: string | null
+          endpoints?: Json | null
+          id?: string
+          is_active?: boolean
+          name: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          auth_type?: string
+          base_url?: string
+          created_at?: string
+          default_settings?: Json | null
+          description?: string | null
+          endpoints?: Json | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cities: {
         Row: {
           created_at: string
@@ -52,6 +94,101 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      companies: {
+        Row: {
+          cnpj: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          settings: Json | null
+          slug: string
+          tenant_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          cnpj?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          settings?: Json | null
+          slug: string
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cnpj?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          settings?: Json | null
+          slug?: string
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companies_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_integrations: {
+        Row: {
+          company_id: string
+          created_at: string
+          credentials: Json | null
+          id: string
+          integration_id: string
+          is_active: boolean
+          settings: Json | null
+          token_cache: Json | null
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          credentials?: Json | null
+          id?: string
+          integration_id: string
+          is_active?: boolean
+          settings?: Json | null
+          token_cache?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          credentials?: Json | null
+          id?: string
+          integration_id?: string
+          is_active?: boolean
+          settings?: Json | null
+          token_cache?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_integrations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_integrations_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "api_integrations"
             referencedColumns: ["id"]
           },
         ]
@@ -295,6 +432,7 @@ export type Database = {
       devices: {
         Row: {
           camera_enabled: boolean
+          company_id: string | null
           created_at: string
           current_playlist_id: string | null
           device_code: string
@@ -311,6 +449,7 @@ export type Database = {
         }
         Insert: {
           camera_enabled?: boolean
+          company_id?: string | null
           created_at?: string
           current_playlist_id?: string | null
           device_code: string
@@ -327,6 +466,7 @@ export type Database = {
         }
         Update: {
           camera_enabled?: boolean
+          company_id?: string | null
           created_at?: string
           current_playlist_id?: string | null
           device_code?: string
@@ -342,6 +482,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "devices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "devices_current_playlist_id_fkey"
             columns: ["current_playlist_id"]
@@ -803,6 +950,101 @@ export type Database = {
             columns: ["fallback_media_id"]
             isOneToOne: false
             referencedRelation: "media_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_cache: {
+        Row: {
+          company_id: string
+          created_at: string
+          ean: string
+          expires_at: string
+          id: string
+          image_url: string | null
+          product_data: Json
+          store_code: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          ean: string
+          expires_at: string
+          id?: string
+          image_url?: string | null
+          product_data: Json
+          store_code: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          ean?: string
+          expires_at?: string
+          id?: string
+          image_url?: string | null
+          product_data?: Json
+          store_code?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_cache_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_lookup_logs: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          device_id: string | null
+          ean: string
+          error_message: string | null
+          id: string
+          latency_ms: number | null
+          status: string
+          store_code: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          device_id?: string | null
+          ean: string
+          error_message?: string | null
+          id?: string
+          latency_ms?: number | null
+          status: string
+          store_code?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          device_id?: string | null
+          ean?: string
+          error_message?: string | null
+          id?: string
+          latency_ms?: number | null
+          status?: string
+          store_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_lookup_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_lookup_logs_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
             referencedColumns: ["id"]
           },
         ]

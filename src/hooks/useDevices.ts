@@ -8,6 +8,7 @@ export interface Device {
   device_code: string;
   name: string;
   store_id: string | null;
+  company_id: string | null;
   display_profile_id: string | null;
   current_playlist_id: string | null;
   status: string;
@@ -22,6 +23,7 @@ export interface Device {
 
 export interface DeviceWithRelations extends Device {
   store?: { id: string; name: string; code: string } | null;
+  company?: { id: string; name: string; slug: string } | null;
   display_profile?: { id: string; name: string; resolution: string } | null;
   current_playlist?: { id: string; name: string } | null;
 }
@@ -30,6 +32,7 @@ export interface DeviceInsert {
   device_code: string;
   name: string;
   store_id?: string | null;
+  company_id?: string | null;
   display_profile_id?: string | null;
   current_playlist_id?: string | null;
   status?: string;
@@ -41,6 +44,7 @@ export interface DeviceInsert {
 export interface DeviceUpdate {
   name?: string;
   store_id?: string | null;
+  company_id?: string | null;
   display_profile_id?: string | null;
   current_playlist_id?: string | null;
   status?: string;
@@ -62,6 +66,7 @@ export const useDevices = () => {
         .select(`
           *,
           store:stores(id, name, code),
+          company:companies(id, name, slug),
           display_profile:display_profiles(id, name, resolution),
           current_playlist:playlists(id, name)
         `)

@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { useOfflinePlayer, CachedPlaylistItem } from "@/hooks/useOfflinePlayer";
+import { useProductLookup } from "@/hooks/useProductLookup";
+import { ProductLookupContainer } from "@/components/player/ProductLookupContainer";
+import { EanInput } from "@/components/player/EanInput";
 import { 
   Wifi, 
   WifiOff, 
@@ -17,6 +20,8 @@ import {
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 
+type PlayerMode = "media" | "product";
+
 const OfflinePlayer = () => {
   const { deviceCode } = useParams<{ deviceCode: string }>();
   const {
@@ -30,6 +35,8 @@ const OfflinePlayer = () => {
     isPlaylistActiveNow,
   } = useOfflinePlayer(deviceCode || "");
 
+  // Estado do player
+  const [playerMode, setPlayerMode] = useState<PlayerMode>("media");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
@@ -39,11 +46,42 @@ const OfflinePlayer = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const mediaTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Hook de consulta de produtos
+  const { 
+    product, 
+    isLoading: isProductLoading, 
+    error: productError, 
+    lookupProduct, 
+    clearProduct 
+  } = useProductLookup({
+    deviceCode: deviceCode || "",
+    onLookupStart: () => {
+      setPlayerMode("product");
+      // Pausa o timer de mídia durante a consulta
+      if (mediaTimerRef.current) {
+        clearTimeout(mediaTimerRef.current);
+      }
+    }
+  });
 
   const activePlaylist = getActivePlaylist();
   const items = activePlaylist?.items || [];
   const currentItem = items[currentIndex];
   const currentMedia = currentItem?.media;
+
+  // Função para voltar ao modo de mídias
+  const handleDismissProduct = useCallback(() => {
+    setPlayerMode("media");
+    clearProduct();
+  }, [clearProduct]);
+
+  // Função para lidar com entrada de EAN
+  const handleEanSubmit = useCallback((ean: string) => {
+    console.log("[OfflinePlayer] EAN submetido:", ean);
+    lookupProduct(ean);
+  }, [lookupProduct]);
 
   // Atualiza relógio
   useEffect(() => {
@@ -53,9 +91,9 @@ const OfflinePlayer = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Controle de exibição de mídia
+  // Controle de exibição de mídia - só roda quando em modo mídia
   useEffect(() => {
-    if (!currentMedia || items.length === 0) return;
+    if (!currentMedia || items.length === 0 || playerMode !== "media") return;
 
     const duration = (currentItem?.duration_override || currentMedia.duration || 10) * 1000;
     setTimeRemaining(duration);
@@ -68,17 +106,19 @@ const OfflinePlayer = () => {
     }, 100);
 
     // Timer para próxima mídia
-    const timer = setTimeout(() => {
+    mediaTimerRef.current = setTimeout(() => {
       setCurrentIndex((prev) => (prev + 1) % items.length);
     }, duration);
 
     return () => {
-      clearTimeout(timer);
+      if (mediaTimerRef.current) {
+        clearTimeout(mediaTimerRef.current);
+      }
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
       }
     };
-  }, [currentIndex, currentMedia, currentItem, items.length]);
+  }, [currentIndex, currentMedia, currentItem, items.length, playerMode]);
 
   // Reproduz vídeo automaticamente
   useEffect(() => {
@@ -209,8 +249,22 @@ const OfflinePlayer = () => {
 
   return (
     <div className="relative min-h-screen bg-black overflow-hidden select-none">
-      {/* Conteúdo Principal */}
-      <div className="relative w-full h-screen">
+      {/* Container de Produto - sobrepõe as mídias quando ativo */}
+      {playerMode === "product" && (
+        <ProductLookupContainer
+          product={product}
+          isLoading={isProductLoading}
+          error={productError}
+          onDismiss={handleDismissProduct}
+          timeout={15}
+        />
+      )}
+
+      {/* Container de Mídias - visível apenas quando em modo mídia */}
+      <div className={cn(
+        "relative w-full h-screen transition-opacity duration-300",
+        playerMode === "product" ? "opacity-0 pointer-events-none" : "opacity-100"
+      )}>
         {currentMedia?.type === "video" ? (
           <video
             ref={videoRef}
@@ -234,23 +288,33 @@ const OfflinePlayer = () => {
             }}
           />
         )}
-      </div>
 
-      {/* Barra de Progresso */}
-      <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
-        <div
-          className="h-full bg-primary transition-all duration-100 ease-linear"
-          style={{ width: `${progressPercent}%` }}
+        {/* Input EAN - visível apenas no modo mídia */}
+        <EanInput
+          isVisible={playerMode === "media"}
+          onSubmit={handleEanSubmit}
+          disabled={isProductLoading}
         />
       </div>
 
-      {/* Controles superiores */}
-      <div
-        className={cn(
-          "absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/70 to-transparent transition-opacity duration-300",
-          showControls ? "opacity-100" : "opacity-0"
-        )}
-      >
+      {/* Barra de Progresso - só visível no modo mídia */}
+      {playerMode === "media" && (
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
+          <div
+            className="h-full bg-primary transition-all duration-100 ease-linear"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+      )}
+
+      {/* Controles superiores - só visíveis no modo mídia */}
+      {playerMode === "media" && (
+        <div
+          className={cn(
+            "absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/70 to-transparent transition-opacity duration-300",
+            showControls ? "opacity-100" : "opacity-0"
+          )}
+        >
         <div className="flex justify-between items-start">
           {/* Info do dispositivo */}
           <div className="flex items-center gap-3">
@@ -308,8 +372,10 @@ const OfflinePlayer = () => {
           </div>
         </div>
       </div>
+      )}
 
       {/* Info da mídia atual */}
+      {playerMode === "media" && (
       <div
         className={cn(
           "absolute bottom-6 left-6 bg-black/60 backdrop-blur-sm rounded-lg p-3 transition-opacity duration-300",
@@ -330,27 +396,30 @@ const OfflinePlayer = () => {
           </div>
         </div>
       </div>
+      )}
 
       {/* Indicadores de mídia */}
-      <div
-        className={cn(
-          "absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-1.5 transition-opacity duration-300",
-          showControls ? "opacity-100" : "opacity-0"
-        )}
-      >
-        {items.map((_, index) => (
-          <div
-            key={index}
-            className={cn(
-              "w-2 h-6 rounded-full transition-all duration-300",
-              index === currentIndex ? "bg-primary scale-110" : "bg-white/30"
-            )}
-          />
-        ))}
-      </div>
+      {playerMode === "media" && (
+        <div
+          className={cn(
+            "absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-1.5 transition-opacity duration-300",
+            showControls ? "opacity-100" : "opacity-0"
+          )}
+        >
+          {items.map((_, index) => (
+            <div
+              key={index}
+              className={cn(
+                "w-2 h-6 rounded-full transition-all duration-300",
+                index === currentIndex ? "bg-primary scale-110" : "bg-white/30"
+              )}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Status de sincronização */}
-      {isSyncing && (
+      {isSyncing && playerMode === "media" && (
         <div className="absolute bottom-6 right-6 flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-lg px-3 py-2">
           <RefreshCw className="w-4 h-4 text-primary animate-spin" />
           <span className="text-white text-sm">Sincronizando...</span>
@@ -358,7 +427,7 @@ const OfflinePlayer = () => {
       )}
 
       {/* Aviso offline */}
-      {!deviceState?.is_online && (
+      {!deviceState?.is_online && playerMode === "media" && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-yellow-500/20 backdrop-blur-sm rounded-full px-4 py-1.5">
           <WifiOff className="w-4 h-4 text-yellow-400" />
           <span className="text-yellow-200 text-sm">Modo Offline</span>
@@ -366,10 +435,10 @@ const OfflinePlayer = () => {
       )}
 
       {/* Última sincronização */}
-      {deviceState?.last_sync && (
+      {deviceState?.last_sync && playerMode === "media" && (
         <div
           className={cn(
-            "absolute bottom-6 left-1/2 -translate-x-1/2 text-white/40 text-xs transition-opacity duration-300",
+            "absolute bottom-10 left-1/2 -translate-x-1/2 text-white/40 text-xs transition-opacity duration-300",
             showControls ? "opacity-100" : "opacity-0"
           )}
         >
