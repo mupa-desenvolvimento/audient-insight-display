@@ -1,16 +1,26 @@
 import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { PlaylistChannel, PlaylistChannelWithItems, PlaylistChannelItem } from "@/hooks/usePlaylistChannels";
 import { cn } from "@/lib/utils";
-import { Video, Image, Clock, Film, Play, Pause, SkipBack, SkipForward, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import { Video, Image, Clock, Film, Play, Pause, SkipBack, SkipForward, ZoomIn, ZoomOut, Maximize2, Settings } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { ChannelItemSettingsDialog } from "./ChannelItemSettingsDialog";
 
 interface AllMediaTimelineProps {
   channelsWithItems: PlaylistChannelWithItems[];
   onSelectChannel: (channel: PlaylistChannel) => void;
   onReorderGlobal?: (items: { channelId: string; itemId: string; position: number }[]) => void;
+  onUpdateItem?: (itemId: string, updates: {
+    duration_override: number;
+    is_schedule_override: boolean;
+    start_date: string | null;
+    end_date: string | null;
+    start_time: string | null;
+    end_time: string | null;
+    days_of_week: number[] | null;
+  }) => void;
 }
 
 // Color palette for channels
@@ -36,6 +46,7 @@ export const AllMediaTimeline = ({
   channelsWithItems,
   onSelectChannel,
   onReorderGlobal,
+  onUpdateItem,
 }: AllMediaTimelineProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -44,6 +55,7 @@ export const AllMediaTimeline = ({
   const [orderedItems, setOrderedItems] = useState<MediaItemWithMeta[]>([]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
+  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Build initial ordered items from channels, sorted by global_position
@@ -288,13 +300,51 @@ export const AllMediaTimeline = ({
           </Button>
         </div>
 
-        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-          <Clock className="w-3 h-3" />
-          <span>{formatTime(totalDuration)}</span>
-          <span>•</span>
-          <span>{currentIndex + 1}/{orderedItems.length}</span>
+        <div className="flex items-center gap-3">
+          {/* Settings button for current item */}
+          {currentMedia && onUpdateItem && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-7 gap-1.5 text-xs"
+                    onClick={() => setSettingsDialogOpen(true)}
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                    Configurar
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Configurar duração e agendamento da mídia selecionada
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          
+          <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+            <Clock className="w-3 h-3" />
+            <span>{formatTime(totalDuration)}</span>
+            <span>•</span>
+            <span>{currentIndex + 1}/{orderedItems.length}</span>
+          </div>
         </div>
       </div>
+
+      {/* Settings Dialog */}
+      {currentMedia && (
+        <ChannelItemSettingsDialog
+          item={currentMedia.item}
+          open={settingsDialogOpen}
+          onOpenChange={setSettingsDialogOpen}
+          onSave={(id, updates) => {
+            if (onUpdateItem) {
+              onUpdateItem(id, updates);
+            }
+          }}
+        />
+      )}
 
       {/* Channel legend */}
       <div className="shrink-0 bg-muted/20 px-4 py-1.5 flex items-center gap-3">

@@ -14,6 +14,15 @@ interface ChannelsTimelineProps {
   onSelectChannel: (channel: PlaylistChannel) => void;
   onUpdateChannel?: (channelId: string, updates: { start_time?: string; end_time?: string }) => void;
   onReorderGlobal?: (items: { channelId: string; itemId: string; position: number }[]) => void;
+  onUpdateItem?: (itemId: string, updates: {
+    duration_override: number;
+    is_schedule_override: boolean;
+    start_date: string | null;
+    end_date: string | null;
+    start_time: string | null;
+    end_time: string | null;
+    days_of_week: number[] | null;
+  }) => void;
   activeChannelId: string | null;
 }
 
@@ -25,6 +34,7 @@ export const ChannelsTimeline = ({
   onSelectChannel,
   onUpdateChannel,
   onReorderGlobal,
+  onUpdateItem,
   activeChannelId,
 }: ChannelsTimelineProps) => {
   const timelineContainerRef = useRef<HTMLDivElement>(null);
@@ -239,6 +249,7 @@ export const ChannelsTimeline = ({
           channelsWithItems={channelsWithItems || []}
           onSelectChannel={onSelectChannel}
           onReorderGlobal={onReorderGlobal}
+          onUpdateItem={onUpdateItem}
         />
       )}
 

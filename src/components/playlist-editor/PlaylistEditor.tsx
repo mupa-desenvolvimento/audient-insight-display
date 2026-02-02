@@ -56,6 +56,7 @@ export const PlaylistEditor = () => {
     deleteChannel,
     reorderChannels,
     reorderGlobalItems,
+    updateChannelItem,
   } = usePlaylistChannels(activePlaylistId);
   
   // Legacy playlist items (for backward compatibility)
@@ -69,7 +70,7 @@ export const PlaylistEditor = () => {
     getTotalDuration 
   } = usePlaylistItems(activePlaylistId);
 
-  const [activePanel, setActivePanel] = useState<"media" | "settings" | null>("media");
+  const [activePanel, setActivePanel] = useState<"media" | null>("media");
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
@@ -479,6 +480,9 @@ export const PlaylistEditor = () => {
                 }}
                 onReorderGlobal={(items) => {
                   reorderGlobalItems.mutate(items);
+                }}
+                onUpdateItem={(itemId, updates) => {
+                  updateChannelItem.mutate({ id: itemId, ...updates });
                 }}
                 activeChannelId={null}
               />
