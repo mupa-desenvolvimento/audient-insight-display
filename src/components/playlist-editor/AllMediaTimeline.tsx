@@ -46,11 +46,11 @@ export const AllMediaTimeline = ({
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Build initial ordered items from channels
+  // Build initial ordered items from channels, sorted by global_position
   const initialItems = useMemo(() => {
     const items: MediaItemWithMeta[] = [];
-    let globalIndex = 0;
     
+    // First collect all items with channel info
     channelsWithItems.forEach((channel, channelIndex) => {
       if (channel.items && channel.items.length > 0) {
         channel.items.forEach(item => {
@@ -58,16 +58,19 @@ export const AllMediaTimeline = ({
             item,
             channel,
             channelIndex,
-            globalIndex,
+            globalIndex: item.global_position ?? 0,
             duration: item.duration_override || item.media?.duration || 8,
             color: channelColors[channelIndex % channelColors.length],
           });
-          globalIndex++;
         });
       }
     });
     
-    return items;
+    // Sort by global_position
+    items.sort((a, b) => a.globalIndex - b.globalIndex);
+    
+    // Re-assign globalIndex after sorting
+    return items.map((item, idx) => ({ ...item, globalIndex: idx }));
   }, [channelsWithItems]);
 
   // Sync ordered items when channels change
