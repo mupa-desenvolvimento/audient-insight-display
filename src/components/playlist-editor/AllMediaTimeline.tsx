@@ -1,11 +1,12 @@
 import { useMemo, useState, useRef, useEffect } from "react";
 import { PlaylistChannel, PlaylistChannelWithItems, PlaylistChannelItem } from "@/hooks/usePlaylistChannels";
 import { cn } from "@/lib/utils";
-import { Layers, Video, Image, Clock, Film, Radio, Play, Pause } from "lucide-react";
+import { Video, Image, Clock, Film, Play, Pause, SkipBack, SkipForward, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 
 interface AllMediaTimelineProps {
   channelsWithItems: PlaylistChannelWithItems[];
@@ -28,8 +29,10 @@ export const AllMediaTimeline = ({
 }: AllMediaTimelineProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [zoom, setZoom] = useState(100);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
 
   // Aggregate all media items from all channels with sequential order
   const allMediaItems = useMemo(() => {
@@ -61,7 +64,6 @@ export const AllMediaTimeline = ({
     return allMediaItems.map(({ item, channel, channelIndex, globalIndex }) => {
       const duration = item.duration_override || item.media?.duration || 8;
       const widthPercent = totalMediaDuration > 0 ? (duration / totalMediaDuration) * 100 : 0;
-      const leftPercent = totalMediaDuration > 0 ? (currentOffset / totalMediaDuration) * 100 : 0;
       const startTime = currentOffset;
       currentOffset += duration;
       
@@ -72,7 +74,6 @@ export const AllMediaTimeline = ({
         globalIndex,
         duration,
         widthPercent,
-        leftPercent,
         startTime,
         endTime: currentOffset,
         color: channelColors[channelIndex % channelColors.length],
@@ -80,31 +81,12 @@ export const AllMediaTimeline = ({
     });
   }, [allMediaItems, totalMediaDuration]);
 
-  // Current item based on playback time
-  const currentItem = useMemo(() => {
-    return mediaWithPositions.find(
-      ({ startTime, endTime }) => currentTime >= startTime && currentTime < endTime
-    );
-  }, [mediaWithPositions, currentTime]);
-
-  // Group items by channel
-  const itemsByChannel = useMemo(() => {
-    const grouped: Map<string, typeof mediaWithPositions> = new Map();
-    
-    mediaWithPositions.forEach(item => {
-      const channelId = item.channel.id;
-      if (!grouped.has(channelId)) {
-        grouped.set(channelId, []);
-      }
-      grouped.get(channelId)!.push(item);
-    });
-    
-    return grouped;
-  }, [mediaWithPositions]);
+  // Current item based on index
+  const currentMedia = mediaWithPositions[currentIndex];
 
   // Playback timer
   useEffect(() => {
-    if (!isPlaying || totalMediaDuration === 0) {
+    if (!isPlaying || mediaWithPositions.length === 0) {
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -112,9 +94,19 @@ export const AllMediaTimeline = ({
       return;
     }
 
+    const current = mediaWithPositions[currentIndex];
+    if (!current) return;
+
     timerRef.current = setInterval(() => {
       setCurrentTime((prev) => {
-        if (prev >= totalMediaDuration) {
+        const duration = current.duration;
+        if (prev >= duration) {
+          // Move to next item
+          if (currentIndex < mediaWithPositions.length - 1) {
+            setCurrentIndex(currentIndex + 1);
+          } else {
+            setCurrentIndex(0); // Loop back
+          }
           return 0;
         }
         return prev + 0.1;
@@ -126,12 +118,21 @@ export const AllMediaTimeline = ({
         clearInterval(timerRef.current);
       }
     };
-  }, [isPlaying, totalMediaDuration]);
+  }, [isPlaying, currentIndex, mediaWithPositions]);
 
-  const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clickPercent = (e.clientX - rect.left) / rect.width;
-    setCurrentTime(clickPercent * totalMediaDuration);
+  const handleItemClick = (index: number) => {
+    setCurrentIndex(index);
+    setCurrentTime(0);
+  };
+
+  const handlePrevious = () => {
+    setCurrentIndex(prev => Math.max(0, prev - 1));
+    setCurrentTime(0);
+  };
+
+  const handleNext = () => {
+    setCurrentIndex(prev => Math.min(mediaWithPositions.length - 1, prev + 1));
+    setCurrentTime(0);
   };
 
   const formatTime = (seconds: number) => {
@@ -140,10 +141,17 @@ export const AllMediaTimeline = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Calculate minimum width per item based on zoom
+  const getItemWidth = (widthPercent: number) => {
+    const baseMinWidth = 80; // minimum width in pixels
+    const scaledWidth = (widthPercent / 100) * (zoom * 8); // Scale based on zoom
+    return Math.max(baseMinWidth, scaledWidth);
+  };
+
   if (allMediaItems.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8">
-        <Layers className="w-12 h-12 mb-3 opacity-50" />
+        <Film className="w-12 h-12 mb-3 opacity-50" />
         <p className="text-sm font-medium">Nenhuma mídia na playlist</p>
         <p className="text-xs mt-1">Adicione mídias aos canais para visualizá-las aqui</p>
       </div>
@@ -151,183 +159,132 @@ export const AllMediaTimeline = ({
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      {/* Summary Header */}
-      <div className="shrink-0 border-b bg-muted/30 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 text-sm">
-            <span className="font-medium">Todas as Mídias</span>
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <Radio className="w-3.5 h-3.5" />
-                {channelsWithItems.length} canais
-              </span>
-              <span className="flex items-center gap-1">
-                <Film className="w-3.5 h-3.5" />
-                {allMediaItems.length} mídias
-              </span>
-              <span className="flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5" />
-                {formatTime(totalMediaDuration)}
-              </span>
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-[hsl(var(--background))]">
+      {/* Preview Area */}
+      <div className="flex-1 flex items-center justify-center bg-muted/20 relative overflow-hidden">
+        {currentMedia && (
+          <div className="relative w-full h-full flex items-center justify-center p-4">
+            {/* Main Preview */}
+            <div className="relative max-w-full max-h-full rounded-lg overflow-hidden shadow-2xl bg-black">
+              {currentMedia.item.media?.type === 'video' ? (
+                <video
+                  key={currentMedia.item.id}
+                  src={currentMedia.item.media.file_url || ''}
+                  className="max-w-full max-h-[60vh] object-contain"
+                  muted
+                  autoPlay={isPlaying}
+                />
+              ) : (
+                <img
+                  key={currentMedia.item.id}
+                  src={currentMedia.item.media?.thumbnail_url || currentMedia.item.media?.file_url || ''}
+                  alt={currentMedia.item.media?.name || 'Preview'}
+                  className="max-w-full max-h-[60vh] object-contain"
+                />
+              )}
+              
+              {/* Fullscreen button */}
+              <button className="absolute top-3 right-3 p-2 bg-black/50 rounded-lg hover:bg-black/70 transition-colors">
+                <Maximize2 className="w-4 h-4 text-white" />
+              </button>
+              
+              {/* Media Info Overlay */}
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-[10px] uppercase">
+                    {currentMedia.item.media?.type || 'IMAGE'}
+                  </Badge>
+                  <span className="text-white text-sm font-medium truncate">
+                    {currentMedia.item.media?.name}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
+        )}
+      </div>
+
+      {/* Controls Bar */}
+      <div className="shrink-0 border-t border-b bg-card px-4 py-2 flex items-center justify-between gap-4">
+        {/* Zoom Controls */}
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setZoom(z => Math.max(50, z - 25))}>
+            <ZoomOut className="w-4 h-4" />
+          </Button>
+          <Slider
+            value={[zoom]}
+            onValueChange={([v]) => setZoom(v)}
+            min={50}
+            max={200}
+            step={25}
+            className="w-24"
+          />
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setZoom(z => Math.min(200, z + 25))}>
+            <ZoomIn className="w-4 h-4" />
+          </Button>
+          <span className="text-xs text-muted-foreground w-12">{zoom}%</span>
+        </div>
+
+        {/* Playback Controls */}
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handlePrevious}>
+            <SkipBack className="w-4 h-4" />
+          </Button>
+          <Button 
+            variant="default" 
+            size="icon" 
+            className="h-10 w-10 rounded-full"
+            onClick={() => setIsPlaying(!isPlaying)}
+          >
+            {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleNext}>
+            <SkipForward className="w-4 h-4" />
+          </Button>
+        </div>
+
+        {/* Position Info */}
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <span>{currentIndex + 1} / {allMediaItems.length}</span>
         </div>
       </div>
 
-      {/* Channel Legend Bar */}
-      <div className="shrink-0 border-b bg-muted/20 px-4 py-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          {channelsWithItems.map((channel, index) => {
-            const color = channelColors[index % channelColors.length];
-            const channelItemCount = channel.items?.length || 0;
-            
-            return (
-              <button
-                key={channel.id}
-                onClick={() => onSelectChannel(channel)}
-                className={cn(
-                  "flex items-center gap-1.5 px-2 py-1 rounded text-xs hover:bg-muted/50 transition-colors border",
-                  color.border
-                )}
-              >
-                <div className={cn("w-2 h-2 rounded-full", color.accent)} />
-                <span className="font-medium truncate max-w-[100px]">{channel.name}</span>
-                <Badge variant="secondary" className="text-[10px] px-1 h-4">
-                  {channelItemCount}
-                </Badge>
-              </button>
-            );
-          })}
-        </div>
+      {/* Timeline Header */}
+      <div className="shrink-0 bg-muted/30 px-4 py-2 flex items-center gap-2">
+        <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground">Timeline</span>
+        <span className="text-xs text-muted-foreground">•</span>
+        <span className="text-xs text-muted-foreground">{formatTime(totalMediaDuration)}</span>
+        <span className="text-xs text-muted-foreground">•</span>
+        <span className="text-xs text-muted-foreground">{allMediaItems.length} itens</span>
       </div>
 
-      {/* Timeline Preview Bar */}
-      <div className="shrink-0 border-b bg-card px-4 py-3">
-        <div 
-          className="relative h-8 rounded-md overflow-hidden bg-muted/40 cursor-pointer"
-          onClick={handleTimelineClick}
-        >
-          {/* Timeline segments */}
-          <div className="flex h-full">
-            {mediaWithPositions.map(({ item, color, widthPercent, duration, globalIndex }) => {
-              const isActive = currentItem?.item.id === item.id;
-              const isHovered = hoveredItemId === item.id;
+      {/* Timeline - Horizontal thumbnails with proportional widths */}
+      <div className="shrink-0 bg-muted/10" ref={timelineRef}>
+        <ScrollArea className="w-full">
+          <div className="flex p-3 gap-1.5 min-w-max">
+            {mediaWithPositions.map(({ item, channel, channelIndex, duration, widthPercent, globalIndex, color }) => {
+              const isActive = currentIndex === globalIndex;
+              const itemWidth = getItemWidth(widthPercent);
               
               return (
                 <TooltipProvider key={item.id}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <div
+                      <button
+                        onClick={() => handleItemClick(globalIndex)}
                         className={cn(
-                          "h-full border-r border-background/30 flex items-center justify-center overflow-hidden transition-all",
-                          color.accent,
-                          isActive && "ring-2 ring-white ring-inset",
-                          isHovered && "brightness-110"
+                          "shrink-0 rounded-lg overflow-hidden transition-all relative group",
+                          "border-2 hover:border-primary/50",
+                          isActive ? "border-primary ring-2 ring-primary/30" : "border-transparent"
                         )}
-                        style={{ width: `${widthPercent}%`, minWidth: 2 }}
-                        onMouseEnter={() => setHoveredItemId(item.id)}
-                        onMouseLeave={() => setHoveredItemId(null)}
-                      >
-                        <span className="text-[9px] text-white font-medium truncate px-0.5">
-                          {widthPercent > 4 ? `${duration}s` : ''}
-                        </span>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="font-medium">{globalIndex + 1}. {item.media?.name}</p>
-                      <p className="text-xs text-muted-foreground">{duration}s</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              );
-            })}
-          </div>
-
-          {/* Playhead */}
-          <div 
-            className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg pointer-events-none"
-            style={{ left: `${(currentTime / totalMediaDuration) * 100}%` }}
-          >
-            <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-white rounded-full" />
-          </div>
-        </div>
-
-        {/* Playback controls */}
-        <div className="flex items-center justify-between mt-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2"
-            onClick={() => setIsPlaying(!isPlaying)}
-          >
-            {isPlaying ? (
-              <Pause className="w-4 h-4 mr-1" />
-            ) : (
-              <Play className="w-4 h-4 mr-1" />
-            )}
-            {isPlaying ? 'Pausar' : 'Simular'}
-          </Button>
-          
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span>{formatTime(currentTime)}</span>
-            <span>/</span>
-            <span>{formatTime(totalMediaDuration)}</span>
-            {currentItem && (
-              <Badge variant="outline" className="text-[10px]">
-                {currentItem.globalIndex + 1}/{allMediaItems.length} - {currentItem.item.media?.name}
-              </Badge>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Media Grid by Channel */}
-      <ScrollArea className="flex-1">
-        <div className="p-4 space-y-4">
-          {channelsWithItems.map((channel, channelIndex) => {
-            const items = itemsByChannel.get(channel.id) || [];
-            const color = channelColors[channelIndex % channelColors.length];
-            const channelDuration = items.reduce((sum, i) => sum + i.duration, 0);
-            
-            if (items.length === 0) return null;
-            
-            return (
-              <div key={channel.id} className="space-y-2">
-                {/* Channel Header */}
-                <div className="flex items-center gap-2">
-                  <div className={cn("w-3 h-3 rounded", color.accent)} />
-                  <button
-                    onClick={() => onSelectChannel(channel)}
-                    className="text-sm font-medium hover:text-primary transition-colors"
-                  >
-                    {channel.name}
-                  </button>
-                  <span className="text-xs text-muted-foreground">
-                    {items.length} mídias • {formatTime(channelDuration)}
-                  </span>
-                </div>
-
-                {/* Media Items Row */}
-                <div className="flex gap-2 overflow-x-auto pb-2">
-                  {items.map(({ item, duration, globalIndex, color: itemColor }) => {
-                    const isActive = currentItem?.item.id === item.id;
-                    
-                    return (
-                      <div
-                        key={item.id}
-                        onMouseEnter={() => setHoveredItemId(item.id)}
-                        onMouseLeave={() => setHoveredItemId(null)}
-                        className={cn(
-                          "shrink-0 rounded-lg border-2 overflow-hidden transition-all cursor-pointer",
-                          itemColor.bg,
-                          isActive ? "border-white ring-2 ring-white/50" : itemColor.border,
-                          hoveredItemId === item.id && "scale-105"
-                        )}
-                        style={{ width: 140 }}
+                        style={{ 
+                          width: itemWidth,
+                          height: 80 
+                        }}
                       >
                         {/* Thumbnail */}
-                        <div className="aspect-video bg-muted relative">
+                        <div className="absolute inset-0 bg-muted">
                           {item.media?.thumbnail_url || item.media?.file_url ? (
                             item.media.type === 'video' ? (
                               <video
@@ -342,67 +299,79 @@ export const AllMediaTimeline = ({
                                 className="w-full h-full object-cover"
                               />
                             )
-                          ) : item.media?.type === 'video' ? (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Video className="w-6 h-6 text-muted-foreground" />
-                            </div>
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Image className="w-6 h-6 text-muted-foreground" />
+                            <div className="w-full h-full flex items-center justify-center bg-muted">
+                              {item.media?.type === 'video' ? (
+                                <Video className="w-6 h-6 text-muted-foreground" />
+                              ) : (
+                                <Image className="w-6 h-6 text-muted-foreground" />
+                              )}
                             </div>
                           )}
-                          
-                          {/* Duration badge */}
-                          <div className="absolute bottom-1 right-1 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded">
-                            {duration}s
-                          </div>
-                          
-                          {/* Position badge */}
-                          <div className={cn(
-                            "absolute top-1 left-1 text-white text-[10px] w-5 h-5 rounded flex items-center justify-center font-bold",
-                            itemColor.accent
-                          )}>
-                            {globalIndex + 1}
-                          </div>
+                        </div>
 
-                          {/* Playing indicator */}
-                          {isActive && isPlaying && (
-                            <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                              <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center">
-                                <Play className="w-4 h-4 text-black fill-black" />
-                              </div>
+                        {/* Overlay gradient */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+
+                        {/* Channel color indicator */}
+                        <div className={cn("absolute top-0 left-0 right-0 h-1", color.accent)} />
+
+                        {/* Type badge */}
+                        <Badge 
+                          variant="secondary" 
+                          className="absolute top-2 left-2 text-[8px] px-1 py-0 h-4 uppercase bg-black/60 text-white border-0"
+                        >
+                          {item.media?.type === 'video' ? <Video className="w-2.5 h-2.5 mr-0.5" /> : <Image className="w-2.5 h-2.5 mr-0.5" />}
+                          {item.media?.type || 'IMG'}
+                        </Badge>
+
+                        {/* Name and duration at bottom */}
+                        <div className="absolute bottom-0 left-0 right-0 p-1.5">
+                          <p className="text-[10px] text-white font-medium truncate leading-tight">
+                            {item.media?.name}
+                          </p>
+                        </div>
+
+                        {/* Play indicator for active item */}
+                        {isActive && isPlaying && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                            <div className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center">
+                              <Play className="w-3 h-3 text-black fill-black ml-0.5" />
                             </div>
-                          )}
-                        </div>
-                        
-                        {/* Name */}
-                        <div className="p-1.5">
-                          <div className="flex items-center gap-1">
-                            {item.media?.type === 'video' ? (
-                              <Video className="w-3 h-3 text-muted-foreground shrink-0" />
-                            ) : (
-                              <Image className="w-3 h-3 text-muted-foreground shrink-0" />
-                            )}
-                            <p className="text-[10px] font-medium truncate" title={item.media?.name}>
-                              {item.media?.name}
-                            </p>
                           </div>
-                        </div>
+                        )}
+
+                        {/* Progress bar for active item */}
+                        {isActive && (
+                          <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50">
+                            <div 
+                              className="h-full bg-primary transition-all"
+                              style={{ width: `${(currentTime / duration) * 100}%` }}
+                            />
+                          </div>
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <div className="text-xs">
+                        <p className="font-medium">{item.media?.name}</p>
+                        <p className="text-muted-foreground">
+                          {duration}s • Canal: {channel.name}
+                        </p>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </ScrollArea>
-
-      {/* Footer hint */}
-      <div className="shrink-0 border-t bg-muted/20 px-4 py-2 text-center">
-        <p className="text-xs text-muted-foreground">
-          Clique em um canal para editar ou arraste para reordenar
-        </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              );
+            })}
+            
+            {/* Add button placeholder */}
+            <div className="shrink-0 w-14 h-20 rounded-lg border-2 border-dashed border-muted-foreground/30 flex items-center justify-center text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors cursor-pointer">
+              <span className="text-2xl">+</span>
+            </div>
+          </div>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
       </div>
     </div>
   );
