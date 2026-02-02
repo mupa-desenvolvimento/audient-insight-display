@@ -137,29 +137,27 @@ export const PlaylistTimeline = ({
     <>
       <div className="h-full flex flex-col bg-background">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b bg-card">
-          <div className="flex items-center gap-4">
-            <h3 className="font-semibold">Timeline</h3>
-            <Badge variant="outline" className="gap-1">
-              <Clock className="w-3 h-3" />
-              {formatTotalDuration(totalDuration)}
-            </Badge>
-            <Badge variant="secondary">
-              {items.length} {items.length === 1 ? "item" : "itens"}
-            </Badge>
-          </div>
+        <div className="flex items-center gap-3 px-4 py-2 border-b bg-card/50">
+          <h3 className="font-medium text-sm">Timeline</h3>
+          <Badge variant="outline" className="gap-1 text-xs">
+            <Clock className="w-3 h-3" />
+            {formatTotalDuration(totalDuration)}
+          </Badge>
+          <span className="text-muted-foreground text-xs">
+            • {items.length} {items.length === 1 ? "item" : "itens"}
+          </span>
 
           {hasValidationErrors && (
-            <Badge variant="destructive" className="gap-1">
+            <Badge variant="destructive" className="gap-1 ml-auto text-xs">
               <AlertCircle className="w-3 h-3" />
               Playlist vazia
             </Badge>
           )}
         </div>
 
-        {/* Timeline */}
+        {/* Timeline - horizontal scroll */}
         <div
-          className={`flex-1 relative transition-colors ${
+          className={`flex-1 relative transition-colors min-h-0 ${
             isDragOver ? "bg-primary/5" : ""
           }`}
           onDragOver={handleDragOver}
@@ -170,59 +168,57 @@ export const PlaylistTimeline = ({
             <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
               <div
                 className={`
-                  w-64 h-48 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-3
+                  w-48 h-24 rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-2
                   transition-colors
                   ${isDragOver ? "border-primary bg-primary/10" : "border-muted-foreground/30"}
                 `}
               >
-                <Plus className="w-10 h-10" />
-                <p className="text-sm text-center px-4">
-                  Arraste mídias da biblioteca para começar
+                <Plus className="w-6 h-6" />
+                <p className="text-xs text-center px-2">
+                  Arraste mídias para começar
                 </p>
               </div>
             </div>
           ) : (
-            <ScrollArea className="h-full">
-              <div className="p-6">
-                <div className="flex items-center gap-4 pb-4">
-                  {items.map((item, index) => (
-                    <TimelineItem
-                      key={item.id}
-                      item={item}
-                      index={index}
-                      isSelected={selectedItemId === item.id}
-                      onSelect={() => onSelectItem(item.id)}
-                      onRemove={() => onRemoveItem(item.id)}
-                      onDuplicate={() => onDuplicateItem(item)}
-                      onDurationChange={(duration) => onUpdateDuration(item.id, duration)}
-                      onOpenSettings={() => setSettingsItem(item)}
-                      onDragStart={handleItemDragStart}
-                      onDragOver={handleItemDragOver}
-                      onDrop={handleItemDrop}
-                    />
-                  ))}
+            <ScrollArea className="h-full w-full">
+              <div className="flex items-center gap-2 p-3 min-w-max">
+                {items.map((item, index) => (
+                  <TimelineItem
+                    key={item.id}
+                    item={item}
+                    index={index}
+                    isSelected={selectedItemId === item.id}
+                    onSelect={() => onSelectItem(item.id)}
+                    onRemove={() => onRemoveItem(item.id)}
+                    onDuplicate={() => onDuplicateItem(item)}
+                    onDurationChange={(duration) => onUpdateDuration(item.id, duration)}
+                    onOpenSettings={() => setSettingsItem(item)}
+                    onDragStart={handleItemDragStart}
+                    onDragOver={handleItemDragOver}
+                    onDrop={handleItemDrop}
+                  />
+                ))}
 
-                  {/* Drop zone at end */}
-                  <div
-                    className={`
-                      flex-shrink-0 w-36 h-48 rounded-xl border-2 border-dashed
-                      flex flex-col items-center justify-center gap-2 text-muted-foreground
-                      transition-colors
-                      ${isDragOver ? "border-primary bg-primary/10" : "border-muted-foreground/30"}
-                    `}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleItemDrop(e, items.length);
-                    }}
-                  >
-                    <Plus className="w-8 h-8" />
-                    <span className="text-xs">Adicionar</span>
-                  </div>
+                {/* Drop zone at end */}
+                <div
+                  className={`
+                    flex-shrink-0 w-20 h-24 rounded-lg border-2 border-dashed
+                    flex flex-col items-center justify-center gap-1 text-muted-foreground
+                    transition-colors cursor-pointer hover:border-primary/50
+                    ${isDragOver ? "border-primary bg-primary/10" : "border-muted-foreground/30"}
+                  `}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleItemDrop(e, items.length);
+                  }}
+                >
+                  <Plus className="w-5 h-5" />
+                  <span className="text-[10px]">Adicionar</span>
                 </div>
               </div>
               <ScrollBar orientation="horizontal" />
@@ -232,39 +228,12 @@ export const PlaylistTimeline = ({
           {/* Drag overlay */}
           {isDragOver && items.length > 0 && (
             <div className="absolute inset-0 bg-primary/5 pointer-events-none flex items-center justify-center">
-              <div className="bg-primary text-primary-foreground px-4 py-2 rounded-lg shadow-lg">
+              <div className="bg-primary text-primary-foreground px-3 py-1.5 rounded-lg shadow-lg text-sm">
                 Solte para adicionar
               </div>
             </div>
           )}
         </div>
-
-        {/* Time markers */}
-        {items.length > 0 && (
-          <div className="px-6 py-2 border-t bg-muted/30">
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              {items.reduce<{ time: number; items: { position: number; time: string }[] }>(
-                (acc, item, index) => {
-                  const duration = item.duration_override || item.media?.duration || 8;
-                  const startTime = acc.time;
-                  const mins = Math.floor(startTime / 60);
-                  const secs = startTime % 60;
-                  acc.items.push({
-                    position: index,
-                    time: `${mins}:${secs.toString().padStart(2, "0")}`,
-                  });
-                  acc.time += duration;
-                  return acc;
-                },
-                { time: 0, items: [] }
-              ).items.map((marker) => (
-                <span key={marker.position} className="w-36 text-center">
-                  {marker.time}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Settings Dialog */}

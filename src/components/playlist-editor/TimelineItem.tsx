@@ -42,11 +42,11 @@ interface TimelineItemProps {
 const getMediaIcon = (type: string) => {
   switch (type) {
     case "video":
-      return <Video className="w-5 h-5" />;
+      return <Video className="w-3 h-3" />;
     case "image":
-      return <Image className="w-5 h-5" />;
+      return <Image className="w-3 h-3" />;
     default:
-      return <FileText className="w-5 h-5" />;
+      return <FileText className="w-3 h-3" />;
   }
 };
 
@@ -116,9 +116,9 @@ export const TimelineItem = ({
       onDrop={handleDrop}
       onClick={onSelect}
       className={`
-        relative flex-shrink-0 w-36 h-48 rounded-xl overflow-hidden cursor-pointer
+        relative flex-shrink-0 w-24 h-24 rounded-lg overflow-hidden cursor-pointer
         transition-all duration-200 group
-        ${isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}
+        ${isSelected ? "ring-2 ring-primary ring-offset-1 ring-offset-background" : ""}
         ${isDragOver ? "scale-105 ring-2 ring-primary/50" : ""}
         ${hasError ? "ring-2 ring-destructive/50" : ""}
       `}
@@ -148,100 +148,73 @@ export const TimelineItem = ({
       </div>
 
       {/* Gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
 
-      {/* Drag handle */}
-      <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <div className="p-1 rounded bg-black/50 cursor-grab active:cursor-grabbing">
-          <GripVertical className="w-4 h-4 text-white" />
+      {/* Drag handle - top left on hover */}
+      <div className="absolute top-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="p-0.5 rounded bg-black/50 cursor-grab active:cursor-grabbing">
+          <GripVertical className="w-3 h-3 text-white" />
         </div>
       </div>
 
-      {/* Position badge */}
-      <div className="absolute top-2 right-2 flex items-center gap-1">
-        {hasScheduleOverride && (
-          <Badge variant="secondary" className="bg-blue-500/80 text-white border-0 text-xs px-1">
-            <Calendar className="w-3 h-3" />
-          </Badge>
-        )}
-        <Badge variant="secondary" className="bg-black/50 text-white border-0 text-xs">
-          {index + 1}
-        </Badge>
-      </div>
-
-      {/* Error indicator */}
-      {hasError && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2">
-          <Badge variant="destructive" className="text-xs">
-            <AlertTriangle className="w-3 h-3 mr-1" />
-            Erro
+      {/* Schedule indicator */}
+      {hasScheduleOverride && (
+        <div className="absolute top-1 right-1">
+          <Badge variant="secondary" className="bg-blue-500/80 text-white border-0 h-4 px-1">
+            <Calendar className="w-2.5 h-2.5" />
           </Badge>
         </div>
       )}
 
-      {/* Content info */}
-      <div className="absolute bottom-0 left-0 right-0 p-3">
-        <div className="flex items-center gap-1.5 mb-1">
+      {/* Error indicator */}
+      {hasError && (
+        <div className="absolute top-1 left-1/2 -translate-x-1/2">
+          <Badge variant="destructive" className="text-[10px] h-4 px-1">
+            <AlertTriangle className="w-2.5 h-2.5" />
+          </Badge>
+        </div>
+      )}
+
+      {/* Content info at bottom */}
+      <div className="absolute bottom-0 left-0 right-0 p-1.5">
+        <div className="flex items-center gap-1">
           {getMediaIcon(item.media?.type || "image")}
-          <span className="text-white text-xs font-medium truncate">
+          <span className="text-white text-[10px] font-medium truncate flex-1">
             {item.media?.name || "Sem nome"}
           </span>
         </div>
         
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2 text-white/80 hover:text-white hover:bg-white/20"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Clock className="w-3 h-3 mr-1" />
-              {formatDuration(duration)}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-48 p-3" onClick={(e) => e.stopPropagation()}>
-            <div className="space-y-2">
-              <label className="text-xs font-medium">Duração (segundos)</label>
-              <Input
-                type="number"
-                min={1}
-                value={localDuration}
-                onChange={(e) => setLocalDuration(parseInt(e.target.value) || 8)}
-                onBlur={handleDurationSubmit}
-                onKeyDown={(e) => e.key === "Enter" && handleDurationSubmit()}
-                className="h-8"
-              />
-            </div>
-          </PopoverContent>
-        </Popover>
+        <div className="flex items-center gap-1 mt-0.5">
+          <Clock className="w-2.5 h-2.5 text-white/70" />
+          <span className="text-white/70 text-[10px]">{formatDuration(duration)}</span>
+        </div>
       </div>
 
-      {/* Actions */}
-      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      {/* Actions menu - top right on hover */}
+      <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 bg-black/50 hover:bg-black/70 text-white"
+              className="h-5 w-5 bg-black/50 hover:bg-black/70 text-white"
               onClick={(e) => e.stopPropagation()}
             >
-              <MoreVertical className="w-4 h-4" />
+              <MoreVertical className="w-3 h-3" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="w-40">
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onOpenSettings(); }}>
-              <Settings className="w-4 h-4 mr-2" />
+              <Settings className="w-3.5 h-3.5 mr-2" />
               Configurações
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onDuplicate}>
-              <Copy className="w-4 h-4 mr-2" />
+              <Copy className="w-3.5 h-3.5 mr-2" />
               Duplicar
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onRemove} className="text-destructive">
-              <X className="w-4 h-4 mr-2" />
+              <X className="w-3.5 h-3.5 mr-2" />
               Remover
             </DropdownMenuItem>
           </DropdownMenuContent>
