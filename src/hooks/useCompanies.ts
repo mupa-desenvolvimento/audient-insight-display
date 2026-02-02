@@ -163,20 +163,46 @@ export const useCompanies = () => {
 
   const addCompanyIntegration = useMutation({
     mutationFn: async (integration: CompanyIntegrationInsert) => {
-      const { data, error } = await supabase
+      // First check if integration already exists
+      const { data: existing } = await supabase
         .from("company_integrations")
-        .insert([{
-          company_id: integration.company_id,
-          integration_id: integration.integration_id,
-          credentials: integration.credentials,
-          settings: integration.settings,
-          is_active: true
-        }])
-        .select()
-        .single();
+        .select("id")
+        .eq("company_id", integration.company_id)
+        .eq("integration_id", integration.integration_id)
+        .maybeSingle();
 
-      if (error) throw error;
-      return data;
+      if (existing) {
+        // Update existing integration
+        const { data, error } = await supabase
+          .from("company_integrations")
+          .update({
+            credentials: integration.credentials,
+            settings: integration.settings,
+            is_active: true
+          })
+          .eq("id", existing.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data;
+      } else {
+        // Insert new integration
+        const { data, error } = await supabase
+          .from("company_integrations")
+          .insert([{
+            company_id: integration.company_id,
+            integration_id: integration.integration_id,
+            credentials: integration.credentials,
+            settings: integration.settings,
+            is_active: true
+          }])
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["companies"] });
