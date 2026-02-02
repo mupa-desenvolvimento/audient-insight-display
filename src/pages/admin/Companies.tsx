@@ -9,8 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Building2, Plug2, Trash2, Edit, Settings, Eye, EyeOff, Loader2, Link2, Unlink2 } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Plus, Building2, Plug2, Trash2, Edit, Settings, Eye, EyeOff, Loader2, Link2, Unlink2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import type { Json } from "@/integrations/supabase/types";
 
@@ -218,29 +218,40 @@ export default function Companies() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-6">
+          <Accordion type="single" collapsible className="space-y-4">
             {companies.map((company) => (
-              <Card key={company.id}>
-                <CardHeader className="pb-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        {company.name}
-                        <Badge variant={company.is_active ? "default" : "secondary"}>
-                          {company.is_active ? "Ativa" : "Inativa"}
-                        </Badge>
-                      </CardTitle>
-                      <CardDescription>
-                        Slug: <code className="text-xs bg-muted px-1 py-0.5 rounded">{company.slug}</code>
-                        {company.cnpj && <span className="ml-2">• CNPJ: {company.cnpj}</span>}
-                      </CardDescription>
+              <AccordionItem key={company.id} value={company.id} className="border rounded-lg bg-card">
+                <AccordionTrigger className="px-6 py-4 hover:no-underline">
+                  <div className="flex items-center justify-between w-full pr-4">
+                    <div className="flex items-center gap-3">
+                      <Building2 className="h-5 w-5 text-primary" />
+                      <div className="text-left">
+                        <div className="font-semibold flex items-center gap-2">
+                          {company.name}
+                          <Badge variant={company.is_active ? "default" : "secondary"} className="text-xs">
+                            {company.is_active ? "Ativa" : "Inativa"}
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          <code className="text-xs bg-muted px-1 py-0.5 rounded">{company.slug}</code>
+                          {company.cnpj && <span className="ml-2">• CNPJ: {company.cnpj}</span>}
+                          <span className="ml-2">
+                            • {company.integrations?.length || 0} integração(ões)
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    
-                    <div className="flex gap-2">
+                  </div>
+                </AccordionTrigger>
+                
+                <AccordionContent className="px-6 pb-4">
+                  <div className="space-y-4">
+                    <div className="flex justify-end gap-2">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setSelectedCompany(company);
                           setIsIntegrationDialogOpen(true);
                         }}
@@ -251,92 +262,93 @@ export default function Companies() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDeleteCompany(company)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteCompany(company);
+                        }}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
+                    
+                    {company.integrations && company.integrations.length > 0 ? (
+                      <div className="border rounded-lg">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Integração</TableHead>
+                              <TableHead>Loja</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Credenciais</TableHead>
+                              <TableHead className="text-right">Ações</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {company.integrations.map((ci) => {
+                              const credentials = ci.credentials as Record<string, string> || {};
+                              const settings = ci.settings as Record<string, string> || {};
+                              
+                              return (
+                                <TableRow key={ci.id}>
+                                  <TableCell className="font-medium">
+                                    <div className="flex items-center gap-2">
+                                      <Link2 className="h-4 w-4 text-primary" />
+                                      {ci.integration?.name || "Integração"}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <code className="text-xs bg-muted px-2 py-1 rounded">
+                                      {settings.loja || settings.store_code || "-"}
+                                    </code>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant={ci.is_active ? "default" : "secondary"}>
+                                      {ci.is_active ? "Ativa" : "Inativa"}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm text-muted-foreground">
+                                        Usuário: {credentials.usuario || "-"}
+                                      </span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleRemoveIntegration(ci.id)}
+                                    >
+                                      <Unlink2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : (
+                      <div className="text-center py-6 text-muted-foreground border border-dashed rounded-lg">
+                        <Plug2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p>Nenhuma integração configurada</p>
+                        <Button
+                          variant="link"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedCompany(company);
+                            setIsIntegrationDialogOpen(true);
+                          }}
+                        >
+                          Adicionar integração
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                </CardHeader>
-                
-                <CardContent>
-                  {company.integrations && company.integrations.length > 0 ? (
-                    <div className="border rounded-lg">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Integração</TableHead>
-                            <TableHead>Loja</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Credenciais</TableHead>
-                            <TableHead className="text-right">Ações</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {company.integrations.map((ci) => {
-                            const credentials = ci.credentials as Record<string, string> || {};
-                            const settings = ci.settings as Record<string, string> || {};
-                            
-                            return (
-                              <TableRow key={ci.id}>
-                                <TableCell className="font-medium">
-                                  <div className="flex items-center gap-2">
-                                    <Link2 className="h-4 w-4 text-primary" />
-                                    {ci.integration?.name || "Integração"}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <code className="text-xs bg-muted px-2 py-1 rounded">
-                                    {settings.loja || settings.store_code || "-"}
-                                  </code>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant={ci.is_active ? "default" : "secondary"}>
-                                    {ci.is_active ? "Ativa" : "Inativa"}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm text-muted-foreground">
-                                      Usuário: {credentials.usuario || "-"}
-                                    </span>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleRemoveIntegration(ci.id)}
-                                  >
-                                    <Unlink2 className="h-4 w-4 text-destructive" />
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  ) : (
-                    <div className="text-center py-6 text-muted-foreground border border-dashed rounded-lg">
-                      <Plug2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p>Nenhuma integração configurada</p>
-                      <Button
-                        variant="link"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedCompany(company);
-                          setIsIntegrationDialogOpen(true);
-                        }}
-                      >
-                        Adicionar integração
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                </AccordionContent>
+              </AccordionItem>
             ))}
-          </div>
+          </Accordion>
         )}
 
         {/* Dialog para adicionar integração */}
