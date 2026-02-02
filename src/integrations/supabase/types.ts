@@ -444,6 +444,7 @@ export type Database = {
           name: string
           resolution: string | null
           status: string
+          store_code: string | null
           store_id: string | null
           updated_at: string
         }
@@ -461,6 +462,7 @@ export type Database = {
           name: string
           resolution?: string | null
           status?: string
+          store_code?: string | null
           store_id?: string | null
           updated_at?: string
         }
@@ -478,6 +480,7 @@ export type Database = {
           name?: string
           resolution?: string | null
           status?: string
+          store_code?: string | null
           store_id?: string | null
           updated_at?: string
         }

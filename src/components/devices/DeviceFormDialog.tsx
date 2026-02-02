@@ -40,6 +40,7 @@ const formSchema = z.object({
   current_playlist_id: z.string().optional(),
   resolution: z.string().optional(),
   camera_enabled: z.boolean().default(false),
+  store_code: z.string().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -81,6 +82,7 @@ export function DeviceFormDialog({
       current_playlist_id: device?.current_playlist_id || undefined,
       resolution: device?.resolution || "1920x1080",
       camera_enabled: device?.camera_enabled || false,
+      store_code: (device as any)?.store_code || "",
     },
   });
 
@@ -95,7 +97,8 @@ export function DeviceFormDialog({
           current_playlist_id: data.current_playlist_id || null,
           resolution: data.resolution || null,
           camera_enabled: data.camera_enabled,
-        });
+          store_code: data.store_code || null,
+        } as any);
       } else {
         await onSubmit({
           device_code: data.device_code,
@@ -104,7 +107,8 @@ export function DeviceFormDialog({
           current_playlist_id: data.current_playlist_id || null,
           resolution: data.resolution || null,
           camera_enabled: data.camera_enabled,
-        });
+          store_code: data.store_code || null,
+        } as any);
       }
       form.reset();
       onOpenChange(false);
@@ -273,6 +277,26 @@ export function DeviceFormDialog({
                       <SelectItem value="3840x2160">3840x2160 (4K)</SelectItem>
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="store_code"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Código da Filial (Consulta Preço)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Ex: 8"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Código da filial usado nas consultas de preço da API
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
