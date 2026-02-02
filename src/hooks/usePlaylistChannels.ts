@@ -279,6 +279,38 @@ export const usePlaylistChannels = (playlistId: string | null) => {
     },
   });
 
+  // Update a channel item (for settings dialog)
+  const updateChannelItem = useMutation({
+    mutationFn: async ({ id, ...updates }: { 
+      id: string;
+      duration_override?: number;
+      is_schedule_override?: boolean;
+      start_date?: string | null;
+      end_date?: string | null;
+      start_time?: string | null;
+      end_time?: string | null;
+      days_of_week?: number[] | null;
+    }) => {
+      const { data, error } = await supabase
+        .from("playlist_channel_items")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["playlist-channels", playlistId] });
+      queryClient.invalidateQueries({ queryKey: ["playlist-channels-with-items", playlistId] });
+      toast({ title: "Configurações salvas" });
+    },
+    onError: (error) => {
+      toast({ title: "Erro ao atualizar item", description: error.message, variant: "destructive" });
+    },
+  });
+
   return {
     channels,
     channelsWithItems,
@@ -290,6 +322,7 @@ export const usePlaylistChannels = (playlistId: string | null) => {
     deleteChannel,
     reorderChannels,
     reorderGlobalItems,
+    updateChannelItem,
     getActiveChannel,
   };
 };

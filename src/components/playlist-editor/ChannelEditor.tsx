@@ -33,7 +33,7 @@ export const ChannelEditor = ({
     getTotalDuration 
   } = usePlaylistChannelItems(channel.id);
 
-  const [activePanel, setActivePanel] = useState<"media" | "settings" | null>("media");
+  const [activePanel, setActivePanel] = useState<"media" | null>("media");
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
