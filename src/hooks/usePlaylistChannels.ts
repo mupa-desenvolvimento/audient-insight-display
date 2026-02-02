@@ -38,6 +38,7 @@ export interface PlaylistChannelItem {
   channel_id: string;
   media_id: string;
   position: number;
+  global_position: number;
   duration_override: number | null;
   start_date: string | null;
   end_date: string | null;
@@ -63,6 +64,7 @@ export interface PlaylistChannelItemInsert {
   channel_id: string;
   media_id: string;
   position: number;
+  global_position?: number;
   duration_override?: number | null;
   start_date?: string | null;
   end_date?: string | null;
@@ -258,11 +260,11 @@ export const usePlaylistChannels = (playlistId: string | null) => {
   // Global reorder items across all channels
   const reorderGlobalItems = useMutation({
     mutationFn: async (updates: { itemId: string; channelId: string; position: number }[]) => {
-      // Group updates by what actually changed
-      const promises = updates.map(({ itemId, channelId, position }) =>
+      // Update global_position for all items
+      const promises = updates.map(({ itemId, position }) =>
         supabase
           .from("playlist_channel_items")
-          .update({ channel_id: channelId, position })
+          .update({ global_position: position })
           .eq("id", itemId)
       );
       await Promise.all(promises);
@@ -318,9 +320,39 @@ export const usePlaylistChannelItems = (channelId: string | null) => {
 
   const addItem = useMutation({
     mutationFn: async (item: PlaylistChannelItemInsert) => {
+      // Get max global_position for this playlist to add at the end
+      const { data: existingItems } = await supabase
+        .from("playlist_channel_items")
+        .select("global_position, playlist_channels!inner(playlist_id)")
+        .eq("playlist_channels.playlist_id", item.channel_id.split('-')[0] !== item.channel_id ? undefined : undefined);
+      
+      // Get the channel's playlist_id first
+      const { data: channelData } = await supabase
+        .from("playlist_channels")
+        .select("playlist_id")
+        .eq("id", item.channel_id)
+        .single();
+      
+      let maxGlobalPosition = -1;
+      if (channelData?.playlist_id) {
+        const { data: allItems } = await supabase
+          .from("playlist_channel_items")
+          .select("global_position, playlist_channels!inner(playlist_id)")
+          .eq("playlist_channels.playlist_id", channelData.playlist_id);
+        
+        if (allItems && allItems.length > 0) {
+          maxGlobalPosition = Math.max(...allItems.map(i => i.global_position ?? 0));
+        }
+      }
+      
+      const itemWithGlobalPosition = {
+        ...item,
+        global_position: item.global_position ?? maxGlobalPosition + 1,
+      };
+
       const { data, error } = await supabase
         .from("playlist_channel_items")
-        .insert([item])
+        .insert([itemWithGlobalPosition])
         .select(`
           *,
           media:media_items(id, name, type, file_url, duration, file_size, resolution, status)

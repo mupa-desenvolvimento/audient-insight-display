@@ -555,6 +555,7 @@ export type Database = {
           duration_override: number | null
           end_date: string | null
           end_time: string | null
+          global_position: number | null
           id: string
           is_schedule_override: boolean | null
           media_id: string
@@ -569,6 +570,7 @@ export type Database = {
           duration_override?: number | null
           end_date?: string | null
           end_time?: string | null
+          global_position?: number | null
           id?: string
           is_schedule_override?: boolean | null
           media_id: string
@@ -583,6 +585,7 @@ export type Database = {
           duration_override?: number | null
           end_date?: string | null
           end_time?: string | null
+          global_position?: number | null
           id?: string
           is_schedule_override?: boolean | null
           media_id?: string
