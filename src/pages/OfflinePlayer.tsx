@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useOfflinePlayer, CachedPlaylistItem } from "@/hooks/useOfflinePlayer";
 import { useProductLookup } from "@/hooks/useProductLookup";
 import { ProductLookupContainer } from "@/components/player/ProductLookupContainer";
@@ -19,11 +19,13 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
+import { toast } from "sonner";
 
 type PlayerMode = "media" | "product";
 
 const OfflinePlayer = () => {
   const { deviceCode } = useParams<{ deviceCode: string }>();
+  const navigate = useNavigate();
   const {
     deviceState,
     isLoading,
@@ -33,6 +35,7 @@ const OfflinePlayer = () => {
     getActivePlaylist,
     syncWithServer,
     isPlaylistActiveNow,
+    clearAllData,
   } = useOfflinePlayer(deviceCode || "");
 
   // Estado do player
@@ -82,6 +85,25 @@ const OfflinePlayer = () => {
     console.log("[OfflinePlayer] EAN submetido:", ean);
     lookupProduct(ean);
   }, [lookupProduct]);
+
+  // Função para resetar o dispositivo
+  const handleReset = useCallback(async () => {
+    console.log("[OfflinePlayer] Iniciando reset...");
+    toast.loading("Limpando dados...", { id: "reset" });
+    
+    try {
+      await clearAllData();
+      toast.success("Dados limpos com sucesso!", { id: "reset" });
+      
+      // Redireciona para a tela de setup
+      setTimeout(() => {
+        navigate(`/setup/${deviceCode}`);
+      }, 1000);
+    } catch (error) {
+      console.error("[OfflinePlayer] Erro ao resetar:", error);
+      toast.error("Erro ao limpar dados", { id: "reset" });
+    }
+  }, [clearAllData, navigate, deviceCode]);
 
   // Atualiza relógio
   useEffect(() => {
@@ -294,6 +316,7 @@ const OfflinePlayer = () => {
           isVisible={playerMode === "media"}
           onSubmit={handleEanSubmit}
           disabled={isProductLoading}
+          onReset={handleReset}
         />
       </div>
 

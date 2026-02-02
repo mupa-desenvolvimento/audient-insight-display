@@ -156,6 +156,40 @@ export const useOfflinePlayer = (deviceCode: string) => {
     }
   };
 
+  // Limpa todos os dados do cache
+  const clearAllData = useCallback(async () => {
+    console.log("[useOfflinePlayer] Limpando todos os dados...");
+    
+    // Limpa localStorage
+    localStorage.removeItem(`${STORAGE_KEY}_${deviceCode}`);
+    
+    // Limpa IndexedDB
+    try {
+      const deleteRequest = indexedDB.deleteDatabase("PlayerMediaCache");
+      await new Promise<void>((resolve, reject) => {
+        deleteRequest.onsuccess = () => resolve();
+        deleteRequest.onerror = () => reject(deleteRequest.error);
+        deleteRequest.onblocked = () => {
+          console.warn("[useOfflinePlayer] Database blocked, forcing close...");
+          resolve();
+        };
+      });
+    } catch (e) {
+      console.error("[useOfflinePlayer] Erro ao limpar IndexedDB:", e);
+    }
+    
+    // Revoga todas as URLs de blob
+    mediaCacheRef.current.forEach((url) => {
+      URL.revokeObjectURL(url);
+    });
+    mediaCacheRef.current.clear();
+    
+    // Reseta estado
+    setDeviceState(null);
+    
+    console.log("[useOfflinePlayer] Dados limpos com sucesso");
+  }, [deviceCode]);
+
   // Verifica se playlist está ativa agora
   const isPlaylistActiveNow = useCallback((playlist: CachedPlaylist): boolean => {
     if (!playlist.is_active) return false;
@@ -427,5 +461,6 @@ export const useOfflinePlayer = (deviceCode: string) => {
     getActivePlaylist,
     syncWithServer,
     isPlaylistActiveNow,
+    clearAllData,
   };
 };
