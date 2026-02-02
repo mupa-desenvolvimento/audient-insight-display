@@ -55,6 +55,7 @@ export const PlaylistEditor = () => {
     updateChannel,
     deleteChannel,
     reorderChannels,
+    reorderGlobalItems,
   } = usePlaylistChannels(activePlaylistId);
   
   // Legacy playlist items (for backward compatibility)
@@ -475,6 +476,9 @@ export const PlaylistEditor = () => {
                 onSelectChannel={setSelectedChannel}
                 onUpdateChannel={(channelId, updates) => {
                   updateChannel.mutate({ id: channelId, ...updates });
+                }}
+                onReorderGlobal={(items) => {
+                  reorderGlobalItems.mutate(items);
                 }}
                 activeChannelId={null}
               />

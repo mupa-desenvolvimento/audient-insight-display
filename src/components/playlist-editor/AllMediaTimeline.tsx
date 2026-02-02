@@ -10,7 +10,7 @@ import { Slider } from "@/components/ui/slider";
 interface AllMediaTimelineProps {
   channelsWithItems: PlaylistChannelWithItems[];
   onSelectChannel: (channel: PlaylistChannel) => void;
-  onReorderGlobal?: (items: { channelId: string; itemId: string; newPosition: number }[]) => void;
+  onReorderGlobal?: (items: { channelId: string; itemId: string; position: number }[]) => void;
 }
 
 // Color palette for channels
@@ -153,8 +153,10 @@ export const AllMediaTimeline = ({
     const dragIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
     
     if (dragIndex !== dropIndex && !isNaN(dragIndex)) {
+      let newItems: MediaItemWithMeta[] = [];
+      
       setOrderedItems(prev => {
-        const newItems = [...prev];
+        newItems = [...prev];
         const [draggedItem] = newItems.splice(dragIndex, 1);
         newItems.splice(dropIndex, 0, draggedItem);
         
@@ -170,10 +172,21 @@ export const AllMediaTimeline = ({
       } else if (dragIndex > currentIndex && dropIndex <= currentIndex) {
         setCurrentIndex(prev => prev + 1);
       }
+
+      // Persist to database
+      if (onReorderGlobal && newItems.length > 0) {
+        // Build update array with new positions per channel
+        const updates = newItems.map((item, idx) => ({
+          itemId: item.item.id,
+          channelId: item.item.channel_id,
+          position: idx,
+        }));
+        onReorderGlobal(updates);
+      }
     }
     
     handleDragEnd();
-  }, [currentIndex, handleDragEnd]);
+  }, [currentIndex, handleDragEnd, onReorderGlobal]);
 
   // Width based on duration
   const getItemWidth = (duration: number) => {

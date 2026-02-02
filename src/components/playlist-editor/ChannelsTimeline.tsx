@@ -13,6 +13,7 @@ interface ChannelsTimelineProps {
   channelsWithItems?: PlaylistChannelWithItems[];
   onSelectChannel: (channel: PlaylistChannel) => void;
   onUpdateChannel?: (channelId: string, updates: { start_time?: string; end_time?: string }) => void;
+  onReorderGlobal?: (items: { channelId: string; itemId: string; position: number }[]) => void;
   activeChannelId: string | null;
 }
 
@@ -23,6 +24,7 @@ export const ChannelsTimeline = ({
   channelsWithItems,
   onSelectChannel,
   onUpdateChannel,
+  onReorderGlobal,
   activeChannelId,
 }: ChannelsTimelineProps) => {
   const timelineContainerRef = useRef<HTMLDivElement>(null);
@@ -236,6 +238,7 @@ export const ChannelsTimeline = ({
         <AllMediaTimeline
           channelsWithItems={channelsWithItems || []}
           onSelectChannel={onSelectChannel}
+          onReorderGlobal={onReorderGlobal}
         />
       )}
 

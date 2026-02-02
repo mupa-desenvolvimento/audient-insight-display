@@ -255,6 +255,28 @@ export const usePlaylistChannels = (playlistId: string | null) => {
     return activeChannel;
   };
 
+  // Global reorder items across all channels
+  const reorderGlobalItems = useMutation({
+    mutationFn: async (updates: { itemId: string; channelId: string; position: number }[]) => {
+      // Group updates by what actually changed
+      const promises = updates.map(({ itemId, channelId, position }) =>
+        supabase
+          .from("playlist_channel_items")
+          .update({ channel_id: channelId, position })
+          .eq("id", itemId)
+      );
+      await Promise.all(promises);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["playlist-channels", playlistId] });
+      queryClient.invalidateQueries({ queryKey: ["playlist-channels-with-items", playlistId] });
+      toast({ title: "Ordem atualizada" });
+    },
+    onError: (error) => {
+      toast({ title: "Erro ao reordenar mídias", description: error.message, variant: "destructive" });
+    },
+  });
+
   return {
     channels,
     channelsWithItems,
@@ -265,6 +287,7 @@ export const usePlaylistChannels = (playlistId: string | null) => {
     updateChannel,
     deleteChannel,
     reorderChannels,
+    reorderGlobalItems,
     getActiveChannel,
   };
 };
