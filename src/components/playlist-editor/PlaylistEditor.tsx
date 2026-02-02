@@ -392,7 +392,7 @@ export const PlaylistEditor = () => {
             </div>
 
             {activeTab === "channels" ? (
-              <div className="flex-1 overflow-auto p-4 min-h-0">
+              <div className="flex-1 overflow-hidden min-h-0">
                 <ChannelsList
                   channels={playlistChannels}
                   activeChannelId={null}
@@ -406,17 +406,19 @@ export const PlaylistEditor = () => {
                 />
               </div>
             ) : (
-              <EditorPropertiesPanel
-                activePanel={activePanel}
-                formData={formData}
-                channels={distributionChannels}
-                itemCount={items.length}
-                totalDuration={totalDuration}
-                connectedDevicesCount={connectedDevices.length}
-                onFormChange={handleFormChange}
-                onAddMedia={handleAddMedia}
-                itemsLength={items.length}
-              />
+              <div className="flex-1 overflow-hidden min-h-0">
+                <EditorPropertiesPanel
+                  activePanel={activePanel}
+                  formData={formData}
+                  channels={distributionChannels}
+                  itemCount={items.length}
+                  totalDuration={totalDuration}
+                  connectedDevicesCount={connectedDevices.length}
+                  onFormChange={handleFormChange}
+                  onAddMedia={handleAddMedia}
+                  itemsLength={items.length}
+                />
+              </div>
             )}
           </div>
         )}
