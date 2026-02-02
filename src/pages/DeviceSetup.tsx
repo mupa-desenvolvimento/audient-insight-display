@@ -57,6 +57,7 @@ export default function DeviceSetup() {
   
   // Device state
   const [deviceName, setDeviceName] = useState('');
+  const [storeCode, setStoreCode] = useState('');
 
   // Update step based on auth state
   useEffect(() => {
@@ -194,7 +195,8 @@ export default function DeviceSetup() {
             store_id: selectedStoreId,
             name: deviceName || `Dispositivo ${deviceId?.slice(0, 8)}`,
             status: 'online',
-            is_active: true
+            is_active: true,
+            store_code: storeCode || null
           })
           .eq('id', existingDevice.id);
 
@@ -220,7 +222,8 @@ export default function DeviceSetup() {
             name: deviceName || `Dispositivo ${deviceId?.slice(0, 8)}`,
             store_id: selectedStoreId,
             status: 'online',
-            is_active: true
+            is_active: true,
+            store_code: storeCode || null
           })
           .select()
           .single();
@@ -482,6 +485,19 @@ export default function DeviceSetup() {
                       />
                     </div>
 
+                    <div className="space-y-2">
+                      <Label htmlFor="storeCode">Código da Filial (Consulta Preço)</Label>
+                      <Input
+                        id="storeCode"
+                        placeholder="Ex: 8"
+                        value={storeCode}
+                        onChange={(e) => setStoreCode(e.target.value)}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Código usado na API de consulta de preços (ex: loja=8)
+                      </p>
+                    </div>
+
                     <Button 
                       className="w-full" 
                       onClick={handleStoreConfirm}
@@ -607,6 +623,12 @@ export default function DeviceSetup() {
                     <span className="text-muted-foreground">Grupo:</span>
                     <span className="font-medium">{selectedGroup?.name}</span>
                   </div>
+                  {storeCode && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Filial (API):</span>
+                      <span className="font-medium">{storeCode}</span>
+                    </div>
+                  )}
                 </div>
 
                 <Button className="w-full" onClick={handleStartPlayer}>

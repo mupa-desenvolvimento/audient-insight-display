@@ -285,7 +285,7 @@ Deno.serve(async (req) => {
     // Buscar dispositivo e sua empresa
     const { data: device, error: deviceError } = await supabase
       .from('devices')
-      .select('id, company_id, store_id')
+      .select('id, company_id, store_id, store_code')
       .eq('device_code', device_code)
       .single();
     
@@ -344,9 +344,13 @@ Deno.serve(async (req) => {
       );
     }
     
-    const storeCode = (companyIntegration.settings as Record<string, string>).loja || 
+    // Código da loja vem do dispositivo, com fallback para configuração da empresa
+    const storeCode = device.store_code || 
+                      (companyIntegration.settings as Record<string, string>).loja || 
                       (companyIntegration.settings as Record<string, string>).store_code || 
                       '1';
+    
+    console.log('[Lookup] Usando store_code:', storeCode, 'para dispositivo:', device_code);
     
     // Verificar cache
     const cacheTtl = (companyIntegration.settings as Record<string, number>).cache_ttl_minutes || 
