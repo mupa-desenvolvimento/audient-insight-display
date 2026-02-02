@@ -1,13 +1,16 @@
+import { useState, useRef, useEffect, useCallback } from "react";
 import { PlaylistChannel } from "@/hooks/usePlaylistChannels";
 import { cn } from "@/lib/utils";
 import { Clock, Shield, Play, Radio, Film, AlertCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { ResizableChannelBlock } from "./ResizableChannelBlock";
 
 interface ChannelsTimelineProps {
   channels: PlaylistChannel[];
   onSelectChannel: (channel: PlaylistChannel) => void;
+  onUpdateChannel?: (channelId: string, updates: { start_time?: string; end_time?: string }) => void;
   activeChannelId: string | null;
 }
 
@@ -16,8 +19,30 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
 export const ChannelsTimeline = ({
   channels,
   onSelectChannel,
+  onUpdateChannel,
   activeChannelId,
 }: ChannelsTimelineProps) => {
+  const timelineContainerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  // Measure container width for resize calculations
+  useEffect(() => {
+    const updateWidth = () => {
+      if (timelineContainerRef.current) {
+        setContainerWidth(timelineContainerRef.current.offsetWidth);
+      }
+    };
+    
+    updateWidth();
+    window.addEventListener("resize", updateWidth);
+    return () => window.removeEventListener("resize", updateWidth);
+  }, []);
+
+  const handleChannelResize = useCallback((channelId: string, startTime: string, endTime: string) => {
+    if (onUpdateChannel) {
+      onUpdateChannel(channelId, { start_time: startTime, end_time: endTime });
+    }
+  }, [onUpdateChannel]);
   // Convert time string to minutes from midnight
   const timeToMinutes = (time: string): number => {
     const [hours, minutes] = time.slice(0, 5).split(":").map(Number);
@@ -217,7 +242,7 @@ export const ChannelsTimeline = ({
 
         {/* Scrollable Timeline Area */}
         <ScrollArea className="flex-1">
-          <div className="min-w-[1200px]">
+          <div className="min-w-[1200px]" ref={timelineContainerRef}>
             {/* Hour markers */}
             <div className="flex border-b h-10 sticky top-0 bg-card z-10">
               {HOURS.map((hour) => (
@@ -265,91 +290,10 @@ export const ChannelsTimeline = ({
                       style={{ left: `${currentTimePosition}%` }}
                     />
 
-                    {/* Channel block(s) */}
-                    <TooltipProvider>
-                      {style.isOvernight ? (
-                        <>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div
-                                className={cn(
-                                  "absolute top-1/2 -translate-y-1/2 h-10 rounded-md border-2 cursor-pointer transition-all flex items-center px-2 gap-1.5 overflow-hidden",
-                                  colors.bg,
-                                  colors.border,
-                                  colors.text,
-                                  isSelected && "ring-2 ring-white ring-offset-2 ring-offset-background shadow-lg",
-                                  isLive && "shadow-[0_0_16px_rgba(34,197,94,0.3)]",
-                                  noMedia && "border-dashed"
-                                )}
-                                style={{
-                                  left: `${style.firstBlock.left}%`,
-                                  width: `${style.firstBlock.width}%`,
-                                }}
-                                onClick={() => onSelectChannel(channel)}
-                              >
-                                {getStatusIcon(channel)}
-                                <span className="text-xs font-semibold truncate drop-shadow-sm">
-                                  {channel.name}
-                                </span>
-                                <span className="text-[10px] opacity-80 ml-auto shrink-0 flex items-center gap-0.5">
-                                  <Film className="w-3 h-3" />
-                                  {channel.item_count || 0}
-                                </span>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">
-                              <div className="space-y-1">
-                                <p className="font-semibold">{channel.name}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {channel.start_time.slice(0, 5)} – {channel.end_time.slice(0, 5)}
-                                </p>
-                                <p className="text-xs flex items-center gap-1">
-                                  <Film className="w-3 h-3" />
-                                  {channel.item_count || 0} mídias
-                                </p>
-                                {channel.is_fallback && (
-                                  <Badge variant="outline" className="text-[10px] border-yellow-500 text-yellow-600">
-                                    Fallback
-                                  </Badge>
-                                )}
-                                {noMedia && (
-                                  <p className="text-xs text-red-500">⚠ Sem mídias configuradas</p>
-                                )}
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div
-                                className={cn(
-                                  "absolute top-1/2 -translate-y-1/2 h-10 rounded-md border-2 cursor-pointer transition-all flex items-center px-2 gap-1 overflow-hidden",
-                                  colors.bg,
-                                  colors.border,
-                                  colors.text,
-                                  isSelected && "ring-2 ring-white ring-offset-2 ring-offset-background",
-                                  noMedia && "border-dashed"
-                                )}
-                                style={{
-                                  left: `${style.secondBlock.left}%`,
-                                  width: `${style.secondBlock.width}%`,
-                                }}
-                                onClick={() => onSelectChannel(channel)}
-                              >
-                                <span className="text-xs font-medium truncate">
-                                  ↪ {channel.name}
-                                </span>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">
-                              <p className="font-medium">{channel.name} (continuação)</p>
-                              <p className="text-xs text-muted-foreground">
-                                Horário noturno: {channel.start_time.slice(0, 5)} – {channel.end_time.slice(0, 5)}
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </>
-                      ) : (
+                    {/* Channel block(s) - Resizable */}
+                    {style.isOvernight ? (
+                      // For overnight schedules, show both blocks but not resizable
+                      <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div
@@ -363,8 +307,8 @@ export const ChannelsTimeline = ({
                                 noMedia && "border-dashed"
                               )}
                               style={{
-                                left: `${style.left}%`,
-                                width: `${Math.max(style.width, 3)}%`,
+                                left: `${style.firstBlock.left}%`,
+                                width: `${style.firstBlock.width}%`,
                               }}
                               onClick={() => onSelectChannel(channel)}
                             >
@@ -372,12 +316,10 @@ export const ChannelsTimeline = ({
                               <span className="text-xs font-semibold truncate drop-shadow-sm">
                                 {channel.name}
                               </span>
-                              {style.width > 6 && (
-                                <span className="text-[10px] opacity-80 ml-auto shrink-0 flex items-center gap-0.5">
-                                  <Film className="w-3 h-3" />
-                                  {channel.item_count || 0}
-                                </span>
-                              )}
+                              <span className="text-[10px] opacity-80 ml-auto shrink-0 flex items-center gap-0.5">
+                                <Film className="w-3 h-3" />
+                                {channel.item_count || 0}
+                              </span>
                             </div>
                           </TooltipTrigger>
                           <TooltipContent side="top">
@@ -401,8 +343,50 @@ export const ChannelsTimeline = ({
                             </div>
                           </TooltipContent>
                         </Tooltip>
-                      )}
-                    </TooltipProvider>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div
+                              className={cn(
+                                "absolute top-1/2 -translate-y-1/2 h-10 rounded-md border-2 cursor-pointer transition-all flex items-center px-2 gap-1 overflow-hidden",
+                                colors.bg,
+                                colors.border,
+                                colors.text,
+                                isSelected && "ring-2 ring-white ring-offset-2 ring-offset-background",
+                                noMedia && "border-dashed"
+                              )}
+                              style={{
+                                left: `${style.secondBlock.left}%`,
+                                width: `${style.secondBlock.width}%`,
+                              }}
+                              onClick={() => onSelectChannel(channel)}
+                            >
+                              <span className="text-xs font-medium truncate">
+                                ↪ {channel.name}
+                              </span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <p className="font-medium">{channel.name} (continuação)</p>
+                            <p className="text-xs text-muted-foreground">
+                              Horário noturno: {channel.start_time.slice(0, 5)} – {channel.end_time.slice(0, 5)}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : (
+                      <ResizableChannelBlock
+                        channel={channel}
+                        style={{ left: style.left, width: style.width }}
+                        colors={colors}
+                        isSelected={isSelected}
+                        isLive={isLive}
+                        noMedia={noMedia}
+                        onSelect={() => onSelectChannel(channel)}
+                        onResize={(startTime, endTime) => handleChannelResize(channel.id, startTime, endTime)}
+                        containerWidth={containerWidth}
+                      />
+                    )}
                   </div>
                 );
               })}

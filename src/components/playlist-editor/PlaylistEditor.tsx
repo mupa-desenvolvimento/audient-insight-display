@@ -471,6 +471,9 @@ export const PlaylistEditor = () => {
               <ChannelsTimeline
                 channels={playlistChannels}
                 onSelectChannel={setSelectedChannel}
+                onUpdateChannel={(channelId, updates) => {
+                  updateChannel.mutate({ id: channelId, ...updates });
+                }}
                 activeChannelId={null}
               />
               
