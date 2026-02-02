@@ -406,7 +406,7 @@ export const PlaylistEditor = () => {
                 />
               </div>
             ) : (
-              <div className="flex-1 overflow-hidden min-h-0">
+              <div className="h-full overflow-hidden">
                 <EditorPropertiesPanel
                   activePanel={activePanel}
                   formData={formData}
