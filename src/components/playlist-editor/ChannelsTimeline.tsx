@@ -192,11 +192,52 @@ export const ChannelsTimeline = ({
 
   return (
     <div className="bg-card border rounded-lg overflow-hidden flex flex-col h-full">
+      {/* Header with View Mode Toggle */}
+      <div className="px-4 py-3 border-b bg-muted/30 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-4">
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "channels" | "all-media")}>
+            <TabsList className="h-8">
+              <TabsTrigger value="all-media" className="text-xs gap-1.5 h-7 px-3">
+                <Layers className="w-3.5 h-3.5" />
+                Todas Mídias
+              </TabsTrigger>
+              <TabsTrigger value="channels" className="text-xs gap-1.5 h-7 px-3">
+                <LayoutList className="w-3.5 h-3.5" />
+                Por Canal
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+
+        {viewMode === "channels" && (
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-green-500" />
+              <span>Ao Vivo</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-blue-500" />
+              <span>Programado</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-yellow-500" />
+              <span>Fallback</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-muted border" />
+              <span>Inativo</span>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* All Media Timeline View */}
-      <AllMediaTimeline
-        channelsWithItems={channelsWithItems || []}
-        onSelectChannel={onSelectChannel}
-      />
+      {viewMode === "all-media" && (
+        <AllMediaTimeline
+          channelsWithItems={channelsWithItems || []}
+          onSelectChannel={onSelectChannel}
+        />
+      )}
 
       {/* Channels Timeline View */}
       {viewMode === "channels" && (
