@@ -31,35 +31,10 @@ interface TokenCache {
   expires_at: string;
 }
 
-interface ZaffariLoginResponse {
-  token?: string;
-  access_token?: string;
-  expires_in?: number;
-}
-
-interface ZaffariPriceItem {
-  descricao?: string;
-  nome?: string;
-  name?: string;
-  preco?: number;
-  precoAtual?: number;
-  price?: number;
-  precoAnterior?: number;
-  precoOriginal?: number;
-  original_price?: number;
-  unidade?: string;
-  unit?: string;
-  embalagem?: string;
-  oferta?: boolean;
-  isOffer?: boolean;
-  is_offer?: boolean;
-}
-
-interface ZaffariPriceResponse {
-  produtos?: ZaffariPriceItem[];
-  items?: ZaffariPriceItem[];
-  data?: ZaffariPriceItem[];
-}
+// Zaffari API constants
+const ZAFFARI_BASE_URL = 'https://zaffariexpress.com.br';
+const ZAFFARI_LOGIN_URL = `${ZAFFARI_BASE_URL}/api/login/login`;
+const ZAFFARI_PRICE_URL = `${ZAFFARI_BASE_URL}/api/v1/consultapreco/precos`;
 
 // Função para validar e normalizar EAN
 function validateEan(ean: string): { valid: boolean; normalized: string; error?: string } {
@@ -81,46 +56,36 @@ function validateEan(ean: string): { valid: boolean; normalized: string; error?:
   return { valid: true, normalized: trimmed };
 }
 
-// Função para obter ou renovar token
-async function getToken(
+// Função para obter novo token da Zaffari
+async function getZaffariToken(
   supabase: ReturnType<typeof createClient>,
-  companyIntegration: {
-    id: string;
-    credentials: Record<string, string>;
-    settings: Record<string, unknown>;
-    token_cache: TokenCache | null;
-    integration: {
-      base_url: string;
-      endpoints: Record<string, { method: string; path: string }>;
-      default_settings: Record<string, unknown>;
-    };
-  }
+  integrationId: string,
+  credentials: { usuario: string; password: string },
+  currentCache: TokenCache | null
 ): Promise<{ token: string | null; error?: string }> {
   const now = new Date();
   
-  // Verifica se o token em cache ainda é válido
-  if (companyIntegration.token_cache?.token && companyIntegration.token_cache?.expires_at) {
-    const expiresAt = new Date(companyIntegration.token_cache.expires_at);
-    // Renova 5 minutos antes de expirar
+  // Verifica se o token em cache ainda é válido (com margem de 5 minutos)
+  if (currentCache?.token && currentCache?.expires_at) {
+    const expiresAt = new Date(currentCache.expires_at);
     if (expiresAt > new Date(now.getTime() + 5 * 60 * 1000)) {
       console.log('[Token] Usando token em cache');
-      return { token: companyIntegration.token_cache.token };
+      return { token: currentCache.token };
     }
   }
   
-  console.log('[Token] Obtendo novo token...');
-  
-  const credentials = companyIntegration.credentials;
-  const baseUrl = companyIntegration.integration.base_url;
-  const loginEndpoint = companyIntegration.integration.endpoints.login;
+  console.log('[Token] Obtendo novo token da Zaffari...');
   
   if (!credentials.usuario || !credentials.password) {
+    console.error('[Token] Credenciais não configuradas');
     return { token: null, error: 'Credenciais não configuradas' };
   }
   
   try {
-    const response = await fetch(`${baseUrl}${loginEndpoint.path}`, {
-      method: loginEndpoint.method,
+    console.log('[Token] POST', ZAFFARI_LOGIN_URL);
+    
+    const response = await fetch(ZAFFARI_LOGIN_URL, {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         usuario: credentials.usuario,
@@ -128,33 +93,43 @@ async function getToken(
       })
     });
     
+    console.log('[Token] Response status:', response.status);
+    
     if (!response.ok) {
-      console.error('[Token] Erro na autenticação:', response.status);
+      const errorText = await response.text();
+      console.error('[Token] Erro na autenticação:', response.status, errorText);
       return { token: null, error: `Erro na autenticação: ${response.status}` };
     }
     
-    const data = await response.json() as ZaffariLoginResponse;
-    const token = data.token || data.access_token;
+    const data = await response.json();
+    console.log('[Token] Response data keys:', Object.keys(data));
+    
+    // A API Zaffari pode retornar o token em diferentes campos
+    const token = data.token || data.access_token || data.accessToken || data.Token;
     
     if (!token) {
-      console.error('[Token] Token não encontrado na resposta');
+      console.error('[Token] Token não encontrado na resposta:', JSON.stringify(data));
       return { token: null, error: 'Token não encontrado na resposta' };
     }
     
-    // Calcula expiração (padrão 60 minutos se não informado)
-    const ttlMinutes = (companyIntegration.settings.token_ttl_minutes as number) || 
-                       (companyIntegration.integration.default_settings.token_ttl_minutes as number) || 60;
+    // Calcula expiração (60 minutos padrão)
+    const ttlMinutes = 60;
     const expiresAt = new Date(now.getTime() + ttlMinutes * 60 * 1000);
     
     // Atualiza cache no banco
-    await supabase
+    const { error: updateError } = await supabase
       .from('company_integrations')
       .update({
         token_cache: { token, expires_at: expiresAt.toISOString() }
       })
-      .eq('id', companyIntegration.id);
+      .eq('id', integrationId);
     
-    console.log('[Token] Novo token obtido e armazenado');
+    if (updateError) {
+      console.error('[Token] Erro ao salvar cache:', updateError);
+    } else {
+      console.log('[Token] Novo token obtido e armazenado');
+    }
+    
     return { token };
   } catch (err) {
     console.error('[Token] Erro ao obter token:', err);
@@ -162,88 +137,84 @@ async function getToken(
   }
 }
 
-// Função para consultar preço
-async function fetchPrice(
+// Função para consultar preço na Zaffari
+async function fetchZaffariPrice(
   token: string,
-  baseUrl: string,
-  endpoint: { method: string; path: string },
   storeCode: string,
   ean: string
-): Promise<{ data: ZaffariPriceItem | null; error?: string }> {
+): Promise<{ data: Record<string, unknown> | null; error?: string; tokenExpired?: boolean }> {
+  const url = `${ZAFFARI_PRICE_URL}?loja=${encodeURIComponent(storeCode)}&ean=${encodeURIComponent(ean)}`;
+  
+  console.log('[Price] GET', url);
+  
   try {
-    const url = `${baseUrl}${endpoint.path}?loja=${encodeURIComponent(storeCode)}&ean=${encodeURIComponent(ean)}`;
-    
-    console.log('[Price] Consultando:', url);
-    
     const response = await fetch(url, {
-      method: endpoint.method,
+      method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       }
     });
     
-    if (response.status === 401) {
-      return { data: null, error: 'TOKEN_EXPIRED' };
+    console.log('[Price] Response status:', response.status);
+    
+    if (response.status === 401 || response.status === 403) {
+      console.log('[Price] Token expirado ou inválido');
+      return { data: null, error: 'TOKEN_EXPIRED', tokenExpired: true };
     }
     
     if (!response.ok) {
-      console.error('[Price] Erro na consulta:', response.status);
+      const errorText = await response.text();
+      console.error('[Price] Erro na consulta:', response.status, errorText);
       return { data: null, error: `Erro na consulta: ${response.status}` };
     }
     
-    const responseData = await response.json() as ZaffariPriceResponse;
+    const responseText = await response.text();
+    console.log('[Price] Response text (first 500 chars):', responseText.substring(0, 500));
     
-    // Tenta encontrar o produto nos diferentes formatos de resposta
-    const items = responseData.produtos || responseData.items || responseData.data || [];
+    if (!responseText || responseText.trim() === '') {
+      console.error('[Price] Resposta vazia');
+      return { data: null, error: 'Resposta vazia do servidor' };
+    }
     
-    if (!items || items.length === 0) {
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('[Price] Erro ao parsear JSON:', parseError);
+      return { data: null, error: 'Resposta inválida do servidor' };
+    }
+    
+    console.log('[Price] Response data type:', typeof responseData);
+    console.log('[Price] Response data keys:', Object.keys(responseData || {}));
+    
+    // A API pode retornar um array direto ou um objeto com array
+    let items: Record<string, unknown>[] = [];
+    
+    if (Array.isArray(responseData)) {
+      items = responseData;
+    } else if (responseData.produtos) {
+      items = responseData.produtos;
+    } else if (responseData.items) {
+      items = responseData.items;
+    } else if (responseData.data) {
+      items = Array.isArray(responseData.data) ? responseData.data : [responseData.data];
+    } else if (responseData.ean || responseData.preco || responseData.descricao) {
+      // Resposta é o próprio produto
+      items = [responseData];
+    }
+    
+    console.log('[Price] Items count:', items.length);
+    
+    if (items.length === 0) {
       return { data: null, error: 'Produto não encontrado' };
     }
     
+    console.log('[Price] First item:', JSON.stringify(items[0]));
     return { data: items[0] };
   } catch (err) {
     console.error('[Price] Erro:', err);
     return { data: null, error: 'Falha na conexão com servidor de preços' };
-  }
-}
-
-// Função para obter imagem do produto
-async function fetchProductImage(imageBaseUrl: string, ean: string): Promise<string | null> {
-  try {
-    const url = `${imageBaseUrl}/${ean}`;
-    console.log('[Image] Buscando imagem:', url);
-    
-    const response = await fetch(url, { method: 'GET' });
-    
-    if (!response.ok) {
-      console.log('[Image] Imagem não encontrada:', response.status);
-      return null;
-    }
-    
-    const contentType = response.headers.get('content-type');
-    
-    // Se retornar JSON com URL
-    if (contentType?.includes('application/json')) {
-      const data = await response.json();
-      return data.url || data.image_url || data.imageUrl || null;
-    }
-    
-    // Se retornar a própria imagem, retorna a URL
-    if (contentType?.includes('image/')) {
-      return url;
-    }
-    
-    // Se retornar texto (URL)
-    const text = await response.text();
-    if (text.startsWith('http')) {
-      return text.trim();
-    }
-    
-    return url;
-  } catch (err) {
-    console.error('[Image] Erro:', err);
-    return null;
   }
 }
 
@@ -263,6 +234,8 @@ Deno.serve(async (req) => {
     
     const body = await req.json() as ProductLookupRequest;
     const { device_code, ean } = body;
+    
+    console.log('[Request] device_code:', device_code, 'ean:', ean);
     
     // Validar entrada
     if (!device_code) {
@@ -290,12 +263,14 @@ Deno.serve(async (req) => {
       .single();
     
     if (deviceError || !device) {
-      console.error('[Device] Não encontrado:', device_code);
+      console.error('[Device] Não encontrado:', device_code, deviceError);
       return new Response(
         JSON.stringify({ success: false, error: 'Dispositivo não encontrado' } as ProductResponse),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    
+    console.log('[Device] Encontrado:', device.id, 'company:', device.company_id, 'store_code:', device.store_code);
     
     if (!device.company_id) {
       console.error('[Device] Sem empresa vinculada:', device_code);
@@ -308,54 +283,29 @@ Deno.serve(async (req) => {
     // Buscar integração ativa da empresa
     const { data: companyIntegration, error: integrationError } = await supabase
       .from('company_integrations')
-      .select(`
-        id,
-        credentials,
-        settings,
-        token_cache,
-        integration:api_integrations (
-          id,
-          name,
-          base_url,
-          endpoints,
-          default_settings
-        )
-      `)
+      .select('id, credentials, settings, token_cache')
       .eq('company_id', device.company_id)
       .eq('is_active', true)
       .single();
     
     if (integrationError || !companyIntegration) {
-      console.error('[Integration] Não encontrada para empresa:', device.company_id);
+      console.error('[Integration] Não encontrada para empresa:', device.company_id, integrationError);
       return new Response(
         JSON.stringify({ success: false, error: 'Integração não configurada para esta empresa' } as ProductResponse),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
-    const integration = Array.isArray(companyIntegration.integration) 
-      ? companyIntegration.integration[0] 
-      : companyIntegration.integration;
+    console.log('[Integration] Encontrada:', companyIntegration.id);
     
-    if (!integration) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Dados de integração inválidos' } as ProductResponse),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // Código da loja vem do dispositivo
+    const storeCode = device.store_code || '1';
+    console.log('[Lookup] store_code:', storeCode);
     
-    // Código da loja vem do dispositivo, com fallback para configuração da empresa
-    const storeCode = device.store_code || 
-                      (companyIntegration.settings as Record<string, string>).loja || 
-                      (companyIntegration.settings as Record<string, string>).store_code || 
-                      '1';
+    const credentials = companyIntegration.credentials as { usuario: string; password: string };
+    const tokenCache = companyIntegration.token_cache as TokenCache | null;
     
-    console.log('[Lookup] Usando store_code:', storeCode, 'para dispositivo:', device_code);
-    
-    // Verificar cache
-    const cacheTtl = (companyIntegration.settings as Record<string, number>).cache_ttl_minutes || 
-                     (integration.default_settings as Record<string, number>).cache_ttl_minutes || 15;
-    
+    // Verificar cache de produto primeiro
     const { data: cached } = await supabase
       .from('product_cache')
       .select('product_data, image_url')
@@ -368,7 +318,6 @@ Deno.serve(async (req) => {
     if (cached) {
       console.log('[Cache] Hit para EAN:', normalizedEan);
       
-      // Registrar log
       await supabase.from('product_lookup_logs').insert({
         device_id: device.id,
         company_id: device.company_id,
@@ -400,13 +349,12 @@ Deno.serve(async (req) => {
     }
     
     // Obter token
-    let tokenResult = await getToken(supabase, {
-      ...companyIntegration,
-      integration: integration as typeof companyIntegration.integration,
-      token_cache: companyIntegration.token_cache as TokenCache | null,
-      credentials: companyIntegration.credentials as Record<string, string>,
-      settings: companyIntegration.settings as Record<string, unknown>
-    });
+    let tokenResult = await getZaffariToken(
+      supabase,
+      companyIntegration.id,
+      credentials,
+      tokenCache
+    );
     
     if (!tokenResult.token) {
       await supabase.from('product_lookup_logs').insert({
@@ -426,17 +374,11 @@ Deno.serve(async (req) => {
     }
     
     // Consultar preço
-    let priceResult = await fetchPrice(
-      tokenResult.token,
-      integration.base_url,
-      (integration.endpoints as Record<string, { method: string; path: string }>).price,
-      storeCode,
-      normalizedEan
-    );
+    let priceResult = await fetchZaffariPrice(tokenResult.token, storeCode, normalizedEan);
     
     // Se token expirou, renova e tenta novamente
-    if (priceResult.error === 'TOKEN_EXPIRED') {
-      console.log('[Price] Token expirado, renovando...');
+    if (priceResult.tokenExpired) {
+      console.log('[Retry] Token expirado, renovando...');
       
       // Limpa cache do token
       await supabase
@@ -444,13 +386,12 @@ Deno.serve(async (req) => {
         .update({ token_cache: {} })
         .eq('id', companyIntegration.id);
       
-      tokenResult = await getToken(supabase, {
-        ...companyIntegration,
-        integration: integration as typeof companyIntegration.integration,
-        token_cache: null,
-        credentials: companyIntegration.credentials as Record<string, string>,
-        settings: companyIntegration.settings as Record<string, unknown>
-      });
+      tokenResult = await getZaffariToken(
+        supabase,
+        companyIntegration.id,
+        credentials,
+        null
+      );
       
       if (!tokenResult.token) {
         return new Response(
@@ -459,13 +400,7 @@ Deno.serve(async (req) => {
         );
       }
       
-      priceResult = await fetchPrice(
-        tokenResult.token,
-        integration.base_url,
-        (integration.endpoints as Record<string, { method: string; path: string }>).price,
-        storeCode,
-        normalizedEan
-      );
+      priceResult = await fetchZaffariPrice(tokenResult.token, storeCode, normalizedEan);
     }
     
     if (!priceResult.data) {
@@ -487,36 +422,47 @@ Deno.serve(async (req) => {
       );
     }
     
-    // Buscar imagem
-    const imageBaseUrl = (companyIntegration.settings as Record<string, string>).image_base_url || 
-                         (integration.default_settings as Record<string, string>).image_base_url;
-    
-    let imageUrl: string | null = null;
-    if (imageBaseUrl) {
-      imageUrl = await fetchProductImage(imageBaseUrl, normalizedEan);
-    }
-    
-    // Normalizar dados do produto
+    // Normalizar dados do produto Zaffari
+    // Campos da API: descricao_produto, preco_base, embalagem_venda, link_imagem, etc.
     const priceData = priceResult.data;
-    const currentPrice = priceData.preco || priceData.precoAtual || priceData.price || 0;
-    const originalPrice = priceData.precoAnterior || priceData.precoOriginal || priceData.original_price || null;
-    const isOffer = priceData.oferta || priceData.isOffer || priceData.is_offer || (originalPrice !== null && originalPrice > currentPrice);
+    
+    // Parsear preço (vem como string "8.99")
+    const priceStr = priceData.preco_base || priceData.preco_prop_sellprice || priceData.preco || priceData.precoAtual || priceData.price || '0';
+    const currentPrice = typeof priceStr === 'string' ? parseFloat(priceStr) || 0 : (priceStr as number);
+    
+    // Preço original para ofertas
+    const originalPriceStr = priceData.preco_anterior || priceData.precoAnterior || priceData.precoOriginal || priceData.original_price || null;
+    const originalPrice = originalPriceStr ? (typeof originalPriceStr === 'string' ? parseFloat(originalPriceStr) || null : (originalPriceStr as number)) : null;
+    
+    const isOffer = !!(priceData.oferta || priceData.isOffer || priceData.is_offer || (originalPrice !== null && originalPrice > currentPrice));
     
     let savingsPercent: number | null = null;
     if (isOffer && originalPrice && originalPrice > currentPrice) {
       savingsPercent = Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
     }
     
+    // Nome do produto
+    const name = (priceData.descricao_produto || priceData.descricao || priceData.nome || priceData.name || 'Produto') as string;
+    
+    // Unidade
+    const unit = (priceData.embalagem_venda || priceData.unidade || priceData.unit || priceData.embalagem || 'UN') as string;
+    
+    // Imagem
+    const imageUrl = (priceData.link_imagem || priceData.imagem || priceData.image_url || null) as string | null;
+    
     const productData = {
-      name: priceData.descricao || priceData.nome || priceData.name || 'Produto',
-      unit: priceData.unidade || priceData.unit || priceData.embalagem || 'UN',
+      name,
+      unit,
       current_price: currentPrice,
       original_price: originalPrice,
       is_offer: isOffer,
       savings_percent: savingsPercent
     };
     
-    // Salvar em cache
+    console.log('[Product] Normalizado:', JSON.stringify(productData), 'image:', imageUrl);
+    
+    // Salvar em cache (15 minutos)
+    const cacheTtl = 15;
     const expiresAt = new Date(Date.now() + cacheTtl * 60 * 1000);
     
     await supabase
@@ -542,7 +488,7 @@ Deno.serve(async (req) => {
       latency_ms: Date.now() - startTime
     });
     
-    console.log('[Success] Produto encontrado:', normalizedEan, 'em', Date.now() - startTime, 'ms');
+    console.log('[Success] Produto encontrado em', Date.now() - startTime, 'ms');
     
     return new Response(
       JSON.stringify({
@@ -558,7 +504,7 @@ Deno.serve(async (req) => {
     );
     
   } catch (err) {
-    console.error('[Error]', err);
+    console.error('[Error] Exceção não tratada:', err);
     
     return new Response(
       JSON.stringify({ success: false, error: 'Erro interno do servidor' } as ProductResponse),
