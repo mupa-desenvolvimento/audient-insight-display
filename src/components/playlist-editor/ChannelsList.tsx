@@ -195,8 +195,25 @@ export const ChannelsList = ({
     setIsDialogOpen(true);
   };
 
+  const validateDates = (): string | null => {
+    if (formData.is_fallback) return null;
+    
+    if (formData.start_date && formData.end_date) {
+      if (new Date(formData.end_date) < new Date(formData.start_date)) {
+        return "A data de término não pode ser anterior à data de início";
+      }
+    }
+    
+    return null;
+  };
+
   const handleSubmit = () => {
     if (!formData.name.trim()) return;
+    
+    const dateError = validateDates();
+    if (dateError) {
+      return;
+    }
     
     if (editingChannel) {
       onUpdateChannel(editingChannel.id, {
@@ -229,6 +246,8 @@ export const ChannelsList = ({
     setIsDialogOpen(false);
     resetForm();
   };
+
+  const dateValidationError = validateDates();
 
   const toggleDayOfWeek = (day: number) => {
     setFormData((prev) => ({
@@ -551,10 +570,21 @@ export const ChannelsList = ({
                   value={formData.is_fallback ? "" : (formData.end_date || "")}
                   onChange={(e) => setFormData(prev => ({ ...prev, end_date: e.target.value || null }))}
                   disabled={formData.is_fallback}
-                  className={cn(formData.is_fallback && "opacity-50 cursor-not-allowed")}
+                  className={cn(
+                    formData.is_fallback && "opacity-50 cursor-not-allowed",
+                    dateValidationError && "border-destructive"
+                  )}
+                  min={formData.start_date || undefined}
                 />
               </div>
             </div>
+            
+            {dateValidationError && (
+              <p className="text-sm text-destructive flex items-center gap-1">
+                <span className="text-destructive">⚠</span>
+                {dateValidationError}
+              </p>
+            )}
 
             {/* Time fields */}
             <div className="grid grid-cols-2 gap-4">
@@ -643,7 +673,7 @@ export const ChannelsList = ({
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSubmit} disabled={!formData.name.trim()}>
+            <Button onClick={handleSubmit} disabled={!formData.name.trim() || !!dateValidationError}>
               {editingChannel ? "Salvar" : "Criar Canal"}
             </Button>
           </DialogFooter>
