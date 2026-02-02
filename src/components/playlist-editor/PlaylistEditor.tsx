@@ -351,7 +351,7 @@ export const PlaylistEditor = () => {
   }
 
   return (
-    <div className="h-full flex flex-col bg-background text-foreground overflow-hidden">
+    <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
       {/* Header */}
       <EditorHeader
         projectName={formData.name || "Novo Projeto"}
@@ -364,8 +364,8 @@ export const PlaylistEditor = () => {
         onUpdateDevices={handleUpdateDevices}
       />
 
-      {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* Main Content - Full height minus header */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Left Sidebar - Tools */}
         <EditorSidebar
           activePanel={activePanel}
@@ -374,9 +374,9 @@ export const PlaylistEditor = () => {
 
         {/* Left Panel - Content Selection */}
         {activePanel && (
-          <div className="w-80 border-r bg-card flex flex-col">
+          <div className="w-80 border-r bg-card flex flex-col overflow-hidden">
             {/* Tabs for Channels vs Legacy mode */}
-            <div className="p-3 border-b">
+            <div className="p-3 border-b shrink-0">
               <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
                 <TabsList className="w-full">
                   <TabsTrigger value="channels" className="flex-1 gap-2">
@@ -392,7 +392,7 @@ export const PlaylistEditor = () => {
             </div>
 
             {activeTab === "channels" ? (
-              <div className="flex-1 overflow-auto p-4">
+              <div className="flex-1 overflow-auto p-4 min-h-0">
                 <ChannelsList
                   channels={playlistChannels}
                   activeChannelId={null}
@@ -421,9 +421,9 @@ export const PlaylistEditor = () => {
           </div>
         )}
 
-        {/* Center - Canvas/Preview (only show in legacy mode or when no channel is selected) */}
+        {/* Center - Canvas/Preview (only show in legacy mode) */}
         {activeTab === "legacy" && (
-          <div className="flex-1 flex flex-col min-w-0">
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
             <EditorCanvas
               currentItem={currentPreviewItem}
               isPlaying={isPreviewPlaying}
@@ -463,8 +463,8 @@ export const PlaylistEditor = () => {
 
         {/* Channels Timeline view when in channels mode */}
         {activeTab === "channels" && !selectedChannel && (
-          <div className="flex-1 flex flex-col min-w-0 p-4 bg-muted/30">
-            <div className="flex-1 flex flex-col gap-4">
+          <div className="flex-1 flex flex-col min-w-0 p-4 bg-muted/30 overflow-hidden">
+            <div className="flex-1 flex flex-col gap-4 min-h-0">
               {/* Timeline visualization */}
               <ChannelsTimeline
                 channels={playlistChannels}
@@ -485,9 +485,8 @@ export const PlaylistEditor = () => {
               
               {/* Instructions when channels exist */}
               {playlistChannels.length > 0 && (
-                <div className="text-center text-muted-foreground text-sm">
-                  <p>Clique em um bloco na timeline ou na lista à esquerda para editar o conteúdo do canal.</p>
-                  <p className="mt-1">Arraste os cards na lista para reordenar a prioridade dos canais.</p>
+                <div className="text-center text-muted-foreground text-sm shrink-0">
+                  Clique em um canal para editar ou arraste para reordenar
                 </div>
               )}
             </div>
