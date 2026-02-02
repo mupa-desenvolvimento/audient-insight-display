@@ -13,6 +13,7 @@ import {
   ListVideo,
   Layers,
   Building2,
+  Plug2,
 } from "lucide-react";
 import logoHorizontal from "@/assets/logo_horizontal.svg";
 import { NavLink, useNavigate } from "react-router-dom";
@@ -47,7 +48,10 @@ const menuItems = [
   { title: "Configurações", url: "/admin/settings", icon: Settings },
 ];
 
-const superAdminItems = [{ title: "Clientes", url: "/admin/tenants", icon: Building2 }];
+const superAdminItems = [
+  { title: "Clientes", url: "/admin/tenants", icon: Building2 },
+  { title: "Empresas", url: "/admin/companies", icon: Plug2 },
+];
 
 const AppSidebar = () => {
   const { user, signOut } = useAuth();

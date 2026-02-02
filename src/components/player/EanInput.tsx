@@ -1,17 +1,21 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Barcode, Search, X } from "lucide-react";
+import { Barcode, Search, X, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const RESET_CODE = "050223";
 
 interface EanInputProps {
   onSubmit: (ean: string) => void;
   isVisible: boolean;
   disabled?: boolean;
   onFocus?: () => void;
+  onReset?: () => void;
 }
 
-export const EanInput = ({ onSubmit, isVisible, disabled, onFocus }: EanInputProps) => {
+export const EanInput = ({ onSubmit, isVisible, disabled, onFocus, onReset }: EanInputProps) => {
   const [value, setValue] = useState("");
   const [showManualInput, setShowManualInput] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const hiddenInputRef = useRef<HTMLInputElement>(null);
 
@@ -38,6 +42,14 @@ export const EanInput = ({ onSubmit, isVisible, disabled, onFocus }: EanInputPro
   const handleSubmit = useCallback((eanValue: string) => {
     const trimmed = eanValue.trim();
     if (!trimmed) return;
+
+    // Verifica código secreto de reset
+    if (trimmed === RESET_CODE) {
+      console.log("[EanInput] Código de reset detectado");
+      setShowResetConfirm(true);
+      setValue("");
+      return;
+    }
 
     // Validações básicas
     if (!/^\d+$/.test(trimmed)) {
@@ -72,6 +84,12 @@ export const EanInput = ({ onSubmit, isVisible, disabled, onFocus }: EanInputPro
     const newValue = e.target.value;
     setValue(newValue);
 
+    // Verifica código de reset
+    if (newValue === RESET_CODE) {
+      handleSubmit(newValue);
+      return;
+    }
+
     // Se o leitor de código de barras inserir rapidamente (scanner)
     // geralmente termina com Enter, mas alguns modelos só inserem os dígitos
     // Então verificamos se o tamanho é válido para código de barras
@@ -90,6 +108,17 @@ export const EanInput = ({ onSubmit, isVisible, disabled, onFocus }: EanInputPro
     onFocus?.();
   };
 
+  const handleConfirmReset = () => {
+    console.log("[EanInput] Reset confirmado");
+    setShowResetConfirm(false);
+    onReset?.();
+  };
+
+  const handleCancelReset = () => {
+    setShowResetConfirm(false);
+    hiddenInputRef.current?.focus();
+  };
+
   if (!isVisible) return null;
 
   return (
@@ -102,7 +131,7 @@ export const EanInput = ({ onSubmit, isVisible, disabled, onFocus }: EanInputPro
         onChange={handleHiddenInput}
         onKeyDown={handleKeyDown}
         onFocus={handleFocus}
-        disabled={disabled}
+        disabled={disabled || showResetConfirm}
         className="absolute opacity-0 w-0 h-0 pointer-events-auto"
         aria-label="Scanner de código de barras"
         autoComplete="off"
@@ -111,11 +140,41 @@ export const EanInput = ({ onSubmit, isVisible, disabled, onFocus }: EanInputPro
         spellCheck={false}
       />
 
+      {/* Modal de confirmação de reset */}
+      {showResetConfirm && (
+        <div className="absolute inset-0 bg-black/90 flex items-center justify-center z-50">
+          <div className="bg-card border border-border rounded-xl p-8 max-w-md text-center shadow-2xl">
+            <div className="w-16 h-16 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-4">
+              <RotateCcw className="w-8 h-8 text-destructive" />
+            </div>
+            <h2 className="text-2xl font-bold text-foreground mb-2">Resetar Dispositivo?</h2>
+            <p className="text-muted-foreground mb-6">
+              Isso apagará todos os dados locais do aplicativo, incluindo cache de mídias e configurações.
+              O dispositivo precisará ser reconfigurado.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={handleCancelReset}
+                className="px-6 py-3 bg-muted text-foreground rounded-lg hover:bg-muted/80 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmReset}
+                className="px-6 py-3 bg-destructive text-destructive-foreground rounded-lg hover:bg-destructive/90 transition-colors"
+              >
+                Confirmar Reset
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Indicador de scanner ativo */}
       <div
         className={cn(
           "absolute bottom-6 left-1/2 -translate-x-1/2 transition-all duration-300",
-          showManualInput ? "opacity-0 pointer-events-none" : "opacity-100"
+          showManualInput || showResetConfirm ? "opacity-0 pointer-events-none" : "opacity-100"
         )}
       >
         <button
@@ -128,7 +187,7 @@ export const EanInput = ({ onSubmit, isVisible, disabled, onFocus }: EanInputPro
       </div>
 
       {/* Input manual visível */}
-      {showManualInput && (
+      {showManualInput && !showResetConfirm && (
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/80 backdrop-blur-sm rounded-xl p-2 shadow-2xl">
           <div className="relative">
             <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
