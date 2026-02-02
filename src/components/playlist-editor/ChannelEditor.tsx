@@ -116,9 +116,9 @@ export const ChannelEditor = ({
   }));
 
   return (
-    <div className="h-full flex flex-col bg-background text-foreground overflow-hidden">
-      {/* Channel Header */}
-      <div className="h-14 border-b bg-card flex items-center justify-between px-4">
+    <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
+      {/* Channel Header - Fixed */}
+      <div className="h-14 border-b bg-card flex items-center justify-between px-4 shrink-0">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" onClick={onBack} className="gap-2">
             <ArrowLeft className="w-4 h-4" />
@@ -166,38 +166,40 @@ export const ChannelEditor = ({
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* Main Content - Takes remaining height */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Left Sidebar - Tools */}
         <EditorSidebar
           activePanel={activePanel}
           onPanelChange={setActivePanel}
         />
 
-        {/* Left Panel - Media Library */}
+        {/* Left Panel - Media Library with internal scroll */}
         {activePanel === "media" && (
-          <EditorPropertiesPanel
-            activePanel={activePanel}
-            formData={{ 
-              name: channel.name, 
-              description: channel.description,
-              channel_id: null,
-              is_active: channel.is_active,
-              start_date: null,
-              end_date: null,
-              days_of_week: channel.days_of_week,
-              start_time: channel.start_time.slice(0, 5),
-              end_time: channel.end_time.slice(0, 5),
-              priority: 5,
-            }}
-            channels={[]}
-            itemCount={items.length}
-            totalDuration={totalDuration}
-            connectedDevicesCount={0}
-            onFormChange={() => {}}
-            onAddMedia={handleAddMedia}
-            itemsLength={items.length}
-          />
+          <div className="w-72 flex flex-col overflow-hidden border-r bg-muted/50">
+            <EditorPropertiesPanel
+              activePanel={activePanel}
+              formData={{ 
+                name: channel.name, 
+                description: channel.description,
+                channel_id: null,
+                is_active: channel.is_active,
+                start_date: null,
+                end_date: null,
+                days_of_week: channel.days_of_week,
+                start_time: channel.start_time.slice(0, 5),
+                end_time: channel.end_time.slice(0, 5),
+                priority: 5,
+              }}
+              channels={[]}
+              itemCount={items.length}
+              totalDuration={totalDuration}
+              connectedDevicesCount={0}
+              onFormChange={() => {}}
+              onAddMedia={handleAddMedia}
+              itemsLength={items.length}
+            />
+          </div>
         )}
 
         {/* Center - Canvas/Preview */}

@@ -411,16 +411,16 @@ export const EditorPropertiesPanel = ({
   itemsLength,
 }: EditorPropertiesPanelProps) => {
   return (
-    <div className="w-72 flex flex-col bg-muted/50 border-r border-border">
+    <div className="h-full flex flex-col overflow-hidden">
       {/* Panel Header */}
-      <div className="h-10 flex items-center justify-between px-4 border-b border-border">
+      <div className="h-10 flex items-center justify-between px-4 border-b border-border shrink-0">
         <span className="text-xs font-medium text-muted-foreground">
           {activePanel === "media" ? "Biblioteca de Mídias" : "Configurações"}
         </span>
       </div>
 
-      {/* Panel Content */}
-      <div className="flex-1 overflow-hidden">
+      {/* Panel Content - Scrollable */}
+      <div className="flex-1 overflow-hidden min-h-0">
         {activePanel === "media" ? (
           <MediaLibraryPanel onAddMedia={onAddMedia} itemsLength={itemsLength} />
         ) : (
