@@ -51,6 +51,7 @@ export interface PlaylistChannelItem {
     name: string;
     type: string;
     file_url: string | null;
+    thumbnail_url: string | null;
     duration: number | null;
     file_size: number | null;
     resolution: string | null;
@@ -69,6 +70,10 @@ export interface PlaylistChannelItemInsert {
   end_time?: string | null;
   days_of_week?: number[] | null;
   is_schedule_override?: boolean;
+}
+
+export interface PlaylistChannelWithItems extends PlaylistChannel {
+  items: PlaylistChannelItem[];
 }
 
 export const usePlaylistChannels = (playlistId: string | null) => {
@@ -96,6 +101,54 @@ export const usePlaylistChannels = (playlistId: string | null) => {
         days_of_week: channel.days_of_week || [0, 1, 2, 3, 4, 5, 6],
         item_count: channel.playlist_channel_items?.[0]?.count || 0,
       })) as PlaylistChannel[];
+    },
+    enabled: !!playlistId,
+  });
+
+  // Fetch channels with their items for timeline display
+  const { data: channelsWithItems = [], isLoading: itemsLoading } = useQuery({
+    queryKey: ["playlist-channels-with-items", playlistId],
+    queryFn: async () => {
+      if (!playlistId) return [];
+      
+      // First get all channels
+      const { data: channelsData, error: channelsError } = await supabase
+        .from("playlist_channels")
+        .select("*")
+        .eq("playlist_id", playlistId)
+        .order("position", { ascending: true });
+
+      if (channelsError) throw channelsError;
+      if (!channelsData || channelsData.length === 0) return [];
+
+      // Then get all items for these channels
+      const channelIds = channelsData.map(c => c.id);
+      const { data: itemsData, error: itemsError } = await supabase
+        .from("playlist_channel_items")
+        .select(`
+          *,
+          media:media_items(id, name, type, file_url, thumbnail_url, duration, file_size, resolution, status)
+        `)
+        .in("channel_id", channelIds)
+        .order("position", { ascending: true });
+
+      if (itemsError) throw itemsError;
+
+      // Group items by channel
+      const itemsByChannel = (itemsData || []).reduce((acc, item) => {
+        if (!acc[item.channel_id]) {
+          acc[item.channel_id] = [];
+        }
+        acc[item.channel_id].push(item);
+        return acc;
+      }, {} as Record<string, PlaylistChannelItem[]>);
+
+      return channelsData.map(channel => ({
+        ...channel,
+        days_of_week: channel.days_of_week || [0, 1, 2, 3, 4, 5, 6],
+        item_count: itemsByChannel[channel.id]?.length || 0,
+        items: itemsByChannel[channel.id] || [],
+      })) as PlaylistChannelWithItems[];
     },
     enabled: !!playlistId,
   });
@@ -204,7 +257,9 @@ export const usePlaylistChannels = (playlistId: string | null) => {
 
   return {
     channels,
+    channelsWithItems,
     isLoading,
+    isLoadingWithItems: itemsLoading,
     error,
     createChannel,
     updateChannel,

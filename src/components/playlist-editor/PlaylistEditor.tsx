@@ -49,6 +49,7 @@ export const PlaylistEditor = () => {
   // Playlist channels (blocos de programação)
   const {
     channels: playlistChannels,
+    channelsWithItems,
     isLoading: channelsLoading,
     createChannel,
     updateChannel,
@@ -470,6 +471,7 @@ export const PlaylistEditor = () => {
               {/* Timeline visualization */}
               <ChannelsTimeline
                 channels={playlistChannels}
+                channelsWithItems={channelsWithItems}
                 onSelectChannel={setSelectedChannel}
                 onUpdateChannel={(channelId, updates) => {
                   updateChannel.mutate({ id: channelId, ...updates });
