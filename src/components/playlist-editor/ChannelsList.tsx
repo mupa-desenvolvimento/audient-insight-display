@@ -44,6 +44,8 @@ interface ChannelFormData {
   description: string | null;
   start_time: string;
   end_time: string;
+  start_date: string | null;
+  end_date: string | null;
   days_of_week: number[];
   is_fallback: boolean;
   is_active: boolean;
@@ -87,6 +89,8 @@ export const ChannelsList = ({
     description: null,
     start_time: "00:00",
     end_time: "23:59",
+    start_date: null,
+    end_date: null,
     days_of_week: [0, 1, 2, 3, 4, 5, 6],
     is_fallback: false,
     is_active: true,
@@ -161,6 +165,8 @@ export const ChannelsList = ({
       description: null,
       start_time: "00:00",
       end_time: "23:59",
+      start_date: null,
+      end_date: null,
       days_of_week: [0, 1, 2, 3, 4, 5, 6],
       is_fallback: false,
       is_active: true,
@@ -180,6 +186,8 @@ export const ChannelsList = ({
       description: channel.description,
       start_time: channel.start_time.slice(0, 5),
       end_time: channel.end_time.slice(0, 5),
+      start_date: channel.start_date,
+      end_date: channel.end_date,
       days_of_week: channel.days_of_week,
       is_fallback: channel.is_fallback,
       is_active: channel.is_active,
@@ -196,6 +204,8 @@ export const ChannelsList = ({
         description: formData.description,
         start_time: formData.start_time,
         end_time: formData.end_time,
+        start_date: formData.start_date,
+        end_date: formData.is_fallback ? null : formData.end_date,
         days_of_week: formData.days_of_week,
         is_fallback: formData.is_fallback,
         is_active: formData.is_active,
@@ -207,6 +217,8 @@ export const ChannelsList = ({
         description: formData.description,
         start_time: formData.start_time,
         end_time: formData.end_time,
+        start_date: formData.start_date,
+        end_date: formData.is_fallback ? null : formData.end_date,
         days_of_week: formData.days_of_week,
         is_fallback: formData.is_fallback,
         is_active: formData.is_active,
@@ -272,6 +284,26 @@ export const ChannelsList = ({
     if (days.length === 5 && !days.includes(0) && !days.includes(6)) return "Seg–Sex";
     if (days.length === 2 && days.includes(0) && days.includes(6)) return "Fim de semana";
     return days.map(d => DAYS_OF_WEEK[d].label).join(", ");
+  };
+
+  const formatDateRange = (startDate: string | null, endDate: string | null, isFallback: boolean) => {
+    if (!startDate && !endDate) return null;
+    
+    const formatDate = (date: string) => {
+      const [year, month, day] = date.split('-');
+      return `${day}/${month}`;
+    };
+    
+    if (startDate && endDate && !isFallback) {
+      return `${formatDate(startDate)} – ${formatDate(endDate)}`;
+    }
+    if (startDate) {
+      return isFallback ? `A partir de ${formatDate(startDate)}` : `Início: ${formatDate(startDate)}`;
+    }
+    if (endDate && !isFallback) {
+      return `Até ${formatDate(endDate)}`;
+    }
+    return null;
   };
 
   return (
@@ -394,12 +426,21 @@ export const ChannelsList = ({
                     <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
                   </div>
                   
-                  {/* Row 2: Time + Media Count */}
+                  {/* Row 2: Date + Time + Media Count */}
                   <div className="flex items-center justify-between pl-6">
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      {formatDateRange(channel.start_date, channel.end_date, channel.is_fallback) && (
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {formatDateRange(channel.start_date, channel.end_date, channel.is_fallback)}
+                        </span>
+                      )}
+                      
                       <span className="flex items-center gap-1 font-mono">
                         <Clock className="w-3 h-3" />
-                        {channel.start_time.slice(0, 5)}–{channel.end_time.slice(0, 5)}
+                        {channel.start_time.slice(0, 5)}
+                        {!channel.is_fallback && `–${channel.end_time.slice(0, 5)}`}
+                        {channel.is_fallback && "–∞"}
                       </span>
                       
                       <span className="flex items-center gap-1 font-medium text-foreground">
@@ -481,11 +522,46 @@ export const ChannelsList = ({
               />
             </div>
 
+            {/* Date fields */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4" />
+                  Data de Início
+                </Label>
+                <Input
+                  type="date"
+                  value={formData.start_date || ""}
+                  onChange={(e) => setFormData(prev => ({ ...prev, start_date: e.target.value || null }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className={cn(
+                  "flex items-center gap-2",
+                  formData.is_fallback && "text-muted-foreground"
+                )}>
+                  <Calendar className="w-4 h-4" />
+                  Data de Término
+                  {formData.is_fallback && (
+                    <span className="text-xs font-normal">(indeterminado)</span>
+                  )}
+                </Label>
+                <Input
+                  type="date"
+                  value={formData.is_fallback ? "" : (formData.end_date || "")}
+                  onChange={(e) => setFormData(prev => ({ ...prev, end_date: e.target.value || null }))}
+                  disabled={formData.is_fallback}
+                  className={cn(formData.is_fallback && "opacity-50 cursor-not-allowed")}
+                />
+              </div>
+            </div>
+
+            {/* Time fields */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <Clock className="w-4 h-4" />
-                  Início
+                  Horário de Início
                 </Label>
                 <Input
                   type="time"
@@ -494,14 +570,22 @@ export const ChannelsList = ({
                 />
               </div>
               <div className="space-y-2">
-                <Label className="flex items-center gap-2">
+                <Label className={cn(
+                  "flex items-center gap-2",
+                  formData.is_fallback && "text-muted-foreground"
+                )}>
                   <Clock className="w-4 h-4" />
-                  Fim
+                  Horário de Término
+                  {formData.is_fallback && (
+                    <span className="text-xs font-normal">(indeterminado)</span>
+                  )}
                 </Label>
                 <Input
                   type="time"
-                  value={formData.end_time}
+                  value={formData.is_fallback ? "" : formData.end_time}
                   onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
+                  disabled={formData.is_fallback}
+                  className={cn(formData.is_fallback && "opacity-50 cursor-not-allowed")}
                 />
               </div>
             </div>
