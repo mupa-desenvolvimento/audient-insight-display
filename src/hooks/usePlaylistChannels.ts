@@ -310,6 +310,7 @@ export const usePlaylistChannelItems = (channelId: string | null) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["playlist-channel-items", channelId] });
       queryClient.invalidateQueries({ queryKey: ["playlist-channels"] });
+      queryClient.invalidateQueries({ queryKey: ["playlist-channels-with-items"] });
       toast({ title: "Mídia adicionada ao canal" });
     },
     onError: (error) => {
@@ -345,6 +346,7 @@ export const usePlaylistChannelItems = (channelId: string | null) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["playlist-channel-items", channelId] });
       queryClient.invalidateQueries({ queryKey: ["playlist-channels"] });
+      queryClient.invalidateQueries({ queryKey: ["playlist-channels-with-items"] });
       toast({ title: "Mídia removida do canal" });
     },
     onError: (error) => {
@@ -361,6 +363,7 @@ export const usePlaylistChannelItems = (channelId: string | null) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["playlist-channel-items", channelId] });
+      queryClient.invalidateQueries({ queryKey: ["playlist-channels-with-items"] });
     },
     onError: (error) => {
       toast({ title: "Erro ao reordenar itens", description: error.message, variant: "destructive" });
