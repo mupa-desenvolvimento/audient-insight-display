@@ -10,6 +10,8 @@ export interface PlaylistChannel {
   description: string | null;
   start_time: string;
   end_time: string;
+  start_date: string | null;
+  end_date: string | null;
   days_of_week: number[];
   position: number;
   is_fallback: boolean;
@@ -26,6 +28,8 @@ export interface PlaylistChannelInsert {
   description?: string | null;
   start_time?: string;
   end_time?: string;
+  start_date?: string | null;
+  end_date?: string | null;
   days_of_week?: number[];
   position?: number;
   is_fallback?: boolean;

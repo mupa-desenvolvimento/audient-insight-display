@@ -615,6 +615,7 @@ export type Database = {
           created_at: string
           days_of_week: number[] | null
           description: string | null
+          end_date: string | null
           end_time: string
           id: string
           is_active: boolean
@@ -623,6 +624,7 @@ export type Database = {
           name: string
           playlist_id: string
           position: number
+          start_date: string | null
           start_time: string
           updated_at: string
         }
@@ -630,6 +632,7 @@ export type Database = {
           created_at?: string
           days_of_week?: number[] | null
           description?: string | null
+          end_date?: string | null
           end_time?: string
           id?: string
           is_active?: boolean
@@ -638,6 +641,7 @@ export type Database = {
           name: string
           playlist_id: string
           position?: number
+          start_date?: string | null
           start_time?: string
           updated_at?: string
         }
@@ -645,6 +649,7 @@ export type Database = {
           created_at?: string
           days_of_week?: number[] | null
           description?: string | null
+          end_date?: string | null
           end_time?: string
           id?: string
           is_active?: boolean
@@ -653,6 +658,7 @@ export type Database = {
           name?: string
           playlist_id?: string
           position?: number
+          start_date?: string | null
           start_time?: string
           updated_at?: string
         }
