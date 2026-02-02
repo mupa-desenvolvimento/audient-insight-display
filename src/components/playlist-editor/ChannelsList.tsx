@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { PlaylistChannel, PlaylistChannelInsert } from "@/hooks/usePlaylistChannels";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   Plus, 
   Clock, 
@@ -19,19 +20,22 @@ import {
   Trash2, 
   Play, 
   ChevronRight,
+  ChevronDown,
   Radio,
-  Shield
+  Shield,
+  Film,
+  Calendar
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const DAYS_OF_WEEK = [
-  { value: 0, label: "Dom" },
-  { value: 1, label: "Seg" },
-  { value: 2, label: "Ter" },
-  { value: 3, label: "Qua" },
-  { value: 4, label: "Qui" },
-  { value: 5, label: "Sex" },
-  { value: 6, label: "Sáb" },
+  { value: 0, label: "Dom", short: "D" },
+  { value: 1, label: "Seg", short: "S" },
+  { value: 2, label: "Ter", short: "T" },
+  { value: 3, label: "Qua", short: "Q" },
+  { value: 4, label: "Qui", short: "Q" },
+  { value: 5, label: "Sex", short: "S" },
+  { value: 6, label: "Sáb", short: "S" },
 ];
 
 interface ChannelFormData {
@@ -70,6 +74,7 @@ export const ChannelsList = ({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingChannel, setEditingChannel] = useState<PlaylistChannel | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
   
   // Drag and drop state
   const [draggedChannel, setDraggedChannel] = useState<PlaylistChannel | null>(null);
@@ -91,13 +96,11 @@ export const ChannelsList = ({
     setDraggedChannel(channel);
     dragNodeRef.current = e.target as HTMLDivElement;
     
-    // Set drag image
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/plain", channel.id);
     }
     
-    // Add dragging class after a small delay
     setTimeout(() => {
       if (dragNodeRef.current) {
         dragNodeRef.current.style.opacity = "0.5";
@@ -138,12 +141,10 @@ export const ChannelsList = ({
       return;
     }
     
-    // Calculate new order
     const newChannels = [...channels];
     const [removed] = newChannels.splice(dragIndex, 1);
     newChannels.splice(dropIndex, 0, removed);
     
-    // Create position updates
     const orderedChannels = newChannels.map((channel, index) => ({
       id: channel.id,
       position: index,
@@ -244,17 +245,32 @@ export const ChannelsList = ({
     return currentTime >= startTime && currentTime <= endTime;
   };
 
-  const getChannelStatusBadge = (channel: PlaylistChannel) => {
-    if (!channel.is_active) {
-      return <Badge variant="secondary">Inativo</Badge>;
+  const getChannelStatus = (channel: PlaylistChannel) => {
+    if (!channel.is_active) return { type: "inactive", label: "Inativo", color: "bg-muted text-muted-foreground" };
+    if (channel.is_fallback) return { type: "fallback", label: "Fallback", color: "bg-yellow-500/20 text-yellow-600 border-yellow-500/50" };
+    if (isChannelActive(channel)) return { type: "live", label: "Ao Vivo", color: "bg-green-500/20 text-green-600 border-green-500/50" };
+    return { type: "scheduled", label: "Programado", color: "bg-blue-500/20 text-blue-600 border-blue-500/50" };
+  };
+
+  const getStatusIcon = (channel: PlaylistChannel) => {
+    const status = getChannelStatus(channel);
+    switch (status.type) {
+      case "live":
+        return <Play className="w-4 h-4 text-green-500" />;
+      case "fallback":
+        return <Shield className="w-4 h-4 text-yellow-500" />;
+      case "scheduled":
+        return <Clock className="w-4 h-4 text-blue-500" />;
+      default:
+        return <Clock className="w-4 h-4 text-muted-foreground" />;
     }
-    if (channel.is_fallback) {
-      return <Badge variant="outline" className="border-yellow-500 text-yellow-600">Fallback</Badge>;
-    }
-    if (isChannelActive(channel)) {
-      return <Badge className="bg-green-500">Ao Vivo</Badge>;
-    }
-    return <Badge variant="outline">Programado</Badge>;
+  };
+
+  const formatDaysLabel = (days: number[]) => {
+    if (days.length === 7) return "Todos os dias";
+    if (days.length === 5 && !days.includes(0) && !days.includes(6)) return "Seg–Sex";
+    if (days.length === 2 && days.includes(0) && days.includes(6)) return "Fim de semana";
+    return days.map(d => DAYS_OF_WEEK[d].label).join(", ");
   };
 
   return (
@@ -262,159 +278,176 @@ export const ChannelsList = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Radio className="w-5 h-5 text-primary" />
-            Canais de Programação
+          <h2 className="text-base font-semibold flex items-center gap-2">
+            <Radio className="w-4 h-4 text-primary" />
+            Canais
           </h2>
-          <p className="text-sm text-muted-foreground">
-            Blocos de conteúdo por horário em "{playlistName}"
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {channels.length} {channels.length === 1 ? "canal" : "canais"}
           </p>
         </div>
-        <Button onClick={openNewDialog} size="sm">
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Canal
+        <Button onClick={openNewDialog} size="sm" variant="outline">
+          <Plus className="w-4 h-4" />
         </Button>
       </div>
 
       {/* Channels List */}
       {channels.length === 0 ? (
-        <Card>
-          <CardContent className="py-8 text-center">
-            <Tv className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-            <p className="text-muted-foreground mb-4">
-              Nenhum canal criado ainda. Crie seu primeiro canal para começar.
+        <Card className="border-dashed">
+          <CardContent className="py-6 text-center">
+            <Tv className="w-10 h-10 mx-auto mb-3 text-muted-foreground/50" />
+            <p className="text-sm text-muted-foreground mb-3">
+              Nenhum canal criado
             </p>
-            <Button onClick={openNewDialog}>
+            <Button onClick={openNewDialog} size="sm">
               <Plus className="w-4 h-4 mr-2" />
-              Criar Primeiro Canal
+              Criar Canal
             </Button>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {channels.map((channel, index) => (
-            <Card 
-              key={channel.id}
-              draggable
-              onDragStart={(e) => handleDragStart(e, channel, index)}
-              onDragEnd={handleDragEnd}
-              onDragOver={(e) => handleDragOver(e, index)}
-              onDrop={(e) => handleDrop(e, index)}
-              className={cn(
-                "cursor-pointer transition-all hover:border-primary/50",
-                activeChannelId === channel.id && "border-primary ring-1 ring-primary",
-                draggedChannel?.id === channel.id && "opacity-50",
-                dragOverIndex === index && draggedChannel?.id !== channel.id && "border-primary border-dashed"
-              )}
-              onClick={() => onSelectChannel(channel)}
-            >
-              <CardContent className="p-0">
-                {/* Linha 1: Header - Drag, Icon, Badge, Actions */}
-                <div className="flex items-center justify-between px-3 py-2 border-b border-border/50">
-                  <div className="flex items-center gap-3">
+        <div className="space-y-2">
+          {channels.map((channel, index) => {
+            const status = getChannelStatus(channel);
+            const isLive = status.type === "live";
+            
+            return (
+              <Card 
+                key={channel.id}
+                draggable
+                onDragStart={(e) => handleDragStart(e, channel, index)}
+                onDragEnd={handleDragEnd}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDrop={(e) => handleDrop(e, index)}
+                className={cn(
+                  "cursor-pointer transition-all group",
+                  "hover:border-primary/50 hover:shadow-sm",
+                  activeChannelId === channel.id && "border-primary ring-1 ring-primary",
+                  draggedChannel?.id === channel.id && "opacity-50",
+                  dragOverIndex === index && draggedChannel?.id !== channel.id && "border-primary border-dashed border-2",
+                  isLive && "ring-1 ring-green-500/50 shadow-[0_0_12px_rgba(34,197,94,0.15)]"
+                )}
+                onClick={() => onSelectChannel(channel)}
+              >
+                <CardContent className="p-3">
+                  {/* Row 1: Status + Name + Actions */}
+                  <div className="flex items-center gap-2 mb-2">
                     {/* Drag Handle */}
-                    <div className="text-muted-foreground cursor-grab hover:text-foreground transition-colors">
-                      <GripVertical className="w-5 h-5" />
+                    <div 
+                      className="text-muted-foreground/50 hover:text-muted-foreground cursor-grab shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <GripVertical className="w-4 h-4" />
                     </div>
                     
                     {/* Status Icon */}
                     <div className={cn(
-                      "w-8 h-8 rounded-lg flex items-center justify-center",
-                      channel.is_fallback 
-                        ? "bg-yellow-500/20" 
-                        : isChannelActive(channel) 
-                          ? "bg-green-500/20" 
-                          : "bg-muted"
+                      "w-7 h-7 rounded-md flex items-center justify-center shrink-0",
+                      status.type === "live" && "bg-green-500/20",
+                      status.type === "fallback" && "bg-yellow-500/20",
+                      status.type === "scheduled" && "bg-blue-500/20",
+                      status.type === "inactive" && "bg-muted"
                     )}>
-                      {channel.is_fallback ? (
-                        <Shield className="w-4 h-4 text-yellow-500" />
-                      ) : isChannelActive(channel) ? (
-                        <Play className="w-4 h-4 text-green-500" />
-                      ) : (
-                        <Clock className="w-4 h-4 text-muted-foreground" />
-                      )}
+                      {getStatusIcon(channel)}
                     </div>
                     
-                    {/* Badge */}
-                    {getChannelStatusBadge(channel)}
+                    {/* Name + Badge */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm truncate">{channel.name}</span>
+                        <Badge 
+                          variant="outline" 
+                          className={cn("text-[10px] px-1.5 py-0 h-4 shrink-0", status.color)}
+                        >
+                          {status.label}
+                        </Badge>
+                      </div>
+                    </div>
+                    
+                    {/* Actions */}
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEditDialog(channel);
+                        }}
+                      >
+                        <Edit className="w-3 h-3" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        className="h-6 w-6 text-destructive hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteId(channel.id);
+                        }}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                    
+                    <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
                   </div>
                   
-                  {/* Actions */}
-                  <div className="flex items-center gap-1">
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openEditDialog(channel);
-                      }}
+                  {/* Row 2: Time + Media Count */}
+                  <div className="flex items-center justify-between pl-6">
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1 font-mono">
+                        <Clock className="w-3 h-3" />
+                        {channel.start_time.slice(0, 5)}–{channel.end_time.slice(0, 5)}
+                      </span>
+                      
+                      <span className="flex items-center gap-1 font-medium text-foreground">
+                        <Film className="w-3 h-3 text-primary" />
+                        {channel.item_count || 0}
+                      </span>
+                    </div>
+                    
+                    {/* Days - Collapsible */}
+                    <Collapsible 
+                      open={expandedDays[channel.id]}
+                      onOpenChange={(open) => setExpandedDays(prev => ({ ...prev, [channel.id]: open }))}
                     >
-                      <Edit className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeleteId(channel.id);
-                      }}
-                    >
-                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                    </Button>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                  </div>
-                </div>
-                
-                {/* Linha 2: Horário */}
-                <div className="px-3 py-3 flex justify-center">
-                  <div className="flex items-center gap-2 text-lg font-semibold">
-                    <Clock className="w-4 h-4 text-muted-foreground" />
-                    <span>
-                      {channel.start_time.slice(0, 5)} – {channel.end_time.slice(0, 5)}
-                    </span>
-                  </div>
-                </div>
-                
-                {/* Linha 3: Dias da Semana */}
-                <div className="px-3 pb-3 flex justify-center">
-                  <div className="flex items-center gap-3">
-                    {DAYS_OF_WEEK.map((day) => (
-                      <div key={day.value} className="flex flex-col items-center gap-1">
-                        <span
-                          className={cn(
-                            "text-xs font-medium",
-                            channel.days_of_week.includes(day.value)
-                              ? "text-foreground"
-                              : "text-muted-foreground/40"
-                          )}
-                        >
-                          {day.label[0]}
+                      <CollapsibleTrigger 
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Calendar className="w-3 h-3" />
+                        <span className="max-w-[80px] truncate">
+                          {formatDaysLabel(channel.days_of_week)}
                         </span>
-                        <div
-                          className={cn(
-                            "w-2 h-2 rounded-full transition-colors",
-                            channel.days_of_week.includes(day.value)
-                              ? "bg-primary"
-                              : "bg-muted-foreground/20"
-                          )}
-                        />
-                      </div>
-                    ))}
+                        <ChevronDown className={cn(
+                          "w-3 h-3 transition-transform",
+                          expandedDays[channel.id] && "rotate-180"
+                        )} />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="absolute mt-1 right-0 z-10">
+                        <div className="bg-popover border rounded-md shadow-lg p-2 flex gap-1">
+                          {DAYS_OF_WEEK.map((day) => (
+                            <div
+                              key={day.value}
+                              className={cn(
+                                "w-6 h-6 rounded text-[10px] font-medium flex items-center justify-center",
+                                channel.days_of_week.includes(day.value)
+                                  ? "bg-primary text-primary-foreground"
+                                  : "bg-muted text-muted-foreground"
+                              )}
+                            >
+                              {day.short}
+                            </div>
+                          ))}
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
                   </div>
-                </div>
-                
-                {/* Linha 4: Rodapé - Mídias */}
-                <div className="px-3 py-2 border-t border-border/50 flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    {channel.item_count || 0} mídias
-                  </span>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
@@ -443,6 +476,7 @@ export const ChannelsList = ({
                 value={formData.description || ""}
                 onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 placeholder="Descrição opcional do canal"
+                rows={2}
               />
             </div>
 
@@ -495,31 +529,31 @@ export const ChannelsList = ({
               </div>
             </div>
 
-            <div className="flex items-center justify-between border rounded-lg p-3">
-              <div className="space-y-0.5">
-                <Label className="flex items-center gap-2">
-                  <Shield className="w-4 h-4" />
-                  Canal Fallback
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Exibido quando nenhum outro canal está ativo
-                </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-yellow-500" />
+                  <Label className="cursor-pointer">Fallback</Label>
+                </div>
+                <Switch
+                  checked={formData.is_fallback}
+                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_fallback: checked }))}
+                />
               </div>
-              <Switch
-                checked={formData.is_fallback}
-                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_fallback: checked }))}
-              />
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Switch
-                checked={formData.is_active}
-                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_active: checked }))}
-              />
-              <Label>Canal ativo</Label>
+              
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="flex items-center gap-2">
+                  <Play className="w-4 h-4 text-green-500" />
+                  <Label className="cursor-pointer">Ativo</Label>
+                </div>
+                <Switch
+                  checked={formData.is_active}
+                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_active: checked }))}
+                />
+              </div>
             </div>
           </div>
-
+          
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancelar
@@ -532,20 +566,22 @@ export const ChannelsList = ({
       </Dialog>
 
       {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir Canal</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir este canal? Todo o conteúdo associado será perdido.
+              Tem certeza que deseja excluir este canal? Todas as mídias associadas serão removidas.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                if (deleteId) onDeleteChannel(deleteId);
-                setDeleteId(null);
+                if (deleteId) {
+                  onDeleteChannel(deleteId);
+                  setDeleteId(null);
+                }
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
