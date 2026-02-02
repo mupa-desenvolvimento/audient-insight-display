@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.import-stores]
 verify_jwt = false
+
+[functions.product-lookup]
+verify_jwt = false
