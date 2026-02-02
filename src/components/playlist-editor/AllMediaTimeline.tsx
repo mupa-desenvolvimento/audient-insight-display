@@ -1,7 +1,7 @@
-import { useMemo, useState, useRef, useEffect } from "react";
+import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { PlaylistChannel, PlaylistChannelWithItems, PlaylistChannelItem } from "@/hooks/usePlaylistChannels";
 import { cn } from "@/lib/utils";
-import { Video, Image, Clock, Film, Play, Pause, SkipBack, SkipForward, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import { Video, Image, Clock, Film, Play, Pause, SkipBack, SkipForward, ZoomIn, ZoomOut, Maximize2, GripVertical } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -11,26 +11,39 @@ import { Slider } from "@/components/ui/slider";
 interface AllMediaTimelineProps {
   channelsWithItems: PlaylistChannelWithItems[];
   onSelectChannel: (channel: PlaylistChannel) => void;
+  onReorderGlobal?: (items: { channelId: string; itemId: string; newPosition: number }[]) => void;
 }
 
 // Color palette for channels
 const channelColors = [
-  { bg: "bg-blue-500/20", border: "border-blue-500", accent: "bg-blue-500", text: "text-blue-500" },
-  { bg: "bg-green-500/20", border: "border-green-500", accent: "bg-green-500", text: "text-green-500" },
-  { bg: "bg-purple-500/20", border: "border-purple-500", accent: "bg-purple-500", text: "text-purple-500" },
-  { bg: "bg-orange-500/20", border: "border-orange-500", accent: "bg-orange-500", text: "text-orange-500" },
-  { bg: "bg-pink-500/20", border: "border-pink-500", accent: "bg-pink-500", text: "text-pink-500" },
-  { bg: "bg-cyan-500/20", border: "border-cyan-500", accent: "bg-cyan-500", text: "text-cyan-500" },
+  { bg: "bg-blue-500/20", border: "border-blue-500", accent: "bg-blue-500", text: "text-blue-400", name: "blue" },
+  { bg: "bg-emerald-500/20", border: "border-emerald-500", accent: "bg-emerald-500", text: "text-emerald-400", name: "emerald" },
+  { bg: "bg-violet-500/20", border: "border-violet-500", accent: "bg-violet-500", text: "text-violet-400", name: "violet" },
+  { bg: "bg-amber-500/20", border: "border-amber-500", accent: "bg-amber-500", text: "text-amber-400", name: "amber" },
+  { bg: "bg-rose-500/20", border: "border-rose-500", accent: "bg-rose-500", text: "text-rose-400", name: "rose" },
+  { bg: "bg-cyan-500/20", border: "border-cyan-500", accent: "bg-cyan-500", text: "text-cyan-400", name: "cyan" },
 ];
+
+interface DragState {
+  isDragging: boolean;
+  dragIndex: number | null;
+  dropIndex: number | null;
+}
 
 export const AllMediaTimeline = ({
   channelsWithItems,
   onSelectChannel,
+  onReorderGlobal,
 }: AllMediaTimelineProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [zoom, setZoom] = useState(100);
+  const [dragState, setDragState] = useState<DragState>({
+    isDragging: false,
+    dragIndex: null,
+    dropIndex: null,
+  });
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
 
@@ -141,10 +154,58 @@ export const AllMediaTimeline = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Drag and Drop handlers
+  const handleDragStart = useCallback((e: React.DragEvent, index: number) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', index.toString());
+    setDragState(prev => ({ ...prev, isDragging: true, dragIndex: index }));
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragState.dropIndex !== index) {
+      setDragState(prev => ({ ...prev, dropIndex: index }));
+    }
+  }, [dragState.dropIndex]);
+
+  const handleDragEnd = useCallback(() => {
+    setDragState({ isDragging: false, dragIndex: null, dropIndex: null });
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    const dragIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+    
+    if (dragIndex !== dropIndex && onReorderGlobal) {
+      // Build reorder commands
+      const reorderCommands: { channelId: string; itemId: string; newPosition: number }[] = [];
+      
+      // Get the dragged item
+      const draggedItem = mediaWithPositions[dragIndex];
+      const targetItem = mediaWithPositions[dropIndex];
+      
+      if (draggedItem && targetItem) {
+        // For now, just log - actual reordering would need more complex logic
+        console.log(`Reorder: Move item ${dragIndex} to position ${dropIndex}`);
+        
+        reorderCommands.push({
+          channelId: draggedItem.channel.id,
+          itemId: draggedItem.item.id,
+          newPosition: dropIndex,
+        });
+        
+        onReorderGlobal(reorderCommands);
+      }
+    }
+    
+    handleDragEnd();
+  }, [mediaWithPositions, onReorderGlobal, handleDragEnd]);
+
   // Calculate minimum width per item based on zoom
-  const getItemWidth = (widthPercent: number) => {
-    const baseMinWidth = 80; // minimum width in pixels
-    const scaledWidth = (widthPercent / 100) * (zoom * 8); // Scale based on zoom
+  const getItemWidth = (widthPercent: number, duration: number) => {
+    const baseMinWidth = 100; // minimum width in pixels
+    const scaledWidth = (duration / 8) * (zoom * 1.2); // Scale based on duration and zoom
     return Math.max(baseMinWidth, scaledWidth);
   };
 
@@ -170,7 +231,7 @@ export const AllMediaTimeline = ({
                 <video
                   key={currentMedia.item.id}
                   src={currentMedia.item.media.file_url || ''}
-                  className="max-w-full max-h-[60vh] object-contain"
+                  className="max-w-full max-h-[50vh] object-contain"
                   muted
                   autoPlay={isPlaying}
                 />
@@ -179,7 +240,7 @@ export const AllMediaTimeline = ({
                   key={currentMedia.item.id}
                   src={currentMedia.item.media?.thumbnail_url || currentMedia.item.media?.file_url || ''}
                   alt={currentMedia.item.media?.name || 'Preview'}
-                  className="max-w-full max-h-[60vh] object-contain"
+                  className="max-w-full max-h-[50vh] object-contain"
                 />
               )}
               
@@ -191,8 +252,9 @@ export const AllMediaTimeline = ({
               {/* Media Info Overlay */}
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-[10px] uppercase">
-                    {currentMedia.item.media?.type || 'IMAGE'}
+                  <div className={cn("w-3 h-3 rounded-full", currentMedia.color.accent)} />
+                  <Badge variant="secondary" className={cn("text-[10px] uppercase", currentMedia.color.bg, currentMedia.color.text, "border-0")}>
+                    {currentMedia.channel.name}
                   </Badge>
                   <span className="text-white text-sm font-medium truncate">
                     {currentMedia.item.media?.name}
@@ -249,124 +311,197 @@ export const AllMediaTimeline = ({
         </div>
       </div>
 
-      {/* Timeline Header */}
-      <div className="shrink-0 bg-muted/30 px-4 py-2 flex items-center gap-2">
-        <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-        <span className="text-xs text-muted-foreground">Timeline</span>
-        <span className="text-xs text-muted-foreground">•</span>
-        <span className="text-xs text-muted-foreground">{formatTime(totalMediaDuration)}</span>
-        <span className="text-xs text-muted-foreground">•</span>
-        <span className="text-xs text-muted-foreground">{allMediaItems.length} itens</span>
+      {/* Channel Legend */}
+      <div className="shrink-0 bg-muted/30 px-4 py-2 flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-xs font-medium">{formatTime(totalMediaDuration)}</span>
+          <span className="text-xs text-muted-foreground">•</span>
+          <span className="text-xs text-muted-foreground">{allMediaItems.length} itens</span>
+        </div>
+        <div className="h-4 w-px bg-border" />
+        <div className="flex items-center gap-3">
+          {channelsWithItems.map((channel, index) => {
+            const color = channelColors[index % channelColors.length];
+            const itemCount = channel.items?.length || 0;
+            if (itemCount === 0) return null;
+            
+            return (
+              <button
+                key={channel.id}
+                onClick={() => onSelectChannel(channel)}
+                className={cn(
+                  "flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors",
+                  "hover:bg-muted"
+                )}
+              >
+                <div className={cn("w-2.5 h-2.5 rounded-full", color.accent)} />
+                <span className={cn("text-xs font-medium", color.text)}>{channel.name}</span>
+                <span className="text-[10px] text-muted-foreground">({itemCount})</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Timeline - Horizontal thumbnails with proportional widths */}
+      {/* Timeline - Horizontal thumbnails with drag and drop */}
       <div className="shrink-0 bg-muted/10" ref={timelineRef}>
         <ScrollArea className="w-full">
-          <div className="flex p-3 gap-1.5 min-w-max">
+          <div className="flex p-3 gap-2 min-w-max">
             {mediaWithPositions.map(({ item, channel, channelIndex, duration, widthPercent, globalIndex, color }) => {
               const isActive = currentIndex === globalIndex;
-              const itemWidth = getItemWidth(widthPercent);
+              const isDragging = dragState.dragIndex === globalIndex;
+              const isDropTarget = dragState.dropIndex === globalIndex && dragState.dragIndex !== globalIndex;
+              const itemWidth = getItemWidth(widthPercent, duration);
               
               return (
-                <TooltipProvider key={item.id}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => handleItemClick(globalIndex)}
-                        className={cn(
-                          "shrink-0 rounded-lg overflow-hidden transition-all relative group",
-                          "border-2 hover:border-primary/50",
-                          isActive ? "border-primary ring-2 ring-primary/30" : "border-transparent"
-                        )}
-                        style={{ 
-                          width: itemWidth,
-                          height: 80 
-                        }}
-                      >
-                        {/* Thumbnail */}
-                        <div className="absolute inset-0 bg-muted">
-                          {item.media?.thumbnail_url || item.media?.file_url ? (
-                            item.media.type === 'video' ? (
-                              <video
-                                src={item.media.file_url || ''}
-                                className="w-full h-full object-cover"
-                                muted
-                              />
-                            ) : (
-                              <img
-                                src={item.media.thumbnail_url || item.media.file_url || ''}
-                                alt={item.media.name}
-                                className="w-full h-full object-cover"
-                              />
-                            )
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-muted">
-                              {item.media?.type === 'video' ? (
-                                <Video className="w-6 h-6 text-muted-foreground" />
+                <div
+                  key={item.id}
+                  className="relative"
+                >
+                  {/* Drop indicator left */}
+                  {isDropTarget && dragState.dragIndex !== null && dragState.dragIndex > globalIndex && (
+                    <div className="absolute -left-1 top-0 bottom-0 w-1 bg-primary rounded-full z-10" />
+                  )}
+                  
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, globalIndex)}
+                          onDragOver={(e) => handleDragOver(e, globalIndex)}
+                          onDragEnd={handleDragEnd}
+                          onDrop={(e) => handleDrop(e, globalIndex)}
+                          onClick={() => handleItemClick(globalIndex)}
+                          className={cn(
+                            "shrink-0 rounded-lg overflow-hidden transition-all relative group cursor-grab active:cursor-grabbing",
+                            "border-2",
+                            isActive ? "border-primary ring-2 ring-primary/30" : color.border,
+                            isDragging && "opacity-50 scale-95",
+                            !isDragging && "hover:scale-[1.02]"
+                          )}
+                          style={{ 
+                            width: itemWidth,
+                            height: 100,
+                          }}
+                        >
+                          {/* Channel color bar at top */}
+                          <div className={cn("absolute top-0 left-0 right-0 h-1.5 z-10", color.accent)} />
+                          
+                          {/* Drag handle */}
+                          <div className="absolute top-2 left-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="p-1 rounded bg-black/60">
+                              <GripVertical className="w-3 h-3 text-white" />
+                            </div>
+                          </div>
+                          
+                          {/* Thumbnail */}
+                          <div className="absolute inset-0 bg-muted">
+                            {item.media?.thumbnail_url || item.media?.file_url ? (
+                              item.media.type === 'video' ? (
+                                <video
+                                  src={item.media.file_url || ''}
+                                  className="w-full h-full object-cover"
+                                  muted
+                                />
                               ) : (
-                                <Image className="w-6 h-6 text-muted-foreground" />
-                              )}
+                                <img
+                                  src={item.media.thumbnail_url || item.media.file_url || ''}
+                                  alt={item.media.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              )
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center bg-muted">
+                                {item.media?.type === 'video' ? (
+                                  <Video className="w-8 h-8 text-muted-foreground" />
+                                ) : (
+                                  <Image className="w-8 h-8 text-muted-foreground" />
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Overlay gradient */}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+                          {/* Channel badge */}
+                          <Badge 
+                            className={cn(
+                              "absolute top-3 right-2 text-[9px] px-1.5 py-0.5 h-auto uppercase font-bold border-0",
+                              color.bg, color.text
+                            )}
+                          >
+                            {channel.name}
+                          </Badge>
+
+                          {/* Type badge */}
+                          <div className="absolute top-3 left-8 flex items-center gap-1">
+                            <Badge 
+                              variant="secondary" 
+                              className="text-[8px] px-1 py-0 h-4 uppercase bg-black/60 text-white border-0"
+                            >
+                              {item.media?.type === 'video' ? <Video className="w-2.5 h-2.5" /> : <Image className="w-2.5 h-2.5" />}
+                            </Badge>
+                          </div>
+
+                          {/* Name and duration at bottom */}
+                          <div className="absolute bottom-0 left-0 right-0 p-2">
+                            <p className="text-[11px] text-white font-medium truncate leading-tight mb-0.5">
+                              {item.media?.name}
+                            </p>
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-2.5 h-2.5 text-white/70" />
+                              <span className="text-[10px] text-white/70">{duration}s</span>
+                            </div>
+                          </div>
+
+                          {/* Play indicator for active item */}
+                          {isActive && isPlaying && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                              <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center">
+                                <Play className="w-4 h-4 text-black fill-black ml-0.5" />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Progress bar for active item */}
+                          {isActive && (
+                            <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50">
+                              <div 
+                                className="h-full bg-primary transition-all"
+                                style={{ width: `${(currentTime / duration) * 100}%` }}
+                              />
                             </div>
                           )}
                         </div>
-
-                        {/* Overlay gradient */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-
-                        {/* Channel color indicator */}
-                        <div className={cn("absolute top-0 left-0 right-0 h-1", color.accent)} />
-
-                        {/* Type badge */}
-                        <Badge 
-                          variant="secondary" 
-                          className="absolute top-2 left-2 text-[8px] px-1 py-0 h-4 uppercase bg-black/60 text-white border-0"
-                        >
-                          {item.media?.type === 'video' ? <Video className="w-2.5 h-2.5 mr-0.5" /> : <Image className="w-2.5 h-2.5 mr-0.5" />}
-                          {item.media?.type || 'IMG'}
-                        </Badge>
-
-                        {/* Name and duration at bottom */}
-                        <div className="absolute bottom-0 left-0 right-0 p-1.5">
-                          <p className="text-[10px] text-white font-medium truncate leading-tight">
-                            {item.media?.name}
-                          </p>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs">
+                        <div className="text-xs space-y-1">
+                          <p className="font-medium">{item.media?.name}</p>
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <div className={cn("w-2 h-2 rounded-full", color.accent)} />
+                            <span>{channel.name}</span>
+                            <span>•</span>
+                            <span>{duration}s</span>
+                          </div>
+                          <p className="text-muted-foreground/70">Arraste para reordenar</p>
                         </div>
-
-                        {/* Play indicator for active item */}
-                        {isActive && isPlaying && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                            <div className="w-6 h-6 rounded-full bg-white/90 flex items-center justify-center">
-                              <Play className="w-3 h-3 text-black fill-black ml-0.5" />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Progress bar for active item */}
-                        {isActive && (
-                          <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50">
-                            <div 
-                              className="h-full bg-primary transition-all"
-                              style={{ width: `${(currentTime / duration) * 100}%` }}
-                            />
-                          </div>
-                        )}
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      <div className="text-xs">
-                        <p className="font-medium">{item.media?.name}</p>
-                        <p className="text-muted-foreground">
-                          {duration}s • Canal: {channel.name}
-                        </p>
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  
+                  {/* Drop indicator right */}
+                  {isDropTarget && dragState.dragIndex !== null && dragState.dragIndex < globalIndex && (
+                    <div className="absolute -right-1 top-0 bottom-0 w-1 bg-primary rounded-full z-10" />
+                  )}
+                </div>
               );
             })}
             
             {/* Add button placeholder */}
-            <div className="shrink-0 w-14 h-20 rounded-lg border-2 border-dashed border-muted-foreground/30 flex items-center justify-center text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors cursor-pointer">
+            <div className="shrink-0 w-20 h-[100px] rounded-lg border-2 border-dashed border-muted-foreground/30 flex items-center justify-center text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors cursor-pointer">
               <span className="text-2xl">+</span>
             </div>
           </div>
