@@ -51,14 +51,22 @@ export const ProductDisplay = ({
     ${rgbToRgba(colors.muted, 1)} 100%
   )`;
 
-  // Fundo do lado da imagem - mais claro
-  const rightBackground = colors.isDark 
-    ? `linear-gradient(135deg, ${rgbToRgba(colors.vibrant, 0.3)} 0%, ${rgbToRgba(colors.dominant, 0.2)} 100%)`
-    : `linear-gradient(135deg, ${rgbToRgba(colors.dominant, 0.15)} 0%, ${rgbToRgba(colors.muted, 0.1)} 100%)`;
+  // Fundo do lado da imagem - branco fixo
+  const rightBackground = "white";
 
-  // Cores do texto baseadas na luminância
+  // Cores do texto baseadas na luminância do fundo (lado esquerdo)
   const textColor = colors.isDark ? "text-white" : "text-slate-900";
   const textMuted = colors.isDark ? "text-white/70" : "text-slate-600";
+
+  // Formatar nome do produto: 3 primeiras palavras em bold
+  const formatProductName = (name: string) => {
+    const words = name.split(" ");
+    const boldPart = words.slice(0, 3).join(" ");
+    const restPart = words.slice(3).join(" ");
+    return { boldPart, restPart };
+  };
+
+  const { boldPart, restPart } = formatProductName(product.name);
 
   return (
     <div className="absolute inset-0 flex">
@@ -69,9 +77,10 @@ export const ProductDisplay = ({
       >
         {/* Header com nome */}
         <div className="relative z-10">
-          {/* Nome do produto */}
-          <h1 className={`text-3xl lg:text-4xl xl:text-5xl font-bold ${textColor} leading-tight mb-2`}>
-            {product.name}
+          {/* Nome do produto - 3 primeiras palavras em bold */}
+          <h1 className={`text-3xl lg:text-4xl xl:text-5xl leading-tight mb-2 ${textColor}`}>
+            <span className="font-bold">{boldPart}</span>
+            {restPart && <span className="font-normal"> {restPart}</span>}
           </h1>
           
           {/* Unidade */}
@@ -177,10 +186,9 @@ export const ProductDisplay = ({
         </div>
       </div>
 
-      {/* Lado direito - Imagem do produto */}
+      {/* Lado direito - Imagem do produto (fundo branco) */}
       <div 
-        className="w-1/2 flex items-center justify-center p-8 relative"
-        style={{ background: rightBackground }}
+        className="w-1/2 flex items-center justify-center p-8 relative bg-white"
       >
         {product.image_url ? (
           <img
@@ -199,7 +207,7 @@ export const ProductDisplay = ({
         )}
 
         {/* Indicador de countdown discreto */}
-        <div className="absolute bottom-4 right-4 text-white/30 text-xs">
+        <div className="absolute bottom-4 right-4 text-slate-300 text-xs">
           {countdown}s
         </div>
       </div>
