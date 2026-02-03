@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useOfflinePlayer, CachedPlaylistItem } from "@/hooks/useOfflinePlayer";
+import { useOfflinePlayer, CachedPlaylistItem, CachedMedia } from "@/hooks/useOfflinePlayer";
 import { useProductLookup } from "@/hooks/useProductLookup";
 import { useProductDisplaySettingsBySlug } from "@/hooks/useProductDisplaySettings";
 import { ProductLookupContainer } from "@/components/player/ProductLookupContainer";
@@ -16,13 +16,14 @@ import {
   Minimize,
   Clock,
   Image as ImageIcon,
-  Video
+  Video,
+  Lock
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 
-type PlayerMode = "media" | "product";
+type PlayerMode = "media" | "product" | "blocked" | "override";
 
 const OfflinePlayer = () => {
   const { deviceCode } = useParams<{ deviceCode: string }>();
@@ -208,6 +209,18 @@ const OfflinePlayer = () => {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [toggleFullscreen, syncWithServer, items.length]);
 
+  // Verifica se o dispositivo está bloqueado
+  const isDeviceBlocked = deviceState?.is_blocked === true;
+  
+  // Verifica se há mídia avulsa ativa
+  const hasActiveOverrideMedia = (() => {
+    if (!deviceState?.override_media) return false;
+    const expiresAt = new Date(deviceState.override_media.expires_at);
+    return expiresAt > new Date();
+  })();
+  
+  const overrideMedia = hasActiveOverrideMedia ? deviceState?.override_media : null;
+
   // Tela de loading
   if (isLoading && !deviceState) {
     return (
@@ -215,6 +228,38 @@ const OfflinePlayer = () => {
         <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mb-6" />
         <h1 className="text-2xl font-semibold mb-2">Carregando Player</h1>
         <p className="text-white/60">Dispositivo: {deviceCode}</p>
+      </div>
+    );
+  }
+
+  // TELA DE BLOQUEIO - Prioridade máxima
+  if (isDeviceBlocked) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-950 via-black to-red-950 flex flex-col items-center justify-center text-white p-8">
+        <div className="bg-red-500/20 p-8 rounded-full mb-8 animate-pulse">
+          <Lock className="w-24 h-24 text-red-500" />
+        </div>
+        <h1 className="text-4xl font-bold mb-4 text-red-400">Dispositivo Bloqueado</h1>
+        <p className="text-xl text-white/80 text-center max-w-lg mb-6">
+          {deviceState?.blocked_message || "Este dispositivo foi bloqueado pelo administrador."}
+        </p>
+        <div className="text-white/40 text-sm mt-8 flex items-center gap-2">
+          <Monitor className="w-4 h-4" />
+          <span>{deviceState?.device_name || deviceCode}</span>
+        </div>
+        <p className="text-white/30 text-xs mt-2">
+          Entre em contato com o suporte para mais informações
+        </p>
+        
+        {/* Botão de sincronização escondido para verificar desbloqueio */}
+        <button
+          onClick={syncWithServer}
+          disabled={isSyncing}
+          className="mt-8 flex items-center gap-2 px-4 py-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors text-white/50"
+        >
+          <RefreshCw className={cn("w-4 h-4", isSyncing && "animate-spin")} />
+          {isSyncing ? "Verificando..." : "Verificar status"}
+        </button>
       </div>
     );
   }
@@ -240,8 +285,11 @@ const OfflinePlayer = () => {
     );
   }
 
-  // Sem conteúdo disponível
-  if (!activePlaylist || items.length === 0) {
+  // Se há mídia avulsa ativa, usar ela em vez da playlist
+  const displayOverrideMedia = hasActiveOverrideMedia && overrideMedia;
+
+  // Sem conteúdo disponível (apenas se não tiver mídia avulsa)
+  if (!displayOverrideMedia && (!activePlaylist || items.length === 0)) {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white">
         <Monitor className="w-20 h-20 mb-6 text-white/30" />
@@ -270,9 +318,17 @@ const OfflinePlayer = () => {
     );
   }
 
-  const mediaUrl = currentMedia?.blob_url || currentMedia?.file_url || "";
-  const duration = currentItem?.duration_override || currentMedia?.duration || 10;
-  const progressPercent = ((duration * 1000 - timeRemaining) / (duration * 1000)) * 100;
+  // Mídia a exibir - prioridade para mídia avulsa
+  const displayMedia = displayOverrideMedia ? overrideMedia : currentMedia;
+  const displayMediaUrl = displayOverrideMedia 
+    ? (overrideMedia?.blob_url || overrideMedia?.file_url || "")
+    : (currentMedia?.blob_url || currentMedia?.file_url || "");
+  const displayDuration = displayOverrideMedia 
+    ? (overrideMedia?.duration || 10)
+    : (currentItem?.duration_override || currentMedia?.duration || 10);
+  const progressPercent = displayOverrideMedia 
+    ? 0 // Sem barra de progresso para mídia avulsa
+    : ((displayDuration * 1000 - timeRemaining) / (displayDuration * 1000)) * 100;
 
   return (
     <div className="relative min-h-screen bg-black overflow-hidden select-none">
@@ -297,38 +353,54 @@ const OfflinePlayer = () => {
         />
       )}
 
+      {/* Indicador de Mídia Avulsa */}
+      {displayOverrideMedia && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-orange-500/90 backdrop-blur-sm rounded-full px-4 py-2">
+          <AlertCircle className="w-4 h-4 text-white" />
+          <span className="text-white text-sm font-medium">Mídia Avulsa</span>
+        </div>
+      )}
+
       {/* Container de Mídias - visível apenas quando em modo mídia */}
       <div className={cn(
         "relative w-full h-screen transition-opacity duration-300",
         playerMode === "product" ? "opacity-0 pointer-events-none" : "opacity-100"
       )}>
-        {currentMedia?.type === "video" ? (
+        {displayMedia?.type === "video" ? (
           <video
             ref={videoRef}
-            src={mediaUrl}
+            src={displayMediaUrl}
             className="w-full h-full object-contain"
             autoPlay
             muted
+            loop={!!displayOverrideMedia} // Loop para mídia avulsa
             playsInline
-            onEnded={() => setCurrentIndex((prev) => (prev + 1) % items.length)}
+            onEnded={() => {
+              if (!displayOverrideMedia) {
+                setCurrentIndex((prev) => (prev + 1) % items.length);
+              }
+            }}
           />
         ) : (
           <img
-            src={mediaUrl}
-            alt={currentMedia?.name || "Mídia"}
+            src={displayMediaUrl}
+            alt={displayMedia?.name || "Mídia"}
             className="w-full h-full object-contain transition-opacity duration-500"
             onError={(e) => {
               // Fallback para URL original se blob falhar
-              if (currentMedia?.file_url && (e.target as HTMLImageElement).src !== currentMedia.file_url) {
-                (e.target as HTMLImageElement).src = currentMedia.file_url;
+              const fallbackUrl = displayOverrideMedia 
+                ? overrideMedia?.file_url 
+                : currentMedia?.file_url;
+              if (fallbackUrl && (e.target as HTMLImageElement).src !== fallbackUrl) {
+                (e.target as HTMLImageElement).src = fallbackUrl;
               }
             }}
           />
         )}
       </div>
 
-      {/* Barra de Progresso - só visível no modo mídia */}
-      {playerMode === "media" && (
+      {/* Barra de Progresso - só visível no modo mídia normal (não avulsa) */}
+      {playerMode === "media" && !displayOverrideMedia && (
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
           <div
             className="h-full bg-primary transition-all duration-100 ease-linear"
@@ -413,23 +485,29 @@ const OfflinePlayer = () => {
         )}
       >
         <div className="flex items-center gap-3">
-          {currentMedia?.type === "video" ? (
+          {displayMedia?.type === "video" ? (
             <Video className="w-5 h-5 text-primary" />
           ) : (
             <ImageIcon className="w-5 h-5 text-primary" />
           )}
           <div>
-            <p className="text-white font-medium text-sm">{currentMedia?.name}</p>
-            <p className="text-white/60 text-xs">
-              {currentIndex + 1} de {items.length} • {Math.ceil(timeRemaining / 1000)}s restantes
-            </p>
+            <p className="text-white font-medium text-sm">{displayMedia?.name}</p>
+            {displayOverrideMedia ? (
+              <p className="text-orange-400 text-xs">
+                Mídia avulsa • Expira: {new Date(overrideMedia!.expires_at).toLocaleTimeString("pt-BR")}
+              </p>
+            ) : (
+              <p className="text-white/60 text-xs">
+                {currentIndex + 1} de {items.length} • {Math.ceil(timeRemaining / 1000)}s restantes
+              </p>
+            )}
           </div>
         </div>
       </div>
       )}
 
-      {/* Indicadores de mídia */}
-      {playerMode === "media" && (
+      {/* Indicadores de mídia - esconde durante mídia avulsa */}
+      {playerMode === "media" && !displayOverrideMedia && (
         <div
           className={cn(
             "absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-1.5 transition-opacity duration-300",
