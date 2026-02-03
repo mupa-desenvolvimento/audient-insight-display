@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface ProductData {
@@ -25,29 +25,78 @@ interface UseProductLookupOptions {
   onLookupEnd?: () => void;
 }
 
+// Cache local para respostas rápidas
+const localCache = new Map<string, { product: ProductData; timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
 export const useProductLookup = ({ deviceCode, onLookupStart, onLookupEnd }: UseProductLookupOptions) => {
   const [state, setState] = useState<ProductLookupState>({
     product: null,
     isLoading: false,
     error: null
   });
+  
+  // Previne lookups duplicados
+  const pendingLookupRef = useRef<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const lookupProduct = useCallback(async (ean: string) => {
+    const trimmedEan = ean.trim();
+    
     if (!deviceCode) {
       console.error("[useProductLookup] deviceCode não definido");
       setState({ product: null, isLoading: false, error: "Dispositivo não configurado" });
       return;
     }
 
-    console.log("[useProductLookup] Iniciando consulta para EAN:", ean);
+    // Evita lookup duplicado para mesmo EAN
+    if (pendingLookupRef.current === trimmedEan) {
+      console.log("[useProductLookup] Lookup duplicado ignorado:", trimmedEan);
+      return;
+    }
+
+    // Cancela lookup anterior se houver
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Verifica cache local primeiro (resposta instantânea)
+    const cacheKey = `${deviceCode}:${trimmedEan}`;
+    const cached = localCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      console.log("[useProductLookup] Cache hit:", trimmedEan);
+      setState({ product: cached.product, isLoading: false, error: null });
+      onLookupStart?.();
+      // Delay mínimo para UX
+      setTimeout(() => onLookupEnd?.(), 100);
+      return;
+    }
+
+    console.log("[useProductLookup] Iniciando consulta para EAN:", trimmedEan);
+    
+    pendingLookupRef.current = trimmedEan;
+    abortControllerRef.current = new AbortController();
     
     setState({ product: null, isLoading: true, error: null });
     onLookupStart?.();
 
+    const startTime = performance.now();
+
     try {
       const { data, error } = await supabase.functions.invoke("product-lookup", {
-        body: { device_code: deviceCode, ean }
+        body: { device_code: deviceCode, ean: trimmedEan }
       });
+
+      const elapsed = Math.round(performance.now() - startTime);
+      console.log(`[useProductLookup] Resposta em ${elapsed}ms`);
+
+      // Verifica se foi cancelado
+      if (pendingLookupRef.current !== trimmedEan) {
+        console.log("[useProductLookup] Lookup cancelado (outro em andamento)");
+        return;
+      }
+
+      pendingLookupRef.current = null;
 
       if (error) {
         console.error("[useProductLookup] Erro na chamada:", error);
@@ -72,6 +121,13 @@ export const useProductLookup = ({ deviceCode, onLookupStart, onLookupEnd }: Use
       }
 
       console.log("[useProductLookup] Produto encontrado:", data.product);
+      
+      // Salva no cache local
+      localCache.set(cacheKey, { 
+        product: data.product, 
+        timestamp: Date.now() 
+      });
+      
       setState({ 
         product: data.product, 
         isLoading: false, 
@@ -79,7 +135,13 @@ export const useProductLookup = ({ deviceCode, onLookupStart, onLookupEnd }: Use
       });
       onLookupEnd?.();
     } catch (err) {
+      // Ignora erros de abort
+      if (err instanceof Error && err.name === 'AbortError') {
+        return;
+      }
+      
       console.error("[useProductLookup] Erro inesperado:", err);
+      pendingLookupRef.current = null;
       setState({ 
         product: null, 
         isLoading: false, 
@@ -90,12 +152,28 @@ export const useProductLookup = ({ deviceCode, onLookupStart, onLookupEnd }: Use
   }, [deviceCode, onLookupStart, onLookupEnd]);
 
   const clearProduct = useCallback(() => {
+    pendingLookupRef.current = null;
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     setState({ product: null, isLoading: false, error: null });
+  }, []);
+
+  // Limpa cache expirado periodicamente
+  const clearExpiredCache = useCallback(() => {
+    const now = Date.now();
+    for (const [key, value] of localCache.entries()) {
+      if (now - value.timestamp > CACHE_TTL) {
+        localCache.delete(key);
+      }
+    }
   }, []);
 
   return {
     ...state,
     lookupProduct,
-    clearProduct
+    clearProduct,
+    clearExpiredCache
   };
 };

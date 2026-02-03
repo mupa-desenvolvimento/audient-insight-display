@@ -4,13 +4,18 @@ import { cn } from "@/lib/utils";
 
 const RESET_CODE = "050223";
 
+// Configurações otimizadas para WebView/Kodular
+const SCANNER_CHAR_THRESHOLD = 30; // ms entre caracteres para detectar scanner
+const AUTO_SUBMIT_DELAY = 50; // ms após último caractere para submeter automaticamente
+const VALID_EAN_LENGTHS = [8, 12, 13, 14];
+
 interface EanInputProps {
   onSubmit: (ean: string) => void;
   isVisible: boolean;
   disabled?: boolean;
   onFocus?: () => void;
   onReset?: () => void;
-  alwaysListenForScanner?: boolean; // Permite capturar scanner mesmo quando invisível
+  alwaysListenForScanner?: boolean;
 }
 
 export const EanInput = ({ 
@@ -26,16 +31,25 @@ export const EanInput = ({
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const hiddenInputRef = useRef<HTMLInputElement>(null);
+  
+  // Refs para detecção de scanner e auto-submit
+  const lastKeyTimeRef = useRef<number>(0);
+  const isScannerInputRef = useRef<boolean>(false);
+  const autoSubmitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const bufferRef = useRef<string>("");
 
-  // Foca no input invisível quando as mídias estão visíveis OU quando alwaysListenForScanner está ativo
+  // Foca no input quando mídias visíveis ou alwaysListenForScanner ativo
   useEffect(() => {
     const shouldFocus = (isVisible || alwaysListenForScanner) && !disabled && hiddenInputRef.current;
     if (shouldFocus) {
-      hiddenInputRef.current?.focus();
+      // Delay para garantir que WebView está pronto
+      setTimeout(() => {
+        hiddenInputRef.current?.focus();
+      }, 100);
     }
   }, [isVisible, disabled, alwaysListenForScanner]);
 
-  // Refoca periodicamente quando idle - também quando alwaysListenForScanner ativo
+  // Refoca agressivamente - crítico para WebViews
   useEffect(() => {
     const shouldListen = isVisible || alwaysListenForScanner;
     if (!shouldListen || disabled) return;
@@ -44,20 +58,36 @@ export const EanInput = ({
       if (hiddenInputRef.current && document.activeElement !== hiddenInputRef.current) {
         hiddenInputRef.current.focus();
       }
-    }, 500); // Refoca a cada 500ms para resposta rápida
+    }, 200); // Mais agressivo: 200ms
 
     return () => clearInterval(interval);
   }, [isVisible, disabled, alwaysListenForScanner]);
 
+  // Limpa timeout ao desmontar
+  useEffect(() => {
+    return () => {
+      if (autoSubmitTimeoutRef.current) {
+        clearTimeout(autoSubmitTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleSubmit = useCallback((eanValue: string) => {
     const trimmed = eanValue.trim();
     if (!trimmed) return;
+
+    // Limpa qualquer timeout pendente
+    if (autoSubmitTimeoutRef.current) {
+      clearTimeout(autoSubmitTimeoutRef.current);
+      autoSubmitTimeoutRef.current = null;
+    }
 
     // Verifica código secreto de reset
     if (trimmed === RESET_CODE) {
       console.log("[EanInput] Código de reset detectado");
       setShowResetConfirm(true);
       setValue("");
+      bufferRef.current = "";
       return;
     }
 
@@ -67,8 +97,7 @@ export const EanInput = ({
       return;
     }
 
-    const validLengths = [8, 12, 13, 14];
-    if (!validLengths.includes(trimmed.length)) {
+    if (!VALID_EAN_LENGTHS.includes(trimmed.length)) {
       console.log("[EanInput] EAN com tamanho inválido:", trimmed.length);
       return;
     }
@@ -76,22 +105,25 @@ export const EanInput = ({
     console.log("[EanInput] EAN válido, submetendo:", trimmed);
     onSubmit(trimmed);
     setValue("");
+    bufferRef.current = "";
     setShowManualInput(false);
+    isScannerInputRef.current = false;
   }, [onSubmit]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleSubmit(value);
+  // Handler otimizado para WebViews - usa beforeinput/input events
+  const handleInput = useCallback((e: React.FormEvent<HTMLInputElement>) => {
+    const input = e.currentTarget;
+    const newValue = input.value;
+    const now = Date.now();
+    const timeSinceLastKey = now - lastKeyTimeRef.current;
+    
+    // Detecta se é scanner (caracteres muito rápidos)
+    if (timeSinceLastKey < SCANNER_CHAR_THRESHOLD && newValue.length > 1) {
+      isScannerInputRef.current = true;
     }
-    if (e.key === "Escape") {
-      setValue("");
-      setShowManualInput(false);
-    }
-  };
-
-  const handleHiddenInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
+    
+    lastKeyTimeRef.current = now;
+    bufferRef.current = newValue;
     setValue(newValue);
 
     // Verifica código de reset
@@ -100,19 +132,85 @@ export const EanInput = ({
       return;
     }
 
-    // Se o leitor de código de barras inserir rapidamente (scanner)
-    // geralmente termina com Enter, mas alguns modelos só inserem os dígitos
-    // Então verificamos se o tamanho é válido para código de barras
-    const validLengths = [8, 12, 13, 14];
-    if (validLengths.includes(newValue.length) && /^\d+$/.test(newValue)) {
-      // Pequeno delay para permitir mais dígitos caso o scanner seja lento
-      setTimeout(() => {
-        if (newValue === e.target.value) {
+    // Limpa timeout anterior
+    if (autoSubmitTimeoutRef.current) {
+      clearTimeout(autoSubmitTimeoutRef.current);
+    }
+
+    // Para scanners ou códigos válidos, auto-submete rapidamente
+    if (/^\d+$/.test(newValue) && VALID_EAN_LENGTHS.includes(newValue.length)) {
+      // Auto-submit mais rápido para scanner, um pouco mais lento para digitação manual
+      const delay = isScannerInputRef.current ? AUTO_SUBMIT_DELAY : 150;
+      
+      autoSubmitTimeoutRef.current = setTimeout(() => {
+        // Verifica se o valor não mudou
+        if (bufferRef.current === newValue) {
+          console.log("[EanInput] Auto-submit após", delay, "ms");
           handleSubmit(newValue);
         }
-      }, 100);
+      }, delay);
     }
-  };
+  }, [handleSubmit]);
+
+  // Handler para teclas - backup para Enter
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Captura Enter, keyCode 13, ou qualquer variação
+    if (e.key === "Enter" || e.keyCode === 13 || e.which === 13) {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Limpa timeout de auto-submit
+      if (autoSubmitTimeoutRef.current) {
+        clearTimeout(autoSubmitTimeoutRef.current);
+        autoSubmitTimeoutRef.current = null;
+      }
+      
+      console.log("[EanInput] Enter detectado, valor:", value);
+      if (value.trim()) {
+        handleSubmit(value);
+      }
+      return;
+    }
+    
+    if (e.key === "Escape") {
+      setValue("");
+      bufferRef.current = "";
+      setShowManualInput(false);
+    }
+  }, [value, handleSubmit]);
+
+  // Handler específico para eventos nativos (WebView)
+  useEffect(() => {
+    const input = hiddenInputRef.current;
+    if (!input) return;
+
+    const handleNativeKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.keyCode === 13 || e.which === 13) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (autoSubmitTimeoutRef.current) {
+          clearTimeout(autoSubmitTimeoutRef.current);
+          autoSubmitTimeoutRef.current = null;
+        }
+        
+        const currentValue = input.value.trim();
+        console.log("[EanInput] Native Enter, valor:", currentValue);
+        if (currentValue) {
+          handleSubmit(currentValue);
+        }
+      }
+    };
+
+    // Adiciona listener nativo com capture para pegar antes do React
+    input.addEventListener('keydown', handleNativeKeyDown, { capture: true });
+    input.addEventListener('keypress', handleNativeKeyDown, { capture: true });
+    
+    return () => {
+      input.removeEventListener('keydown', handleNativeKeyDown, { capture: true });
+      input.removeEventListener('keypress', handleNativeKeyDown, { capture: true });
+    };
+  }, [handleSubmit]);
 
   const handleFocus = () => {
     onFocus?.();
@@ -132,29 +230,45 @@ export const EanInput = ({
   // Só retorna null se não estivermos ouvindo por scanner
   if (!isVisible && !alwaysListenForScanner) return null;
 
-  // Se não estiver visível mas estiver ouvindo, apenas mostra o input invisível
   const showUI = isVisible;
 
   return (
     <>
-      {/* Input invisível para leitor de código de barras */}
+      {/* Input invisível para leitor de código de barras - otimizado para WebView */}
       <input
         ref={hiddenInputRef}
         type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
         value={value}
-        onChange={handleHiddenInput}
+        onInput={handleInput}
+        onChange={(e) => setValue(e.target.value)} // Fallback
         onKeyDown={handleKeyDown}
+        onKeyPress={(e) => {
+          // Fallback para WebViews que usam keypress
+          if (e.key === "Enter" || e.charCode === 13) {
+            e.preventDefault();
+            if (value.trim()) handleSubmit(value);
+          }
+        }}
         onFocus={handleFocus}
         disabled={disabled || showResetConfirm}
         className="absolute opacity-0 w-0 h-0 pointer-events-auto"
+        style={{ 
+          position: 'absolute',
+          left: '-9999px',
+          width: '1px',
+          height: '1px'
+        }}
         aria-label="Scanner de código de barras"
         autoComplete="off"
         autoCapitalize="off"
         autoCorrect="off"
         spellCheck={false}
+        enterKeyHint="go"
       />
 
-      {/* Modal de confirmação de reset - só mostra quando UI visível */}
+      {/* Modal de confirmação de reset */}
       {showUI && showResetConfirm && (
         <div className="absolute inset-0 bg-black/90 flex items-center justify-center z-50">
           <div className="bg-card border border-border rounded-xl p-8 max-w-md text-center shadow-2xl">
@@ -184,7 +298,7 @@ export const EanInput = ({
         </div>
       )}
 
-      {/* Indicador de scanner ativo - só mostra quando UI visível */}
+      {/* Indicador de scanner ativo */}
       {showUI && (
         <div
           className={cn(
@@ -202,7 +316,7 @@ export const EanInput = ({
         </div>
       )}
 
-      {/* Input manual visível - só mostra quando UI visível */}
+      {/* Input manual visível */}
       {showUI && showManualInput && !showResetConfirm && (
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/80 backdrop-blur-sm rounded-xl p-2 shadow-2xl">
           <div className="relative">
@@ -210,6 +324,8 @@ export const EanInput = ({
             <input
               ref={inputRef}
               type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={value}
               onChange={(e) => setValue(e.target.value.replace(/\D/g, ""))}
               onKeyDown={handleKeyDown}
@@ -217,6 +333,7 @@ export const EanInput = ({
               className="w-64 pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder:text-white/40 focus:outline-none focus:border-primary"
               autoFocus
               maxLength={14}
+              enterKeyHint="go"
             />
           </div>
           
@@ -231,6 +348,7 @@ export const EanInput = ({
           <button
             onClick={() => {
               setValue("");
+              bufferRef.current = "";
               setShowManualInput(false);
               hiddenInputRef.current?.focus();
             }}
