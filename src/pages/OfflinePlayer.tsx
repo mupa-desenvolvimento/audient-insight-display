@@ -271,6 +271,15 @@ const OfflinePlayer = () => {
 
   return (
     <div className="relative min-h-screen bg-black overflow-hidden select-none">
+      {/* Input EAN - SEMPRE ativo para capturar scanner, mesmo durante exibição do produto */}
+      <EanInput
+        isVisible={playerMode === "media"}
+        onSubmit={handleEanSubmit}
+        disabled={false}
+        onReset={handleReset}
+        alwaysListenForScanner={true}
+      />
+
       {/* Container de Produto - sobrepõe as mídias quando ativo */}
       {playerMode === "product" && (
         <ProductLookupContainer
@@ -310,14 +319,6 @@ const OfflinePlayer = () => {
             }}
           />
         )}
-
-        {/* Input EAN - visível apenas no modo mídia */}
-        <EanInput
-          isVisible={playerMode === "media"}
-          onSubmit={handleEanSubmit}
-          disabled={isProductLoading}
-          onReset={handleReset}
-        />
       </div>
 
       {/* Barra de Progresso - só visível no modo mídia */}
