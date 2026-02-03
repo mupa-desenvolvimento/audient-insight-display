@@ -14,11 +14,13 @@ import {
   Layers,
   Building2,
   Plug2,
+  Palette,
 } from "lucide-react";
 import logoHorizontal from "@/assets/logo_horizontal.svg";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
+import { useUserCompany } from "@/hooks/useUserCompany";
 import { Button } from "@/components/ui/button";
 import {
   Sidebar,
@@ -56,6 +58,7 @@ const superAdminItems = [
 const AppSidebar = () => {
   const { user, signOut } = useAuth();
   const { isSuperAdmin } = useSuperAdmin();
+  const { company } = useUserCompany();
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
@@ -100,6 +103,36 @@ const AppSidebar = () => {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Tenant Admin Section - Display Config */}
+        {company && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-xs font-medium text-muted-foreground px-3 py-2">
+              CONFIGURAÇÕES DA EMPRESA
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <NavLink
+                      to={`/admin/companies/${company.id}/display-config`}
+                      className={({ isActive }) =>
+                        `flex items-center space-x-3 px-3 py-2 rounded-lg transition-all duration-200 ${
+                          isActive
+                            ? "bg-primary text-primary-foreground shadow-md"
+                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        }`
+                      }
+                    >
+                      <Palette className="w-4 h-4" />
+                      <span className="font-medium">Tela de Consulta</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         {/* Super Admin Section */}
         {isSuperAdmin && (
