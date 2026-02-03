@@ -10,34 +10,44 @@ interface EanInputProps {
   disabled?: boolean;
   onFocus?: () => void;
   onReset?: () => void;
+  alwaysListenForScanner?: boolean; // Permite capturar scanner mesmo quando invisível
 }
 
-export const EanInput = ({ onSubmit, isVisible, disabled, onFocus, onReset }: EanInputProps) => {
+export const EanInput = ({ 
+  onSubmit, 
+  isVisible, 
+  disabled, 
+  onFocus, 
+  onReset,
+  alwaysListenForScanner = false 
+}: EanInputProps) => {
   const [value, setValue] = useState("");
   const [showManualInput, setShowManualInput] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const hiddenInputRef = useRef<HTMLInputElement>(null);
 
-  // Foca no input invisível quando as mídias estão visíveis
+  // Foca no input invisível quando as mídias estão visíveis OU quando alwaysListenForScanner está ativo
   useEffect(() => {
-    if (isVisible && !disabled && hiddenInputRef.current) {
-      hiddenInputRef.current.focus();
+    const shouldFocus = (isVisible || alwaysListenForScanner) && !disabled && hiddenInputRef.current;
+    if (shouldFocus) {
+      hiddenInputRef.current?.focus();
     }
-  }, [isVisible, disabled]);
+  }, [isVisible, disabled, alwaysListenForScanner]);
 
-  // Refoca periodicamente quando idle
+  // Refoca periodicamente quando idle - também quando alwaysListenForScanner ativo
   useEffect(() => {
-    if (!isVisible || disabled) return;
+    const shouldListen = isVisible || alwaysListenForScanner;
+    if (!shouldListen || disabled) return;
 
     const interval = setInterval(() => {
       if (hiddenInputRef.current && document.activeElement !== hiddenInputRef.current) {
         hiddenInputRef.current.focus();
       }
-    }, 1000);
+    }, 500); // Refoca a cada 500ms para resposta rápida
 
     return () => clearInterval(interval);
-  }, [isVisible, disabled]);
+  }, [isVisible, disabled, alwaysListenForScanner]);
 
   const handleSubmit = useCallback((eanValue: string) => {
     const trimmed = eanValue.trim();
@@ -119,7 +129,11 @@ export const EanInput = ({ onSubmit, isVisible, disabled, onFocus, onReset }: Ea
     hiddenInputRef.current?.focus();
   };
 
-  if (!isVisible) return null;
+  // Só retorna null se não estivermos ouvindo por scanner
+  if (!isVisible && !alwaysListenForScanner) return null;
+
+  // Se não estiver visível mas estiver ouvindo, apenas mostra o input invisível
+  const showUI = isVisible;
 
   return (
     <>
@@ -140,8 +154,8 @@ export const EanInput = ({ onSubmit, isVisible, disabled, onFocus, onReset }: Ea
         spellCheck={false}
       />
 
-      {/* Modal de confirmação de reset */}
-      {showResetConfirm && (
+      {/* Modal de confirmação de reset - só mostra quando UI visível */}
+      {showUI && showResetConfirm && (
         <div className="absolute inset-0 bg-black/90 flex items-center justify-center z-50">
           <div className="bg-card border border-border rounded-xl p-8 max-w-md text-center shadow-2xl">
             <div className="w-16 h-16 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-4">
@@ -170,24 +184,26 @@ export const EanInput = ({ onSubmit, isVisible, disabled, onFocus, onReset }: Ea
         </div>
       )}
 
-      {/* Indicador de scanner ativo */}
-      <div
-        className={cn(
-          "absolute bottom-6 left-1/2 -translate-x-1/2 transition-all duration-300",
-          showManualInput || showResetConfirm ? "opacity-0 pointer-events-none" : "opacity-100"
-        )}
-      >
-        <button
-          onClick={() => setShowManualInput(true)}
-          className="flex items-center gap-3 px-6 py-3 bg-black/60 backdrop-blur-sm rounded-full text-white/80 hover:text-white hover:bg-black/70 transition-colors"
+      {/* Indicador de scanner ativo - só mostra quando UI visível */}
+      {showUI && (
+        <div
+          className={cn(
+            "absolute bottom-6 left-1/2 -translate-x-1/2 transition-all duration-300",
+            showManualInput || showResetConfirm ? "opacity-0 pointer-events-none" : "opacity-100"
+          )}
         >
-          <Barcode className="w-5 h-5 animate-pulse" />
-          <span className="text-sm">Leia ou digite o código de barras</span>
-        </button>
-      </div>
+          <button
+            onClick={() => setShowManualInput(true)}
+            className="flex items-center gap-3 px-6 py-3 bg-black/60 backdrop-blur-sm rounded-full text-white/80 hover:text-white hover:bg-black/70 transition-colors"
+          >
+            <Barcode className="w-5 h-5 animate-pulse" />
+            <span className="text-sm">Leia ou digite o código de barras</span>
+          </button>
+        </div>
+      )}
 
-      {/* Input manual visível */}
-      {showManualInput && !showResetConfirm && (
+      {/* Input manual visível - só mostra quando UI visível */}
+      {showUI && showManualInput && !showResetConfirm && (
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/80 backdrop-blur-sm rounded-xl p-2 shadow-2xl">
           <div className="relative">
             <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />

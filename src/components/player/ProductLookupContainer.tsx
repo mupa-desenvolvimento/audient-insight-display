@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
-import { cn } from "@/lib/utils";
-import { AlertCircle, Tag, ArrowLeft, Package, Loader2 } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { AlertCircle, Package, Loader2 } from "lucide-react";
+import { extractColors, rgbToString, rgbToRgba, type ExtractedColors } from "@/lib/colorExtractor";
+import { ProductDisplay } from "./ProductDisplay";
 
 interface ProductData {
   ean: string;
@@ -19,18 +20,49 @@ interface ProductLookupContainerProps {
   isLoading: boolean;
   error: string | null;
   onDismiss: () => void;
-  timeout?: number; // em segundos
+  timeout?: number;
+  inputRef?: React.RefObject<HTMLInputElement>;
 }
+
+const defaultColors: ExtractedColors = {
+  dominant: { r: 30, g: 58, b: 95 },
+  vibrant: { r: 59, g: 130, b: 246 },
+  muted: { r: 15, g: 23, b: 42 },
+  isDark: true,
+};
 
 export const ProductLookupContainer = ({
   product,
   isLoading,
   error,
   onDismiss,
-  timeout = 15
+  timeout = 15,
+  inputRef
 }: ProductLookupContainerProps) => {
   const [countdown, setCountdown] = useState(timeout);
-  const [imageError, setImageError] = useState(false);
+  const [colors, setColors] = useState<ExtractedColors>(defaultColors);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const hiddenInputRef = useRef<HTMLInputElement>(null);
+  const effectiveInputRef = inputRef || hiddenInputRef;
+
+  // Foca no input quando produto é carregado
+  useEffect(() => {
+    if (product && effectiveInputRef.current) {
+      effectiveInputRef.current.focus();
+    }
+  }, [product, effectiveInputRef]);
+
+  // Extrair cores quando produto muda
+  useEffect(() => {
+    if (product?.image_url) {
+      setImageLoaded(false);
+      extractColors(product.image_url).then((extractedColors) => {
+        setColors(extractedColors);
+      });
+    } else {
+      setColors(defaultColors);
+    }
+  }, [product?.image_url]);
 
   // Countdown para retorno automático
   useEffect(() => {
@@ -57,16 +89,7 @@ export const ProductLookupContainer = ({
   // Reset countdown quando produto muda
   useEffect(() => {
     setCountdown(timeout);
-    setImageError(false);
   }, [product?.ean, timeout]);
-
-  // Formatar preço
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(price);
-  };
 
   // Estado de carregamento
   if (isLoading) {
@@ -93,17 +116,18 @@ export const ProductLookupContainer = ({
           <p className="text-white/70 text-xl mb-8">{error}</p>
           
           <div className="flex flex-col items-center gap-4">
-            <button
-              onClick={onDismiss}
-              className="flex items-center gap-3 px-8 py-4 bg-white/10 hover:bg-white/20 rounded-xl text-white text-lg transition-colors"
-            >
-              <ArrowLeft className="w-6 h-6" />
-              Voltar às Mídias
-            </button>
             <p className="text-white/40 text-sm">
               Retornando automaticamente em {countdown}s
             </p>
           </div>
+        </div>
+        
+        {/* Barra de progresso */}
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
+          <div
+            className="h-full bg-red-500 transition-all duration-1000 ease-linear"
+            style={{ width: `${(countdown / timeout) * 100}%` }}
+          />
         </div>
       </div>
     );
@@ -112,118 +136,19 @@ export const ProductLookupContainer = ({
   // Estado de produto encontrado
   if (product) {
     return (
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-stretch">
-        {/* Lado esquerdo - Imagem */}
-        <div className="flex-1 flex items-center justify-center p-8 bg-white/5">
-          {product.image_url && !imageError ? (
-            <img
-              src={product.image_url}
-              alt={product.name}
-              className="max-w-full max-h-[80vh] object-contain rounded-xl shadow-2xl"
-              onError={() => setImageError(true)}
-            />
-          ) : (
-            <div className="w-80 h-80 bg-white/10 rounded-xl flex items-center justify-center">
-              <Package className="w-32 h-32 text-white/30" />
-            </div>
-          )}
-        </div>
-
-        {/* Lado direito - Informações */}
-        <div className="flex-1 flex flex-col justify-center p-12">
-          {/* Tag de oferta */}
-          {product.is_offer && (
-            <div className="flex items-center gap-2 mb-4">
-              <span className="inline-flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-full text-lg font-bold animate-pulse">
-                <Tag className="w-5 h-5" />
-                OFERTA
-              </span>
-              {product.savings_percent && (
-                <span className="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-full text-lg font-bold">
-                  -{product.savings_percent}%
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Nome do produto */}
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-6 leading-tight">
-            {product.name}
-          </h1>
-
-          {/* EAN */}
-          <p className="text-white/50 text-lg mb-8 font-mono">
-            EAN: {product.ean}
-          </p>
-
-          {/* Preços */}
-          <div className="mb-8">
-            {product.is_offer && product.original_price && (
-              <div className="flex items-center gap-4 mb-2">
-                <span className="text-white/50 text-2xl">De:</span>
-                <span className="text-white/50 text-3xl line-through">
-                  {formatPrice(product.original_price)}
-                </span>
-              </div>
-            )}
-            
-            <div className="flex items-center gap-4">
-              <span className={cn(
-                "text-2xl",
-                product.is_offer ? "text-green-400" : "text-white/50"
-              )}>
-                {product.is_offer ? "Por:" : "Preço:"}
-              </span>
-              <span className={cn(
-                "font-bold",
-                product.is_offer 
-                  ? "text-6xl md:text-7xl text-green-400" 
-                  : "text-5xl md:text-6xl text-white"
-              )}>
-                {formatPrice(product.current_price)}
-              </span>
-            </div>
-
-            {/* Unidade */}
-            <p className="text-white/40 text-xl mt-2">
-              {product.unit}
-            </p>
-          </div>
-
-          {/* Economia */}
-          {product.is_offer && product.original_price && product.savings_percent && (
-            <div className="bg-green-500/20 border border-green-500/30 rounded-xl p-6 mb-8">
-              <p className="text-green-400 text-2xl font-semibold">
-                🎉 Você economiza {formatPrice(product.original_price - product.current_price)}!
-              </p>
-            </div>
-          )}
-
-          {/* Countdown */}
-          <div className="flex items-center gap-4 text-white/40">
-            <button
-              onClick={onDismiss}
-              className="flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              Voltar
-            </button>
-            <span className="text-sm">
-              Retornando em {countdown}s
-            </span>
-          </div>
-        </div>
-
-        {/* Barra de progresso do countdown */}
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
-          <div
-            className="h-full bg-primary transition-all duration-1000 ease-linear"
-            style={{ width: `${(countdown / timeout) * 100}%` }}
-          />
-        </div>
-      </div>
+      <ProductDisplay
+        product={product}
+        colors={colors}
+        countdown={countdown}
+        timeout={timeout}
+        onImageLoad={() => setImageLoaded(true)}
+        imageLoaded={imageLoaded}
+      />
     );
   }
 
   return null;
 };
+
+// Re-export types
+export type { ProductData };
