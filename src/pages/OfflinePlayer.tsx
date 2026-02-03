@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useOfflinePlayer, CachedPlaylistItem } from "@/hooks/useOfflinePlayer";
 import { useProductLookup } from "@/hooks/useProductLookup";
+import { useProductDisplaySettingsBySlug } from "@/hooks/useProductDisplaySettings";
 import { ProductLookupContainer } from "@/components/player/ProductLookupContainer";
 import { EanInput } from "@/components/player/EanInput";
 import { 
@@ -68,6 +69,10 @@ const OfflinePlayer = () => {
       }
     }
   });
+
+  // Buscar configurações de display da empresa
+  // TODO: Pegar o slug da empresa do dispositivo quando disponível
+  const { data: displaySettings } = useProductDisplaySettingsBySlug(deviceState?.company_slug);
 
   const activePlaylist = getActivePlaylist();
   const items = activePlaylist?.items || [];
@@ -288,6 +293,7 @@ const OfflinePlayer = () => {
           error={productError}
           onDismiss={handleDismissProduct}
           timeout={15}
+          displaySettings={displaySettings || undefined}
         />
       )}
 

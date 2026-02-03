@@ -1001,6 +1001,74 @@ export type Database = {
           },
         ]
       }
+      product_display_settings: {
+        Row: {
+          accent_color: string | null
+          company_id: string
+          container_primary_color: string | null
+          container_secondary_color: string | null
+          created_at: string
+          enable_color_extraction: boolean
+          id: string
+          image_background_color: string | null
+          image_position: string
+          layout_preset: number
+          original_price_font_size: number
+          price_font_size: number
+          price_position: string
+          remove_image_background: boolean
+          subtitle_font_size: number
+          title_font_size: number
+          updated_at: string
+        }
+        Insert: {
+          accent_color?: string | null
+          company_id: string
+          container_primary_color?: string | null
+          container_secondary_color?: string | null
+          created_at?: string
+          enable_color_extraction?: boolean
+          id?: string
+          image_background_color?: string | null
+          image_position?: string
+          layout_preset?: number
+          original_price_font_size?: number
+          price_font_size?: number
+          price_position?: string
+          remove_image_background?: boolean
+          subtitle_font_size?: number
+          title_font_size?: number
+          updated_at?: string
+        }
+        Update: {
+          accent_color?: string | null
+          company_id?: string
+          container_primary_color?: string | null
+          container_secondary_color?: string | null
+          created_at?: string
+          enable_color_extraction?: boolean
+          id?: string
+          image_background_color?: string | null
+          image_position?: string
+          layout_preset?: number
+          original_price_font_size?: number
+          price_font_size?: number
+          price_position?: string
+          remove_image_background?: boolean
+          subtitle_font_size?: number
+          title_font_size?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_display_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_lookup_logs: {
         Row: {
           company_id: string | null

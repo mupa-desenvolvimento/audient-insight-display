@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import { useCompanies, Company, CompanyWithIntegrations, ApiIntegration } from "@/hooks/useCompanies";
 import { Button } from "@/components/ui/button";
@@ -10,11 +11,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Plus, Building2, Plug2, Trash2, Edit, Settings, Eye, EyeOff, Loader2, Link2, Unlink2, ChevronDown } from "lucide-react";
+import { Plus, Building2, Plug2, Trash2, Edit, Settings, Eye, EyeOff, Loader2, Link2, Unlink2, ChevronDown, Monitor } from "lucide-react";
 import { toast } from "sonner";
 import type { Json } from "@/integrations/supabase/types";
 
 export default function Companies() {
+  const navigate = useNavigate();
   const { 
     companies, 
     availableIntegrations, 
@@ -247,6 +249,17 @@ export default function Companies() {
                 <AccordionContent className="px-6 pb-4">
                   <div className="space-y-4">
                     <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/admin/companies/${company.id}/display-config`);
+                        }}
+                      >
+                        <Monitor className="h-4 w-4 mr-2" />
+                        Tela de Consulta
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
