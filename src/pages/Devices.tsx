@@ -3,13 +3,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Monitor, Plus, Settings, MapPin, Copy, ExternalLink, Camera, Loader2, Trash2, Pencil } from "lucide-react";
+import { Monitor, Plus, MapPin, Copy, ExternalLink, Camera, Loader2, Trash2, Pencil, Lock, Settings2, Image } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useDevices, DeviceInsert, DeviceUpdate, DeviceWithRelations } from "@/hooks/useDevices";
 import { usePlaylists } from "@/hooks/usePlaylists";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DeviceFormDialog } from "@/components/devices/DeviceFormDialog";
+import { DeviceControlDialog } from "@/components/devices/DeviceControlDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,11 +25,13 @@ import {
 const Devices = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [controlDialogOpen, setControlDialogOpen] = useState(false);
   const [editingDevice, setEditingDevice] = useState<DeviceWithRelations | null>(null);
+  const [controlDevice, setControlDevice] = useState<DeviceWithRelations | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deviceToDelete, setDeviceToDelete] = useState<DeviceWithRelations | null>(null);
   const { toast } = useToast();
-  const { devices, isLoading, createDevice, updateDevice, deleteDevice } = useDevices();
+  const { devices, isLoading, createDevice, updateDevice, deleteDevice, refetch } = useDevices();
   const { playlists } = usePlaylists();
 
   const filteredDevices = devices.filter(device =>
@@ -94,6 +97,11 @@ const Devices = () => {
   const handleDeleteClick = (device: DeviceWithRelations) => {
     setDeviceToDelete(device);
     setDeleteDialogOpen(true);
+  };
+
+  const handleOpenControl = (device: DeviceWithRelations) => {
+    setControlDevice(device);
+    setControlDialogOpen(true);
   };
 
   const handleConfirmDelete = async () => {
@@ -187,6 +195,14 @@ const Devices = () => {
                     </div>
                   </div>
                   <div className="flex gap-1">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleOpenControl(device)}
+                      title="Controle do dispositivo"
+                    >
+                      <Settings2 className="w-4 h-4" />
+                    </Button>
                     <Button variant="ghost" size="sm" onClick={() => handleEditDevice(device)}>
                       <Pencil className="w-4 h-4" />
                     </Button>
@@ -197,6 +213,21 @@ const Devices = () => {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Status especiais: Bloqueado ou Mídia Avulsa */}
+                {(device as any).is_blocked && (
+                  <div className="flex items-center gap-2 p-2 bg-destructive/10 border border-destructive/30 rounded-lg">
+                    <Lock className="w-4 h-4 text-destructive" />
+                    <span className="text-sm font-medium text-destructive">Bloqueado</span>
+                  </div>
+                )}
+                
+                {!(device as any).is_blocked && (device as any).override_media_id && (
+                  <div className="flex items-center gap-2 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                    <Image className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                    <span className="text-sm font-medium text-yellow-700 dark:text-yellow-400">Mídia Avulsa Ativa</span>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Status</span>
                   <Badge variant={getStatusVariant(device.status)}>
@@ -267,6 +298,13 @@ const Devices = () => {
         device={editingDevice}
         onSubmit={handleFormSubmit}
         isLoading={createDevice.isPending || updateDevice.isPending}
+      />
+
+      <DeviceControlDialog
+        open={controlDialogOpen}
+        onOpenChange={setControlDialogOpen}
+        device={controlDevice}
+        onUpdate={() => refetch()}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

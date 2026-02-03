@@ -431,6 +431,7 @@ export type Database = {
       }
       devices: {
         Row: {
+          blocked_message: string | null
           camera_enabled: boolean
           company_id: string | null
           created_at: string
@@ -439,9 +440,13 @@ export type Database = {
           display_profile_id: string | null
           id: string
           is_active: boolean
+          is_blocked: boolean
           last_seen_at: string | null
+          last_sync_requested_at: string | null
           metadata: Json | null
           name: string
+          override_media_expires_at: string | null
+          override_media_id: string | null
           resolution: string | null
           status: string
           store_code: string | null
@@ -449,6 +454,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          blocked_message?: string | null
           camera_enabled?: boolean
           company_id?: string | null
           created_at?: string
@@ -457,9 +463,13 @@ export type Database = {
           display_profile_id?: string | null
           id?: string
           is_active?: boolean
+          is_blocked?: boolean
           last_seen_at?: string | null
+          last_sync_requested_at?: string | null
           metadata?: Json | null
           name: string
+          override_media_expires_at?: string | null
+          override_media_id?: string | null
           resolution?: string | null
           status?: string
           store_code?: string | null
@@ -467,6 +477,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          blocked_message?: string | null
           camera_enabled?: boolean
           company_id?: string | null
           created_at?: string
@@ -475,9 +486,13 @@ export type Database = {
           display_profile_id?: string | null
           id?: string
           is_active?: boolean
+          is_blocked?: boolean
           last_seen_at?: string | null
+          last_sync_requested_at?: string | null
           metadata?: Json | null
           name?: string
+          override_media_expires_at?: string | null
+          override_media_id?: string | null
           resolution?: string | null
           status?: string
           store_code?: string | null
@@ -504,6 +519,13 @@ export type Database = {
             columns: ["display_profile_id"]
             isOneToOne: false
             referencedRelation: "display_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "devices_override_media_id_fkey"
+            columns: ["override_media_id"]
+            isOneToOne: false
+            referencedRelation: "media_items"
             referencedColumns: ["id"]
           },
           {
