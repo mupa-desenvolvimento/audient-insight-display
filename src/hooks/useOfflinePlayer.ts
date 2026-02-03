@@ -39,6 +39,8 @@ export interface DeviceState {
   device_id: string | null;
   device_name: string | null;
   store_id: string | null;
+  company_id: string | null;
+  company_slug: string | null;
   playlists: CachedPlaylist[];
   last_sync: number;
   is_online: boolean;
@@ -240,14 +242,17 @@ export const useOfflinePlayer = (deviceCode: string) => {
     setSyncError(null);
 
     try {
-      // Busca dispositivo pelo código
+      // Busca dispositivo pelo código com dados da empresa
       const { data: device, error: deviceError } = await supabase
         .from("devices")
-        .select("id, name, store_id, current_playlist_id")
+        .select("id, name, store_id, current_playlist_id, company_id, companies(id, slug)")
         .eq("device_code", deviceCode)
         .single();
 
       if (deviceError) throw deviceError;
+
+      // Extrai dados da empresa
+      const company = device.companies as { id: string; slug: string } | null;
 
       // Busca playlists associadas ao dispositivo via grupos ou diretamente
       const { data: playlistsData, error: playlistsError } = await supabase
@@ -361,6 +366,8 @@ export const useOfflinePlayer = (deviceCode: string) => {
         device_id: device.id,
         device_name: device.name,
         store_id: device.store_id,
+        company_id: company?.id || null,
+        company_slug: company?.slug || null,
         playlists: cachedPlaylists,
         last_sync: Date.now(),
         is_online: true,

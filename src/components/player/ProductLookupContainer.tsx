@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { AlertCircle, Package, Loader2 } from "lucide-react";
 import { extractColors, rgbToString, rgbToRgba, type ExtractedColors } from "@/lib/colorExtractor";
 import { ProductDisplay } from "./ProductDisplay";
+import type { ProductDisplaySettings } from "@/hooks/useProductDisplaySettings";
 
 interface ProductData {
   ean: string;
@@ -22,6 +23,7 @@ interface ProductLookupContainerProps {
   onDismiss: () => void;
   timeout?: number;
   inputRef?: React.RefObject<HTMLInputElement>;
+  displaySettings?: Partial<ProductDisplaySettings>;
 }
 
 const defaultColors: ExtractedColors = {
@@ -37,7 +39,8 @@ export const ProductLookupContainer = ({
   error,
   onDismiss,
   timeout = 15,
-  inputRef
+  inputRef,
+  displaySettings
 }: ProductLookupContainerProps) => {
   const [countdown, setCountdown] = useState(timeout);
   const [colors, setColors] = useState<ExtractedColors>(defaultColors);
@@ -143,6 +146,7 @@ export const ProductLookupContainer = ({
         timeout={timeout}
         onImageLoad={() => setImageLoaded(true)}
         imageLoaded={imageLoaded}
+        settings={displaySettings}
       />
     );
   }

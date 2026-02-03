@@ -32,6 +32,7 @@ import PlaylistEditorPage from "./pages/admin/PlaylistEditor";
 import DeviceGroups from "./pages/admin/DeviceGroups";
 import Tenants from "./pages/admin/Tenants";
 import Companies from "./pages/admin/Companies";
+import ProductDisplayConfig from "./pages/admin/ProductDisplayConfig";
 import Install from "./pages/Install";
 import { OfflineIndicator } from "./components/OfflineIndicator";
 import { PWAUpdatePrompt, InstallPrompt } from "./components/PWAPrompts";
@@ -100,6 +101,7 @@ function AppContent() {
                         <Route path="monitoring" element={<LiveMonitoring />} />
                         <Route path="tenants" element={<Tenants />} />
                         <Route path="companies" element={<Companies />} />
+                        <Route path="companies/:companyId/display-config" element={<ProductDisplayConfig />} />
                       </Routes>
                     </AppLayout>
                   </div>
