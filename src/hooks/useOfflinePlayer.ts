@@ -34,6 +34,16 @@ export interface CachedPlaylist {
   synced_at: number;
 }
 
+export interface OverrideMedia {
+  id: string;
+  name: string;
+  type: string;
+  file_url: string;
+  duration: number;
+  blob_url?: string;
+  expires_at: string;
+}
+
 export interface DeviceState {
   device_code: string;
   device_id: string | null;
@@ -44,10 +54,16 @@ export interface DeviceState {
   playlists: CachedPlaylist[];
   last_sync: number;
   is_online: boolean;
+  // Novos campos de controle
+  is_blocked: boolean;
+  blocked_message: string | null;
+  override_media: OverrideMedia | null;
+  last_sync_requested_at: string | null;
 }
 
 const STORAGE_KEY = "device_player_state";
-const SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutos
+const SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutos para sync completo
+const CONTROL_CHECK_INTERVAL = 30 * 1000; // 30 segundos para verificar bloqueio/mídia avulsa
 const CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24 horas
 
 export const useOfflinePlayer = (deviceCode: string) => {
@@ -242,10 +258,17 @@ export const useOfflinePlayer = (deviceCode: string) => {
     setSyncError(null);
 
     try {
-      // Busca dispositivo pelo código com dados da empresa
+      // Busca dispositivo pelo código com dados da empresa e campos de controle
       const { data: device, error: deviceError } = await supabase
         .from("devices")
-        .select("id, name, store_id, current_playlist_id, company_id, companies(id, slug)")
+        .select(`
+          id, name, store_id, current_playlist_id, company_id,
+          is_blocked, blocked_message, 
+          override_media_id, override_media_expires_at,
+          last_sync_requested_at,
+          companies(id, slug),
+          override_media:media_items!devices_override_media_id_fkey(id, name, type, file_url, duration)
+        `)
         .eq("device_code", deviceCode)
         .single();
 
@@ -253,6 +276,27 @@ export const useOfflinePlayer = (deviceCode: string) => {
 
       // Extrai dados da empresa
       const company = device.companies as { id: string; slug: string } | null;
+      
+      // Processa mídia avulsa (override)
+      let overrideMedia: OverrideMedia | null = null;
+      const overrideMediaData = device.override_media as { id: string; name: string; type: string; file_url: string; duration: number } | null;
+      
+      if (overrideMediaData && device.override_media_expires_at) {
+        const expiresAt = new Date(device.override_media_expires_at);
+        if (expiresAt > new Date()) {
+          overrideMedia = {
+            id: overrideMediaData.id,
+            name: overrideMediaData.name,
+            type: overrideMediaData.type,
+            file_url: overrideMediaData.file_url,
+            duration: overrideMediaData.duration || 10,
+            expires_at: device.override_media_expires_at,
+          };
+          
+          // Adiciona mídia avulsa à lista de download
+          // (será processada junto com as outras mídias)
+        }
+      }
 
       // Busca playlists associadas ao dispositivo via grupos ou diretamente
       const { data: playlistsData, error: playlistsError } = await supabase
@@ -358,6 +402,23 @@ export const useOfflinePlayer = (deviceCode: string) => {
         }
       }
 
+      // Download da mídia avulsa se existir
+      if (overrideMedia && overrideMedia.file_url) {
+        setDownloadProgress({
+          total: mediaToDownload.length + 1,
+          downloaded: mediaToDownload.length,
+          current: overrideMedia.name,
+        });
+        
+        let blobUrl = await loadFromIndexedDB(overrideMedia.id);
+        if (!blobUrl) {
+          blobUrl = await downloadMedia(overrideMedia.file_url, overrideMedia.id);
+        }
+        if (blobUrl) {
+          overrideMedia.blob_url = blobUrl;
+        }
+      }
+
       setDownloadProgress({ total: mediaToDownload.length, downloaded: mediaToDownload.length, current: null });
 
       // Atualiza estado
@@ -371,6 +432,11 @@ export const useOfflinePlayer = (deviceCode: string) => {
         playlists: cachedPlaylists,
         last_sync: Date.now(),
         is_online: true,
+        // Campos de controle
+        is_blocked: device.is_blocked || false,
+        blocked_message: device.blocked_message || null,
+        override_media: overrideMedia,
+        last_sync_requested_at: device.last_sync_requested_at || null,
       };
 
       setDeviceState(newState);
@@ -425,9 +491,43 @@ export const useOfflinePlayer = (deviceCode: string) => {
     init();
   }, [deviceCode]);
 
-  // Configura intervalo de sincronização
+  // Verificação rápida de comandos de controle (bloqueio, mídia avulsa)
+  const checkControlCommands = useCallback(async () => {
+    if (!deviceState?.device_id) return;
+
+    try {
+      const { data: device, error } = await supabase
+        .from("devices")
+        .select("is_blocked, blocked_message, override_media_id, override_media_expires_at, last_sync_requested_at")
+        .eq("device_code", deviceCode)
+        .single();
+
+      if (error || !device) return;
+
+      // Verifica se houve mudança no bloqueio ou mídia avulsa
+      const needsUpdate = 
+        device.is_blocked !== deviceState.is_blocked ||
+        device.blocked_message !== deviceState.blocked_message ||
+        device.override_media_id !== (deviceState.override_media?.id || null);
+
+      // Verifica se foi solicitada uma sincronização forçada
+      const lastSyncRequested = device.last_sync_requested_at;
+      const needsForcedSync = lastSyncRequested && 
+        (!deviceState.last_sync_requested_at || lastSyncRequested > deviceState.last_sync_requested_at);
+
+      if (needsUpdate || needsForcedSync) {
+        console.log("[useOfflinePlayer] Comando de controle detectado, sincronizando...");
+        await syncWithServer();
+      }
+    } catch (e) {
+      console.error("[useOfflinePlayer] Erro ao verificar comandos:", e);
+    }
+  }, [deviceCode, deviceState, syncWithServer]);
+
+  // Configura intervalos de sincronização
   useEffect(() => {
-    syncIntervalRef.current = setInterval(syncWithServer, SYNC_INTERVAL);
+    const fullSyncInterval = setInterval(syncWithServer, SYNC_INTERVAL);
+    const controlCheckInterval = setInterval(checkControlCommands, CONTROL_CHECK_INTERVAL);
 
     // Monitora conexão
     const handleOnline = () => {
@@ -442,13 +542,12 @@ export const useOfflinePlayer = (deviceCode: string) => {
     window.addEventListener("offline", handleOffline);
 
     return () => {
-      if (syncIntervalRef.current) {
-        clearInterval(syncIntervalRef.current);
-      }
+      clearInterval(fullSyncInterval);
+      clearInterval(controlCheckInterval);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
-  }, [syncWithServer]);
+  }, [syncWithServer, checkControlCommands]);
 
   // Cleanup blob URLs
   useEffect(() => {
