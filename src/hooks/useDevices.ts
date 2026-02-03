@@ -17,6 +17,11 @@ export interface Device {
   camera_enabled: boolean;
   metadata: Json | null;
   is_active: boolean;
+  is_blocked: boolean;
+  blocked_message: string | null;
+  override_media_id: string | null;
+  override_media_expires_at: string | null;
+  last_sync_requested_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -58,7 +63,7 @@ export const useDevices = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: devices = [], isLoading, error } = useQuery({
+  const { data: devices = [], isLoading, error, refetch } = useQuery({
     queryKey: ["devices"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -136,6 +141,7 @@ export const useDevices = () => {
     devices,
     isLoading,
     error,
+    refetch,
     createDevice,
     updateDevice,
     deleteDevice,
