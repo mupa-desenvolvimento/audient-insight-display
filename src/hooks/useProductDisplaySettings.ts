@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -146,8 +147,59 @@ export const useProductDisplaySettings = (companyId?: string) => {
   };
 };
 
-// Hook to get settings by company slug (for player)
+// Hook to get settings by company slug (for player) with realtime updates
 export const useProductDisplaySettingsBySlug = (companySlug?: string) => {
+  const queryClient = useQueryClient();
+  const [companyId, setCompanyId] = useState<string | null>(null);
+
+  // First fetch company id
+  useEffect(() => {
+    if (!companySlug) return;
+    
+    const fetchCompanyId = async () => {
+      const { data: company } = await supabase
+        .from("companies")
+        .select("id")
+        .eq("slug", companySlug)
+        .maybeSingle();
+      
+      if (company) {
+        setCompanyId(company.id);
+      }
+    };
+    
+    fetchCompanyId();
+  }, [companySlug]);
+
+  // Subscribe to realtime updates
+  useEffect(() => {
+    if (!companyId) return;
+
+    const channel = supabase
+      .channel(`product-display-settings-${companyId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'product_display_settings',
+          filter: `company_id=eq.${companyId}`,
+        },
+        (payload) => {
+          console.log('Product display settings changed:', payload);
+          // Invalidate query to refetch
+          queryClient.invalidateQueries({ 
+            queryKey: ["product-display-settings-by-slug", companySlug] 
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [companyId, companySlug, queryClient]);
+
   return useQuery({
     queryKey: ["product-display-settings-by-slug", companySlug],
     queryFn: async () => {
@@ -172,5 +224,56 @@ export const useProductDisplaySettingsBySlug = (companySlug?: string) => {
       return (data as ProductDisplaySettings) || { ...defaultSettings, company_id: company.id };
     },
     enabled: !!companySlug,
+  });
+};
+
+// Hook to get settings by company id (for player) with realtime updates
+export const useProductDisplaySettingsRealtime = (companyId?: string) => {
+  const queryClient = useQueryClient();
+
+  // Subscribe to realtime updates
+  useEffect(() => {
+    if (!companyId) return;
+
+    const channel = supabase
+      .channel(`product-display-settings-realtime-${companyId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'product_display_settings',
+          filter: `company_id=eq.${companyId}`,
+        },
+        (payload) => {
+          console.log('Product display settings changed (realtime):', payload);
+          // Invalidate query to refetch
+          queryClient.invalidateQueries({ 
+            queryKey: ["product-display-settings-realtime", companyId] 
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [companyId, queryClient]);
+
+  return useQuery({
+    queryKey: ["product-display-settings-realtime", companyId],
+    queryFn: async () => {
+      if (!companyId) return null;
+
+      const { data, error } = await supabase
+        .from("product_display_settings")
+        .select("*")
+        .eq("company_id", companyId)
+        .maybeSingle();
+
+      if (error) return { ...defaultSettings, company_id: companyId };
+      return (data as ProductDisplaySettings) || { ...defaultSettings, company_id: companyId };
+    },
+    enabled: !!companyId,
   });
 };
