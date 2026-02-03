@@ -87,26 +87,26 @@ const ProductDisplayConfig = () => {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
           {/* Settings Panel */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="xl:col-span-2 space-y-6 order-2 xl:order-1">
             <Tabs defaultValue="presets" className="w-full">
               <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="presets" className="flex items-center gap-2">
                   <Layout className="h-4 w-4" />
-                  Presets
+                  <span className="hidden sm:inline">Presets</span>
                 </TabsTrigger>
                 <TabsTrigger value="fonts" className="flex items-center gap-2">
                   <Type className="h-4 w-4" />
-                  Fontes
+                  <span className="hidden sm:inline">Fontes</span>
                 </TabsTrigger>
                 <TabsTrigger value="colors" className="flex items-center gap-2">
                   <Palette className="h-4 w-4" />
-                  Cores
+                  <span className="hidden sm:inline">Cores</span>
                 </TabsTrigger>
                 <TabsTrigger value="image" className="flex items-center gap-2">
                   <Image className="h-4 w-4" />
-                  Imagem
+                  <span className="hidden sm:inline">Imagem</span>
                 </TabsTrigger>
               </TabsList>
 
@@ -118,7 +118,7 @@ const ProductDisplayConfig = () => {
                     <CardDescription>Escolha um layout base e personalize conforme necessário</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 gap-4">
                       {layoutPresets.map((preset) => (
                         <button
                           key={preset.id}
@@ -132,27 +132,6 @@ const ProductDisplayConfig = () => {
                         >
                           <div className="font-medium">{preset.name}</div>
                           <div className="text-sm text-muted-foreground mt-1">{preset.description}</div>
-                          
-                          {/* Mini preview */}
-                          <div className="mt-3 h-16 rounded bg-muted flex overflow-hidden">
-                            {preset.settings.image_position === "left" ? (
-                              <>
-                                <div className="w-1/2 bg-muted-foreground/20" />
-                                <div className="w-1/2 p-2 flex flex-col justify-end">
-                                  <div className="h-1 w-full bg-muted-foreground/30 rounded" />
-                                  <div className="h-2 w-3/4 bg-primary/50 rounded mt-1" />
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <div className="w-1/2 p-2 flex flex-col justify-end">
-                                  <div className="h-1 w-full bg-muted-foreground/30 rounded" />
-                                  <div className="h-2 w-3/4 bg-primary/50 rounded mt-1" />
-                                </div>
-                                <div className="w-1/2 bg-muted-foreground/20" />
-                              </>
-                            )}
-                          </div>
                         </button>
                       ))}
                     </div>
@@ -302,7 +281,7 @@ const ProductDisplayConfig = () => {
                           conforme o contraste do fundo.
                         </p>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-4">
                           <div className="space-y-2">
                             <Label>Cor Primária do Container</Label>
                             <div className="flex gap-2">
@@ -317,15 +296,6 @@ const ProductDisplayConfig = () => {
                                 onChange={(e) => updateSetting("container_primary_color", e.target.value)}
                                 className="flex-1 font-mono text-sm"
                               />
-                            </div>
-                            <div
-                              className="h-8 rounded flex items-center justify-center text-sm font-medium"
-                              style={{
-                                backgroundColor: localSettings.container_primary_color || "#1E3A5F",
-                                color: getContrastColor(localSettings.container_primary_color || "#1E3A5F"),
-                              }}
-                            >
-                              Texto Automático
                             </div>
                           </div>
 
@@ -344,15 +314,6 @@ const ProductDisplayConfig = () => {
                                 className="flex-1 font-mono text-sm"
                               />
                             </div>
-                            <div
-                              className="h-8 rounded flex items-center justify-center text-sm font-medium"
-                              style={{
-                                backgroundColor: localSettings.container_secondary_color || "#2D4A6F",
-                                color: getContrastColor(localSettings.container_secondary_color || "#2D4A6F"),
-                              }}
-                            >
-                              Texto Automático
-                            </div>
                           </div>
 
                           <div className="space-y-2">
@@ -369,15 +330,6 @@ const ProductDisplayConfig = () => {
                                 onChange={(e) => updateSetting("accent_color", e.target.value)}
                                 className="flex-1 font-mono text-sm"
                               />
-                            </div>
-                            <div
-                              className="h-8 rounded flex items-center justify-center text-sm font-medium"
-                              style={{
-                                backgroundColor: localSettings.accent_color || "#3B82F6",
-                                color: getContrastColor(localSettings.accent_color || "#3B82F6"),
-                              }}
-                            >
-                              Texto Automático
                             </div>
                           </div>
                         </div>
@@ -398,7 +350,7 @@ const ProductDisplayConfig = () => {
                       <div className="space-y-0.5">
                         <Label>Remover Fundo da Imagem</Label>
                         <p className="text-sm text-muted-foreground">
-                          Exibe a imagem sem o fundo original (requer imagens com transparência)
+                          Exibe a imagem sem o fundo original
                         </p>
                       </div>
                       <Switch
@@ -429,23 +381,29 @@ const ProductDisplayConfig = () => {
             </Tabs>
           </div>
 
-          {/* Preview Panel */}
-          <div className="lg:col-span-1">
+          {/* Preview Panel - Larger */}
+          <div className="xl:col-span-3 order-1 xl:order-2">
             <Card className="sticky top-6">
-              <CardHeader>
-                <CardTitle>Preview</CardTitle>
-                <CardDescription>Visualização aproximada do layout</CardDescription>
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center justify-between">
+                  <span>Preview em Tempo Real</span>
+                  <span className="text-xs font-normal text-muted-foreground px-2 py-1 bg-muted rounded">
+                    {layoutPresets.find((p) => p.id === localSettings.layout_preset)?.name || "Personalizado"}
+                  </span>
+                </CardTitle>
               </CardHeader>
               <CardContent>
+                {/* Large Preview */}
                 <div
-                  className="aspect-video rounded-lg overflow-hidden border flex"
+                  className="w-full rounded-lg overflow-hidden border-2 border-border flex"
                   style={{
+                    aspectRatio: "16/9",
                     flexDirection: localSettings.image_position === "left" ? "row-reverse" : "row",
                   }}
                 >
                   {/* Info side */}
                   <div
-                    className="w-1/2 p-3 flex flex-col"
+                    className="w-1/2 p-6 flex flex-col relative overflow-hidden"
                     style={{
                       backgroundColor: localSettings.enable_color_extraction
                         ? "#1E3A5F"
@@ -458,59 +416,97 @@ const ProductDisplayConfig = () => {
                           : "flex-end",
                     }}
                   >
+                    {/* Product name banner */}
                     <div
-                      className="text-xs font-bold uppercase mb-1"
+                      className="absolute top-0 left-0 right-0 px-4 py-3"
                       style={{
-                        color: localSettings.enable_color_extraction
-                          ? "#FFFFFF"
-                          : getContrastColor(localSettings.container_primary_color || "#1E3A5F"),
+                        backgroundColor: localSettings.enable_color_extraction
+                          ? "rgba(59, 130, 246, 0.95)"
+                          : `${localSettings.accent_color || "#3B82F6"}F2`,
                       }}
                     >
-                      PRODUTO
+                      <div
+                        className="font-black uppercase tracking-wide"
+                        style={{
+                          fontSize: `${Math.max(12, (localSettings.title_font_size || 48) / 4)}px`,
+                          color: localSettings.enable_color_extraction
+                            ? "#FFFFFF"
+                            : getContrastColor(localSettings.accent_color || "#3B82F6"),
+                        }}
+                      >
+                        NOME DO PRODUTO
+                      </div>
+                      <div
+                        className="font-light"
+                        style={{
+                          fontSize: `${Math.max(8, (localSettings.subtitle_font_size || 24) / 3)}px`,
+                          color: localSettings.enable_color_extraction
+                            ? "rgba(255,255,255,0.8)"
+                            : getContrastColor(localSettings.accent_color || "#3B82F6"),
+                        }}
+                      >
+                        Descrição adicional do produto
+                      </div>
                     </div>
-                    <div
-                      className="text-[8px] mb-2"
-                      style={{
-                        color: localSettings.enable_color_extraction
-                          ? "rgba(255,255,255,0.7)"
-                          : getContrastColor(localSettings.container_primary_color || "#1E3A5F"),
-                      }}
-                    >
-                      Descrição
-                    </div>
-                    <div
-                      className="text-lg font-bold"
-                      style={{
-                        color: localSettings.enable_color_extraction
-                          ? "#FFFFFF"
-                          : getContrastColor(localSettings.container_primary_color || "#1E3A5F"),
-                      }}
-                    >
-                      R$ 9,99
+
+                    {/* Price section */}
+                    <div className="mt-auto">
+                      <div
+                        className="line-through opacity-60"
+                        style={{
+                          fontSize: `${Math.max(10, (localSettings.original_price_font_size || 36) / 3)}px`,
+                          color: localSettings.enable_color_extraction
+                            ? "#FFFFFF"
+                            : getContrastColor(localSettings.container_primary_color || "#1E3A5F"),
+                        }}
+                      >
+                        De: R$ 12,99
+                      </div>
+                      <div
+                        className="font-bold leading-none"
+                        style={{
+                          fontSize: `${Math.max(24, (localSettings.price_font_size || 96) / 3)}px`,
+                          color: localSettings.enable_color_extraction
+                            ? "#FFFFFF"
+                            : getContrastColor(localSettings.container_primary_color || "#1E3A5F"),
+                        }}
+                      >
+                        R$ 9,99
+                      </div>
                     </div>
                   </div>
 
                   {/* Image side */}
                   <div
-                    className="w-1/2 flex items-center justify-center"
+                    className="w-1/2 flex items-center justify-center p-4"
                     style={{
                       backgroundColor: localSettings.image_background_color || "#FFFFFF",
                     }}
                   >
-                    <div className="w-12 h-12 rounded bg-muted-foreground/20 flex items-center justify-center">
-                      <Image className="w-6 h-6 text-muted-foreground/40" />
+                    <div className="w-32 h-32 rounded-lg bg-gradient-to-br from-muted to-muted-foreground/20 flex items-center justify-center shadow-lg">
+                      <Image className="w-16 h-16 text-muted-foreground/40" />
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-4 text-xs text-muted-foreground">
-                  <p>
-                    <strong>Preset:</strong> {layoutPresets.find((p) => p.id === localSettings.layout_preset)?.name || "Personalizado"}
-                  </p>
-                  <p>
-                    <strong>Cores:</strong>{" "}
-                    {localSettings.enable_color_extraction ? "Extração automática" : "Manual"}
-                  </p>
+                {/* Settings summary */}
+                <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+                  <div className="p-3 rounded-lg bg-muted/50">
+                    <div className="font-medium text-muted-foreground mb-1">Fontes</div>
+                    <div className="space-y-0.5 text-xs">
+                      <div>Título: {localSettings.title_font_size || 48}px</div>
+                      <div>Subtítulo: {localSettings.subtitle_font_size || 24}px</div>
+                      <div>Preço: {localSettings.price_font_size || 96}px</div>
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-muted/50">
+                    <div className="font-medium text-muted-foreground mb-1">Cores</div>
+                    <div className="space-y-0.5 text-xs">
+                      <div>{localSettings.enable_color_extraction ? "✓ Extração automática" : "✗ Manual"}</div>
+                      <div>Imagem: {localSettings.image_position === "left" ? "Esquerda" : "Direita"}</div>
+                      <div>Preço: {localSettings.price_position === "top" ? "Topo" : localSettings.price_position === "center" ? "Centro" : "Inferior"}</div>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
