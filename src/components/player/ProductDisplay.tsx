@@ -75,18 +75,24 @@ export const ProductDisplay = ({
         className="w-1/2 flex flex-col justify-between p-8 lg:p-12 relative overflow-hidden"
         style={{ background: leftGradient }}
       >
-        {/* Header com nome */}
-        <div className="relative z-10">
-          {/* Nome do produto - 3 primeiras palavras em bold */}
-          <h1 className={`text-3xl lg:text-4xl xl:text-5xl leading-tight mb-2 ${textColor}`}>
-            <span className="font-bold">{boldPart}</span>
-            {restPart && <span className="font-normal"> {restPart}</span>}
+        {/* Header com nome - container destacado */}
+        <div 
+          className="relative z-10 px-6 py-4 -mx-8 lg:-mx-12"
+          style={{ 
+            backgroundColor: rgbToRgba(colors.vibrant, 0.95),
+          }}
+        >
+          {/* Nome do produto - 3 primeiras palavras em bold, restante menor e fino */}
+          <h1 className="text-white leading-tight">
+            <span className="block text-3xl lg:text-4xl xl:text-5xl font-black tracking-tight uppercase">
+              {boldPart}
+            </span>
+            {restPart && (
+              <span className="block text-lg lg:text-xl xl:text-2xl font-light tracking-wide uppercase mt-1">
+                {restPart}
+              </span>
+            )}
           </h1>
-          
-          {/* Unidade */}
-          <p className={`text-lg lg:text-xl ${textMuted}`}>
-            {product.unit}
-          </p>
         </div>
 
         {/* Tags de oferta */}
