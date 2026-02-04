@@ -719,7 +719,7 @@ export const useOfflinePlayer = (deviceCode: string) => {
     }
   }, [deviceCode, deviceState, syncWithServer]);
 
-  // Configura intervalos de sincronização
+  // Configura intervalos de sincronização e Realtime
   useEffect(() => {
     const fullSyncInterval = setInterval(syncWithServer, SYNC_INTERVAL);
     const controlCheckInterval = setInterval(checkControlCommands, CONTROL_CHECK_INTERVAL);
@@ -736,13 +736,43 @@ export const useOfflinePlayer = (deviceCode: string) => {
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
+    // Configura Supabase Realtime para atualizações instantâneas
+    let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
+    
+    if (deviceCode) {
+      realtimeChannel = supabase
+        .channel(`device-updates-${deviceCode}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'devices',
+            filter: `device_code=eq.${deviceCode}`,
+          },
+          (payload) => {
+            console.log("[useOfflinePlayer] Realtime update received:", payload);
+            // Dispara sincronização imediata quando o dispositivo for atualizado
+            syncWithServer();
+          }
+        )
+        .subscribe((status) => {
+          console.log("[useOfflinePlayer] Realtime subscription status:", status);
+        });
+    }
+
     return () => {
       clearInterval(fullSyncInterval);
       clearInterval(controlCheckInterval);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      
+      // Limpa subscription Realtime
+      if (realtimeChannel) {
+        supabase.removeChannel(realtimeChannel);
+      }
     };
-  }, [syncWithServer, checkControlCommands]);
+  }, [syncWithServer, checkControlCommands, deviceCode]);
 
   // Cleanup blob URLs
   useEffect(() => {
