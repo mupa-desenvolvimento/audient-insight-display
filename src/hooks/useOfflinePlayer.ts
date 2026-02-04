@@ -740,6 +740,8 @@ export const useOfflinePlayer = (deviceCode: string) => {
     let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
     
     if (deviceCode) {
+      console.log("[useOfflinePlayer] Configurando Realtime para device_code:", deviceCode);
+      
       realtimeChannel = supabase
         .channel(`device-updates-${deviceCode}`)
         .on(
@@ -751,13 +753,57 @@ export const useOfflinePlayer = (deviceCode: string) => {
             filter: `device_code=eq.${deviceCode}`,
           },
           (payload) => {
-            console.log("[useOfflinePlayer] Realtime update received:", payload);
+            console.log("[useOfflinePlayer] ✓ Realtime UPDATE recebido:", payload);
+            console.log("[useOfflinePlayer] Disparando sincronização imediata...");
             // Dispara sincronização imediata quando o dispositivo for atualizado
             syncWithServer();
           }
         )
-        .subscribe((status) => {
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'playlists',
+          },
+          (payload) => {
+            console.log("[useOfflinePlayer] ✓ Playlist alterada:", payload);
+            // Sincroniza quando playlists são alteradas
+            syncWithServer();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'playlist_items',
+          },
+          (payload) => {
+            console.log("[useOfflinePlayer] ✓ Item de playlist alterado:", payload);
+            syncWithServer();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'playlist_channel_items',
+          },
+          (payload) => {
+            console.log("[useOfflinePlayer] ✓ Item de canal alterado:", payload);
+            syncWithServer();
+          }
+        )
+        .subscribe((status, err) => {
           console.log("[useOfflinePlayer] Realtime subscription status:", status);
+          if (err) {
+            console.error("[useOfflinePlayer] Realtime error:", err);
+          }
+          if (status === 'SUBSCRIBED') {
+            console.log("[useOfflinePlayer] ✓ Realtime conectado e pronto!");
+          }
         });
     }
 
