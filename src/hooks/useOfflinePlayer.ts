@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+// Exporta tipos para uso externo
 export interface CachedMedia {
   id: string;
   name: string;
@@ -17,6 +18,26 @@ export interface CachedPlaylistItem {
   position: number;
   duration_override: number | null;
   media: CachedMedia;
+  // Campos de agendamento individual
+  start_date?: string | null;
+  end_date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  days_of_week?: number[] | null;
+}
+
+export interface CachedChannel {
+  id: string;
+  name: string;
+  is_active: boolean;
+  is_fallback: boolean;
+  position: number;
+  start_date: string | null;
+  end_date: string | null;
+  start_time: string;
+  end_time: string;
+  days_of_week: number[] | null;
+  items: CachedPlaylistItem[];
 }
 
 export interface CachedPlaylist {
@@ -24,6 +45,7 @@ export interface CachedPlaylist {
   name: string;
   description: string | null;
   is_active: boolean;
+  has_channels: boolean;
   start_date: string | null;
   end_date: string | null;
   days_of_week: number[] | null;
@@ -31,6 +53,7 @@ export interface CachedPlaylist {
   end_time: string | null;
   priority: number;
   items: CachedPlaylistItem[];
+  channels: CachedChannel[];
   synced_at: number;
 }
 
@@ -208,6 +231,40 @@ export const useOfflinePlayer = (deviceCode: string) => {
     console.log("[useOfflinePlayer] Dados limpos com sucesso");
   }, [deviceCode]);
 
+  // Verifica se um canal está ativo agora
+  const isChannelActiveNow = useCallback((channel: CachedChannel): boolean => {
+    if (!channel.is_active) return false;
+
+    const now = new Date();
+    const currentDay = now.getDay();
+    const currentTime = now.toTimeString().slice(0, 5);
+
+    // Canais fallback estão sempre ativos (menor prioridade)
+    if (channel.is_fallback) return true;
+
+    // Verifica dias da semana
+    if (channel.days_of_week && channel.days_of_week.length > 0) {
+      if (!channel.days_of_week.includes(currentDay)) return false;
+    }
+
+    // Verifica datas
+    if (channel.start_date) {
+      const startDate = new Date(channel.start_date);
+      if (now < startDate) return false;
+    }
+    if (channel.end_date) {
+      const endDate = new Date(channel.end_date);
+      endDate.setHours(23, 59, 59);
+      if (now > endDate) return false;
+    }
+
+    // Verifica horários
+    if (channel.start_time && currentTime < channel.start_time.slice(0, 5)) return false;
+    if (channel.end_time && currentTime > channel.end_time.slice(0, 5)) return false;
+
+    return true;
+  }, []);
+
   // Verifica se playlist está ativa agora
   const isPlaylistActiveNow = useCallback((playlist: CachedPlaylist): boolean => {
     if (!playlist.is_active) return false;
@@ -249,6 +306,50 @@ export const useOfflinePlayer = (deviceCode: string) => {
 
     return activePlaylists[0] || null;
   }, [deviceState, isPlaylistActiveNow]);
+
+  // Obtém o canal ativo da playlist (com base no horário)
+  const getActiveChannel = useCallback((playlist: CachedPlaylist): CachedChannel | null => {
+    if (!playlist.has_channels || !playlist.channels || playlist.channels.length === 0) {
+      return null;
+    }
+
+    // Filtra canais ativos e separa fallback dos normais
+    const activeChannels = playlist.channels.filter(isChannelActiveNow);
+    const normalChannels = activeChannels.filter(c => !c.is_fallback);
+    const fallbackChannels = activeChannels.filter(c => c.is_fallback);
+
+    // Prioridade: canal normal ativo > canal fallback
+    if (normalChannels.length > 0) {
+      // Retorna o de menor posição (primeira ordem)
+      return normalChannels.sort((a, b) => a.position - b.position)[0];
+    }
+
+    if (fallbackChannels.length > 0) {
+      return fallbackChannels.sort((a, b) => a.position - b.position)[0];
+    }
+
+    return null;
+  }, [isChannelActiveNow]);
+
+  // Obtém items ativos da playlist considerando canais
+  const getActiveItems = useCallback((): CachedPlaylistItem[] => {
+    const playlist = getActivePlaylist();
+    if (!playlist) return [];
+
+    // Se a playlist usa canais, buscar items do canal ativo
+    if (playlist.has_channels) {
+      const activeChannel = getActiveChannel(playlist);
+      if (activeChannel) {
+        console.log("[useOfflinePlayer] Canal ativo:", activeChannel.name, "com", activeChannel.items.length, "items");
+        return activeChannel.items;
+      }
+      console.log("[useOfflinePlayer] Nenhum canal ativo para a playlist:", playlist.name);
+      return [];
+    }
+
+    // Playlist sem canais - usa items diretos
+    return playlist.items;
+  }, [getActivePlaylist, getActiveChannel]);
 
   // Sincroniza com servidor
   const syncWithServer = useCallback(async () => {
@@ -306,6 +407,7 @@ export const useOfflinePlayer = (deviceCode: string) => {
           name,
           description,
           is_active,
+          has_channels,
           start_date,
           end_date,
           days_of_week,
@@ -317,7 +419,36 @@ export const useOfflinePlayer = (deviceCode: string) => {
             media_id,
             position,
             duration_override,
+            start_date,
+            end_date,
+            start_time,
+            end_time,
+            days_of_week,
             media:media_items(id, name, type, file_url, duration)
+          ),
+          playlist_channels(
+            id,
+            name,
+            is_active,
+            is_fallback,
+            position,
+            start_date,
+            end_date,
+            start_time,
+            end_time,
+            days_of_week,
+            playlist_channel_items(
+              id,
+              media_id,
+              position,
+              duration_override,
+              start_date,
+              end_date,
+              start_time,
+              end_time,
+              days_of_week,
+              media:media_items(id, name, type, file_url, duration)
+            )
           )
         `)
         .eq("is_active", true)
@@ -331,38 +462,101 @@ export const useOfflinePlayer = (deviceCode: string) => {
 
       for (const playlist of playlistsData || []) {
         const items: CachedPlaylistItem[] = [];
+        const channels: CachedChannel[] = [];
         
-        for (const item of playlist.playlist_items || []) {
-          if (item.media && item.media.file_url) {
-            mediaToDownload.push({
-              id: item.media.id,
-              url: item.media.file_url,
-              name: item.media.name,
-            });
+        // Se a playlist usa canais, processa os canais
+        if (playlist.has_channels && playlist.playlist_channels) {
+          for (const channel of playlist.playlist_channels) {
+            const channelItems: CachedPlaylistItem[] = [];
+            
+            for (const item of channel.playlist_channel_items || []) {
+              if (item.media && item.media.file_url) {
+                mediaToDownload.push({
+                  id: item.media.id,
+                  url: item.media.file_url,
+                  name: item.media.name,
+                });
 
-            items.push({
-              id: item.id,
-              media_id: item.media_id,
-              position: item.position,
-              duration_override: item.duration_override,
-              media: {
+                channelItems.push({
+                  id: item.id,
+                  media_id: item.media_id,
+                  position: item.position,
+                  duration_override: item.duration_override,
+                  start_date: item.start_date,
+                  end_date: item.end_date,
+                  start_time: item.start_time,
+                  end_time: item.end_time,
+                  days_of_week: item.days_of_week,
+                  media: {
+                    id: item.media.id,
+                    name: item.media.name,
+                    type: item.media.type,
+                    file_url: item.media.file_url,
+                    duration: item.media.duration || 10,
+                    cached_at: Date.now(),
+                  },
+                });
+              }
+            }
+
+            if (channelItems.length > 0 || channel.is_fallback) {
+              channels.push({
+                id: channel.id,
+                name: channel.name,
+                is_active: channel.is_active,
+                is_fallback: channel.is_fallback,
+                position: channel.position,
+                start_date: channel.start_date,
+                end_date: channel.end_date,
+                start_time: channel.start_time,
+                end_time: channel.end_time,
+                days_of_week: channel.days_of_week,
+                items: channelItems.sort((a, b) => a.position - b.position),
+              });
+            }
+          }
+        } else {
+          // Playlist sem canais - usa playlist_items diretamente
+          for (const item of playlist.playlist_items || []) {
+            if (item.media && item.media.file_url) {
+              mediaToDownload.push({
                 id: item.media.id,
+                url: item.media.file_url,
                 name: item.media.name,
-                type: item.media.type,
-                file_url: item.media.file_url,
-                duration: item.media.duration || 10,
-                cached_at: Date.now(),
-              },
-            });
+              });
+
+              items.push({
+                id: item.id,
+                media_id: item.media_id,
+                position: item.position,
+                duration_override: item.duration_override,
+                start_date: item.start_date,
+                end_date: item.end_date,
+                start_time: item.start_time,
+                end_time: item.end_time,
+                days_of_week: item.days_of_week,
+                media: {
+                  id: item.media.id,
+                  name: item.media.name,
+                  type: item.media.type,
+                  file_url: item.media.file_url,
+                  duration: item.media.duration || 10,
+                  cached_at: Date.now(),
+                },
+              });
+            }
           }
         }
 
-        if (items.length > 0) {
+        // Adiciona playlist se tiver conteúdo
+        const hasContent = items.length > 0 || channels.some(c => c.items.length > 0);
+        if (hasContent) {
           cachedPlaylists.push({
             id: playlist.id,
             name: playlist.name,
             description: playlist.description,
             is_active: playlist.is_active,
+            has_channels: playlist.has_channels || false,
             start_date: playlist.start_date,
             end_date: playlist.end_date,
             days_of_week: playlist.days_of_week,
@@ -370,6 +564,7 @@ export const useOfflinePlayer = (deviceCode: string) => {
             end_time: playlist.end_time,
             priority: playlist.priority || 0,
             items: items.sort((a, b) => a.position - b.position),
+            channels: channels.sort((a, b) => a.position - b.position),
             synced_at: Date.now(),
           });
         }
@@ -565,6 +760,8 @@ export const useOfflinePlayer = (deviceCode: string) => {
     syncError,
     downloadProgress,
     getActivePlaylist,
+    getActiveItems,
+    getActiveChannel,
     syncWithServer,
     isPlaylistActiveNow,
     clearAllData,

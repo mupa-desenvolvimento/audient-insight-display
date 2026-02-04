@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useOfflinePlayer, CachedPlaylistItem, CachedMedia } from "@/hooks/useOfflinePlayer";
+import { useOfflinePlayer, CachedPlaylistItem, CachedMedia, CachedChannel } from "@/hooks/useOfflinePlayer";
 import { useProductLookup } from "@/hooks/useProductLookup";
 import { useProductDisplaySettingsBySlug } from "@/hooks/useProductDisplaySettings";
 import { ProductLookupContainer } from "@/components/player/ProductLookupContainer";
@@ -35,6 +35,8 @@ const OfflinePlayer = () => {
     syncError,
     downloadProgress,
     getActivePlaylist,
+    getActiveItems,
+    getActiveChannel,
     syncWithServer,
     isPlaylistActiveNow,
     clearAllData,
@@ -76,7 +78,8 @@ const OfflinePlayer = () => {
   const { data: displaySettings } = useProductDisplaySettingsBySlug(deviceState?.company_slug);
 
   const activePlaylist = getActivePlaylist();
-  const items = activePlaylist?.items || [];
+  const activeChannel = activePlaylist?.has_channels ? getActiveChannel(activePlaylist) : null;
+  const items = getActiveItems();
   const currentItem = items[currentIndex];
   const currentMedia = currentItem?.media;
 
@@ -290,6 +293,11 @@ const OfflinePlayer = () => {
 
   // Sem conteúdo disponível (apenas se não tiver mídia avulsa)
   if (!displayOverrideMedia && (!activePlaylist || items.length === 0)) {
+    // Debug info
+    const debugInfo = activePlaylist 
+      ? `Playlist "${activePlaylist.name}" ativa, mas ${activePlaylist.has_channels ? 'nenhum canal ativo' : 'sem itens'}`
+      : `${deviceState?.playlists?.length || 0} playlists em cache`;
+    
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white">
         <Monitor className="w-20 h-20 mb-6 text-white/30" />
@@ -313,6 +321,9 @@ const OfflinePlayer = () => {
         </button>
         <p className="text-white/40 text-sm mt-6">
           Nenhuma playlist ativa para o horário atual
+        </p>
+        <p className="text-white/30 text-xs mt-2">
+          {debugInfo}
         </p>
       </div>
     );
@@ -429,7 +440,7 @@ const OfflinePlayer = () => {
                 {deviceState?.device_name || deviceCode}
               </p>
               <p className="text-white/60 text-xs">
-                {activePlaylist.name}
+                {activePlaylist?.name}{activeChannel ? ` • ${activeChannel.name}` : ''}
               </p>
             </div>
           </div>
