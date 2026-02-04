@@ -175,11 +175,27 @@ const DevicePlayer = () => {
     <div className="fixed inset-0 bg-black overflow-hidden">
       {/* Conteúdo Principal - Tela Cheia */}
       <div className="absolute inset-0">
-        <img
-          src={currentMedia.url}
-          alt={currentMedia.name}
-          className="w-full h-full object-fill"
-        />
+        {currentMedia.type === 'video' ? (
+          <video
+            key={currentMedia.id}
+            src={currentMedia.url}
+            className="w-full h-full object-fill"
+            autoPlay
+            muted
+            playsInline
+            onEnded={() => {
+              setCurrentMediaIndex((prev) => 
+                prev === playlist.length - 1 ? 0 : prev + 1
+              );
+            }}
+          />
+        ) : (
+          <img
+            src={currentMedia.url}
+            alt={currentMedia.name}
+            className="w-full h-full object-fill"
+          />
+        )}
       </div>
 
       {/* Controles (aparecem ao mover o mouse) */}
