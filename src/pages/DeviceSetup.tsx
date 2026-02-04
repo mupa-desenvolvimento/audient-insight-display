@@ -1,6 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,8 +14,12 @@ import { Loader2, Monitor, Building2, Layers, CheckCircle, LogOut, Search, Chevr
 import { z } from 'zod';
 import { cn } from '@/lib/utils';
 
-const emailSchema = z.string().email('Email inválido').max(255);
-const passwordSchema = z.string().min(6, 'Mínimo 6 caracteres').max(72);
+// Validação do código de empresa: 3 números + 3 letras (ex: 123ABC)
+const companyCodeSchema = z
+  .string()
+  .length(6, 'Código deve ter 6 caracteres')
+  .regex(/^\d{3}[A-Za-z]{3}$/, 'Formato: 3 números + 3 letras (ex: 123ABC)')
+  .transform(val => val.toUpperCase());
 
 interface Store {
   id: string;
@@ -32,9 +35,15 @@ interface DeviceGroup {
   screen_type: string | null;
 }
 
+interface Company {
+  id: string;
+  slug: string;
+  name: string;
+}
+
 type SetupStep = 'login' | 'store' | 'group' | 'complete';
 
-// Gera um código único para o dispositivo
+// Gera um código único para o dispositivo (8 caracteres alfanuméricos)
 const generateDeviceCode = () => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
@@ -44,25 +53,31 @@ const generateDeviceCode = () => {
   return code;
 };
 
+// Verifica se é um código de dispositivo literal da URL (ex: ":deviceId")
+const isLiteralUrlParam = (id: string | undefined): boolean => {
+  if (!id) return true;
+  return id.startsWith(':') || id === 'new' || id === 'undefined';
+};
+
 export default function DeviceSetup() {
   const { deviceId: urlDeviceId } = useParams<{ deviceId: string }>();
   const navigate = useNavigate();
-  const { user, isLoading: authLoading, signIn, signOut } = useAuth();
   
-  // Se não tiver deviceId na URL ou for "new", gera um novo
+  // Se não tiver deviceId na URL, for "new", ou for literal ":deviceId", gera um novo
   const [deviceId, setDeviceId] = useState<string>(() => {
-    if (!urlDeviceId || urlDeviceId === 'new') {
+    if (isLiteralUrlParam(urlDeviceId)) {
       return generateDeviceCode();
     }
-    return urlDeviceId;
+    return urlDeviceId!;
   });
   
   const [step, setStep] = useState<SetupStep>('login');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Login state
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  // Login state - agora usa código de empresa
+  const [companyCode, setCompanyCode] = useState('');
+  const [companyCodeError, setCompanyCodeError] = useState<string | null>(null);
+  const [validatedCompany, setValidatedCompany] = useState<Company | null>(null);
   
   // Store/Group state
   const [stores, setStores] = useState<Store[]>([]);
@@ -77,15 +92,14 @@ export default function DeviceSetup() {
   const [deviceName, setDeviceName] = useState('');
   const [storeCode, setStoreCode] = useState('');
 
-  // Update step based on auth state
+  // Se já tem uma empresa validada, vai para store
+  // Não depende mais de autenticação Supabase
   useEffect(() => {
-    if (!authLoading && user) {
+    if (validatedCompany) {
       setStep('store');
       fetchUserStores();
-    } else if (!authLoading && !user) {
-      setStep('login');
     }
-  }, [user, authLoading]);
+  }, [validatedCompany]);
 
   // Fetch stores when user is authenticated
   const fetchUserStores = async () => {
@@ -141,39 +155,63 @@ export default function DeviceSetup() {
     }
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
+  // Valida o código de empresa e avança para seleção de loja
+  const handleCompanyCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setCompanyCodeError(null);
     
+    // Valida formato do código
+    const result = companyCodeSchema.safeParse(companyCode);
+    if (!result.success) {
+      setCompanyCodeError(result.error.errors[0].message);
+      return;
+    }
+    
+    const normalizedCode = result.data; // Já está em maiúsculas
+    
+    setIsSubmitting(true);
     try {
-      emailSchema.parse(email);
-      passwordSchema.parse(password);
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        toast.error(err.errors[0].message);
+      // Busca empresa pelo slug que corresponde ao código
+      // O código 123ABC corresponde ao slug "123abc" ou campo settings.code = "123ABC"
+      const { data: companies, error } = await supabase
+        .from('companies')
+        .select('id, slug, name, settings')
+        .eq('is_active', true);
+        
+      if (error) throw error;
+      
+      // Procura uma empresa cujo slug ou settings.code corresponda
+      const matchedCompany = companies?.find(company => {
+        const slugMatch = company.slug?.toUpperCase() === normalizedCode;
+        const settingsCode = (company.settings as any)?.code?.toUpperCase();
+        return slugMatch || settingsCode === normalizedCode;
+      });
+      
+      if (!matchedCompany) {
+        setCompanyCodeError('Código de empresa inválido');
+        setIsSubmitting(false);
         return;
       }
-    }
-
-    setIsSubmitting(true);
-    const { error } = await signIn(email, password);
-    setIsSubmitting(false);
-
-    if (error) {
-      if (error.message.includes('Invalid login credentials')) {
-        toast.error('Email ou senha incorretos');
-      } else {
-        toast.error('Erro ao fazer login');
-      }
-    } else {
-      toast.success('Login realizado com sucesso');
+      
+      setValidatedCompany({
+        id: matchedCompany.id,
+        slug: matchedCompany.slug,
+        name: matchedCompany.name
+      });
+      toast.success(`Empresa: ${matchedCompany.name}`);
+      setStep('store');
+    } catch (error) {
+      console.error('Error validating company code:', error);
+      setCompanyCodeError('Erro ao validar código');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleLogout = async () => {
-    await signOut();
+  const handleResetCompany = () => {
+    setValidatedCompany(null);
+    setCompanyCode('');
     setStep('login');
-    setEmail('');
-    setPassword('');
     setSelectedStoreId('');
     setSelectedGroupId('');
   };
@@ -294,14 +332,6 @@ export default function DeviceSetup() {
     navigate(`/webview/${deviceId}`);
   };
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   const selectedStore = stores.find(s => s.id === selectedStoreId);
   const selectedGroup = deviceGroups.find(g => g.id === selectedGroupId);
 
@@ -314,8 +344,8 @@ export default function DeviceSetup() {
           <span className="font-semibold">Configuração do Dispositivo</span>
         </div>
         <div className="flex items-center gap-2">
-          {user && (
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
+          {validatedCompany && (
+            <Button variant="ghost" size="sm" onClick={handleResetCompany}>
               <LogOut className="h-4 w-4 mr-2" />
               Sair
             </Button>
@@ -357,55 +387,60 @@ export default function DeviceSetup() {
       {/* Content */}
       <div className="flex-1 flex items-start justify-center p-4">
         <Card className="w-full max-w-md">
-          {/* Login Step */}
+          {/* Login Step - Código de Empresa */}
           {step === 'login' && (
             <>
               <CardHeader className="text-center space-y-4">
                 <div className="flex justify-center">
                   <div className="p-3 rounded-xl bg-primary/10">
-                    <Monitor className="h-8 w-8 text-primary" />
+                    <Building2 className="h-8 w-8 text-primary" />
                   </div>
                 </div>
                 <CardTitle>Identificação</CardTitle>
                 <CardDescription>
-                  Entre com suas credenciais para configurar o dispositivo
+                  Digite o código da empresa para configurar o dispositivo
                 </CardDescription>
                 <div className="bg-muted/50 p-2 rounded-lg">
-                  <code className="text-xs text-muted-foreground">ID: {deviceId}</code>
+                  <code className="text-xs text-muted-foreground">ID do Dispositivo: {deviceId}</code>
                 </div>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleLogin} className="space-y-4">
+                <form onSubmit={handleCompanyCodeSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="companyCode">Código da Empresa</Label>
                     <Input
-                      id="email"
-                      type="email"
-                      placeholder="seu@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      id="companyCode"
+                      type="text"
+                      placeholder="123ABC"
+                      value={companyCode}
+                      onChange={(e) => {
+                        const value = e.target.value.toUpperCase().slice(0, 6);
+                        setCompanyCode(value);
+                        setCompanyCodeError(null);
+                      }}
+                      maxLength={6}
+                      className="text-center text-2xl font-mono tracking-widest uppercase"
                       required
                     />
+                    <p className="text-xs text-muted-foreground text-center">
+                      Formato: 3 números + 3 letras (ex: 123ABC)
+                    </p>
+                    {companyCodeError && (
+                      <p className="text-xs text-destructive text-center">{companyCodeError}</p>
+                    )}
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Senha</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={isSubmitting || companyCode.length !== 6}
+                  >
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Entrando...
+                        Validando...
                       </>
                     ) : (
-                      'Entrar'
+                      'Continuar'
                     )}
                   </Button>
                 </form>
