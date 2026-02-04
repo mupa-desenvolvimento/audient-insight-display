@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface MediaItem {
@@ -31,7 +32,9 @@ export interface DevicePlayerData {
 }
 
 export const useDevicePlayerData = (deviceCode: string | undefined) => {
-  return useQuery({
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
     queryKey: ["device-player-data", deviceCode],
     queryFn: async (): Promise<DevicePlayerData> => {
       if (!deviceCode) {
@@ -188,6 +191,129 @@ export const useDevicePlayerData = (deviceCode: string | undefined) => {
       return { device, playlist, mediaItems, overrideMedia };
     },
     enabled: !!deviceCode,
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: 60000, // Fallback: refetch every 60 seconds
   });
+
+  // Realtime subscriptions for instant updates
+  useEffect(() => {
+    if (!deviceCode) return;
+
+    const invalidateQuery = () => {
+      queryClient.invalidateQueries({ queryKey: ["device-player-data", deviceCode] });
+    };
+
+    // Subscribe to device changes (for override media, blocking, playlist changes)
+    const devicesChannel = supabase
+      .channel('device-player-devices')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'devices',
+          filter: `device_code=eq.${deviceCode}`,
+        },
+        () => {
+          console.log('[Realtime] Device updated, refreshing...');
+          invalidateQuery();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to playlists changes
+    const playlistsChannel = supabase
+      .channel('device-player-playlists')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'playlists',
+        },
+        () => {
+          console.log('[Realtime] Playlist updated, refreshing...');
+          invalidateQuery();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to playlist_channels changes
+    const channelsChannel = supabase
+      .channel('device-player-channels')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'playlist_channels',
+        },
+        () => {
+          console.log('[Realtime] Channel updated, refreshing...');
+          invalidateQuery();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to playlist_items changes
+    const itemsChannel = supabase
+      .channel('device-player-items')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'playlist_items',
+        },
+        () => {
+          console.log('[Realtime] Playlist items updated, refreshing...');
+          invalidateQuery();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to playlist_channel_items changes
+    const channelItemsChannel = supabase
+      .channel('device-player-channel-items')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'playlist_channel_items',
+        },
+        () => {
+          console.log('[Realtime] Channel items updated, refreshing...');
+          invalidateQuery();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to media_items changes
+    const mediaChannel = supabase
+      .channel('device-player-media')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'media_items',
+        },
+        () => {
+          console.log('[Realtime] Media updated, refreshing...');
+          invalidateQuery();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(devicesChannel);
+      supabase.removeChannel(playlistsChannel);
+      supabase.removeChannel(channelsChannel);
+      supabase.removeChannel(itemsChannel);
+      supabase.removeChannel(channelItemsChannel);
+      supabase.removeChannel(mediaChannel);
+    };
+  }, [deviceCode, queryClient]);
+
+  return query;
 };
