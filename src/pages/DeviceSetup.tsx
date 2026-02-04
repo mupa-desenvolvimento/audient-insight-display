@@ -171,35 +171,26 @@ export default function DeviceSetup() {
     
     setIsSubmitting(true);
     try {
-      // Busca empresa pelo slug que corresponde ao código
-      // O código 123ABC corresponde ao slug "123abc" ou campo settings.code = "123ABC"
-      const { data: companies, error } = await supabase
+      // Busca empresa pelo campo code (gerado automaticamente na tabela companies)
+      const { data: company, error } = await supabase
         .from('companies')
-        .select('id, slug, name, settings')
-        .eq('is_active', true);
+        .select('id, slug, name, code')
+        .eq('is_active', true)
+        .eq('code', normalizedCode)
+        .single();
         
-      if (error) throw error;
-      
-      // Procura uma empresa cujo slug ou settings.code corresponda
-      const matchedCompany = companies?.find(company => {
-        const slugMatch = company.slug?.toUpperCase() === normalizedCode;
-        const settingsCode = (company.settings as any)?.code?.toUpperCase();
-        return slugMatch || settingsCode === normalizedCode;
-      });
-      
-      if (!matchedCompany) {
+      if (error || !company) {
         setCompanyCodeError('Código de empresa inválido');
         setIsSubmitting(false);
         return;
       }
       
       setValidatedCompany({
-        id: matchedCompany.id,
-        slug: matchedCompany.slug,
-        name: matchedCompany.name
+        id: company.id,
+        slug: company.slug,
+        name: company.name
       });
-      toast.success(`Empresa: ${matchedCompany.name}`);
-      setStep('store');
+      toast.success(`Empresa: ${company.name}`);
     } catch (error) {
       console.error('Error validating company code:', error);
       setCompanyCodeError('Erro ao validar código');

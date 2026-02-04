@@ -101,6 +101,7 @@ export type Database = {
       companies: {
         Row: {
           cnpj: string | null
+          code: string | null
           created_at: string
           id: string
           is_active: boolean
@@ -112,6 +113,7 @@ export type Database = {
         }
         Insert: {
           cnpj?: string | null
+          code?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
@@ -123,6 +125,7 @@ export type Database = {
         }
         Update: {
           cnpj?: string | null
+          code?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
