@@ -11,7 +11,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { toast } from 'sonner';
-import { Loader2, Monitor, Building2, Layers, CheckCircle, LogOut, Search, ChevronsUpDown, Check } from 'lucide-react';
+import { Loader2, Monitor, Building2, Layers, CheckCircle, LogOut, Search, ChevronsUpDown, Check, RefreshCw } from 'lucide-react';
 import { z } from 'zod';
 import { cn } from '@/lib/utils';
 
@@ -34,10 +34,28 @@ interface DeviceGroup {
 
 type SetupStep = 'login' | 'store' | 'group' | 'complete';
 
+// Gera um código único para o dispositivo
+const generateDeviceCode = () => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 8; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+};
+
 export default function DeviceSetup() {
-  const { deviceId } = useParams<{ deviceId: string }>();
+  const { deviceId: urlDeviceId } = useParams<{ deviceId: string }>();
   const navigate = useNavigate();
   const { user, isLoading: authLoading, signIn, signOut } = useAuth();
+  
+  // Se não tiver deviceId na URL ou for "new", gera um novo
+  const [deviceId, setDeviceId] = useState<string>(() => {
+    if (!urlDeviceId || urlDeviceId === 'new') {
+      return generateDeviceCode();
+    }
+    return urlDeviceId;
+  });
   
   const [step, setStep] = useState<SetupStep>('login');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -247,12 +265,28 @@ export default function DeviceSetup() {
 
       toast.success('Dispositivo configurado com sucesso!');
       setStep('complete');
+      
+      // Se o deviceId foi gerado automaticamente (não veio da URL),
+      // atualiza a URL para refletir o novo ID
+      if (!urlDeviceId || urlDeviceId === 'new') {
+        window.history.replaceState(null, '', `/setup/${deviceId}`);
+      }
     } catch (error) {
       console.error('Error configuring device:', error);
       toast.error('Erro ao configurar dispositivo');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Gerar novo ID e reiniciar configuração
+  const handleGenerateNewId = () => {
+    const newCode = generateDeviceCode();
+    setDeviceId(newCode);
+    setStep('store'); // Volta para seleção de loja
+    setSelectedGroupId('');
+    toast.success(`Novo ID gerado: ${newCode}`);
+    window.history.replaceState(null, '', `/setup/${newCode}`);
   };
 
   const handleStartPlayer = () => {
@@ -600,8 +634,8 @@ export default function DeviceSetup() {
             <>
               <CardHeader className="text-center space-y-4">
                 <div className="flex justify-center">
-                  <div className="p-3 rounded-xl bg-green-500/10">
-                    <CheckCircle className="h-8 w-8 text-green-500" />
+                  <div className="p-3 rounded-xl bg-primary/10">
+                    <CheckCircle className="h-8 w-8 text-primary" />
                   </div>
                 </div>
                 <CardTitle>Configuração Concluída!</CardTitle>
@@ -610,10 +644,16 @@ export default function DeviceSetup() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* ID do Dispositivo em destaque */}
+                <div className="bg-primary/10 border border-primary/20 p-4 rounded-lg text-center">
+                  <p className="text-xs text-muted-foreground mb-1">Código do Dispositivo</p>
+                  <p className="text-2xl font-mono font-bold text-primary tracking-wider">{deviceId}</p>
+                </div>
+
                 <div className="bg-muted/50 p-4 rounded-lg space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Dispositivo:</span>
-                    <span className="font-medium">{deviceName || deviceId?.slice(0, 8)}</span>
+                    <span className="text-muted-foreground">Nome:</span>
+                    <span className="font-medium">{deviceName || `Dispositivo ${deviceId?.slice(0, 8)}`}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Loja:</span>
@@ -631,10 +671,17 @@ export default function DeviceSetup() {
                   )}
                 </div>
 
-                <Button className="w-full" onClick={handleStartPlayer}>
-                  <Monitor className="mr-2 h-4 w-4" />
-                  Iniciar Player
-                </Button>
+                <div className="flex flex-col gap-2">
+                  <Button className="w-full" onClick={handleStartPlayer}>
+                    <Monitor className="mr-2 h-4 w-4" />
+                    Iniciar Player
+                  </Button>
+                  
+                  <Button variant="outline" className="w-full" onClick={handleGenerateNewId}>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Configurar Outro Dispositivo
+                  </Button>
+                </div>
               </CardContent>
             </>
           )}
