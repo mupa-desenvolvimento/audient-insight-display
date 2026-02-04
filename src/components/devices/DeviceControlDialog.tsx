@@ -34,7 +34,6 @@ import {
 } from "lucide-react";
 import { DeviceWithRelations } from "@/hooks/useDevices";
 import { useMediaItems } from "@/hooks/useMediaItems";
-import { usePlaylistItems } from "@/hooks/usePlaylistItems";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow, addHours } from "date-fns";
@@ -55,9 +54,9 @@ export function DeviceControlDialog({
 }: DeviceControlDialogProps) {
   const { toast } = useToast();
   const { mediaItems, isLoading: mediaLoading } = useMediaItems();
-  const { items: playlistItems, isLoading: playlistItemsLoading } = usePlaylistItems(
-    device?.current_playlist_id || undefined
-  );
+  
+  const [playlistItems, setPlaylistItems] = useState<any[]>([]);
+  const [playlistItemsLoading, setPlaylistItemsLoading] = useState(false);
   
   const [isBlocked, setIsBlocked] = useState(false);
   const [blockedMessage, setBlockedMessage] = useState("");
@@ -74,6 +73,73 @@ export function DeviceControlDialog({
       setOverrideMediaId((device as any).override_media_id || null);
     }
   }, [device]);
+
+  // Carregar itens da playlist (suportando canais e itens diretos)
+  useEffect(() => {
+    async function loadPlaylistItems() {
+      if (!device?.current_playlist_id) {
+        setPlaylistItems([]);
+        return;
+      }
+
+      setPlaylistItemsLoading(true);
+      try {
+        // Primeiro verificar se a playlist tem canais
+        const { data: playlist } = await supabase
+          .from("playlists")
+          .select("has_channels")
+          .eq("id", device.current_playlist_id)
+          .single();
+
+        if (playlist?.has_channels) {
+          // Buscar canais primeiro
+          const { data: channels } = await supabase
+            .from("playlist_channels")
+            .select("id")
+            .eq("playlist_id", device.current_playlist_id);
+
+          if (channels && channels.length > 0) {
+            const channelIds = channels.map(c => c.id);
+            const { data: items } = await supabase
+              .from("playlist_channel_items")
+              .select(`
+                id,
+                position,
+                duration_override,
+                media:media_items(id, name, type, file_url, duration, thumbnail_url)
+              `)
+              .in("channel_id", channelIds)
+              .order("position", { ascending: true });
+
+            setPlaylistItems(items || []);
+          } else {
+            setPlaylistItems([]);
+          }
+        } else {
+          // Playlist tradicional - buscar de playlist_items
+          const { data: items } = await supabase
+            .from("playlist_items")
+            .select(`
+              id,
+              position,
+              duration_override,
+              media:media_items(id, name, type, file_url, duration, thumbnail_url)
+            `)
+            .eq("playlist_id", device.current_playlist_id)
+            .order("position", { ascending: true });
+
+          setPlaylistItems(items || []);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar itens:", error);
+        setPlaylistItems([]);
+      } finally {
+        setPlaylistItemsLoading(false);
+      }
+    }
+
+    loadPlaylistItems();
+  }, [device?.current_playlist_id]);
 
   const handleSendUpdate = async () => {
     if (!device) return;
