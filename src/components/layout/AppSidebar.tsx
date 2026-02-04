@@ -15,6 +15,7 @@ import {
   Building2,
   Plug2,
   Palette,
+  ShoppingBag,
 } from "lucide-react";
 import logoHorizontal from "@/assets/logo_horizontal.svg";
 import { NavLink, useNavigate } from "react-router-dom";
@@ -126,6 +127,23 @@ const AppSidebar = () => {
                     >
                       <Palette className="w-4 h-4" />
                       <span className="font-medium">Tela de Consulta</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <NavLink
+                      to="/admin/product-analytics"
+                      className={({ isActive }) =>
+                        `flex items-center space-x-3 px-3 py-2 rounded-lg transition-all duration-200 ${
+                          isActive
+                            ? "bg-primary text-primary-foreground shadow-md"
+                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        }`
+                      }
+                    >
+                      <ShoppingBag className="w-4 h-4" />
+                      <span className="font-medium">Consultas de Produtos</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

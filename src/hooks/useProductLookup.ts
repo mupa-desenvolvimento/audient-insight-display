@@ -19,6 +19,14 @@ interface ProductLookupState {
   error: string | null;
 }
 
+interface Demographics {
+  gender?: string;
+  age_group?: string;
+  age_estimate?: number;
+  emotion?: string;
+  emotion_confidence?: number;
+}
+
 interface UseProductLookupOptions {
   deviceCode: string;
   onLookupStart?: () => void;
@@ -40,7 +48,7 @@ export const useProductLookup = ({ deviceCode, onLookupStart, onLookupEnd }: Use
   const pendingLookupRef = useRef<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const lookupProduct = useCallback(async (ean: string) => {
+  const lookupProduct = useCallback(async (ean: string, demographics?: Demographics) => {
     const trimmedEan = ean.trim();
     
     if (!deviceCode) {
@@ -72,7 +80,7 @@ export const useProductLookup = ({ deviceCode, onLookupStart, onLookupEnd }: Use
       return;
     }
 
-    console.log("[useProductLookup] Iniciando consulta para EAN:", trimmedEan);
+    console.log("[useProductLookup] Iniciando consulta para EAN:", trimmedEan, "demographics:", demographics);
     
     pendingLookupRef.current = trimmedEan;
     abortControllerRef.current = new AbortController();
@@ -84,7 +92,11 @@ export const useProductLookup = ({ deviceCode, onLookupStart, onLookupEnd }: Use
 
     try {
       const { data, error } = await supabase.functions.invoke("product-lookup", {
-        body: { device_code: deviceCode, ean: trimmedEan }
+        body: { 
+          device_code: deviceCode, 
+          ean: trimmedEan,
+          demographics: demographics || null
+        }
       });
 
       const elapsed = Math.round(performance.now() - startTime);
