@@ -8,6 +8,14 @@ const corsHeaders = {
 interface ProductLookupRequest {
   device_code: string;
   ean: string;
+  // Dados demográficos opcionais (via detecção facial)
+  demographics?: {
+    gender?: string;
+    age_group?: string;
+    age_estimate?: number;
+    emotion?: string;
+    emotion_confidence?: number;
+  };
 }
 
 interface ProductResponse {
@@ -233,9 +241,9 @@ Deno.serve(async (req) => {
     );
     
     const body = await req.json() as ProductLookupRequest;
-    const { device_code, ean } = body;
+    const { device_code, ean, demographics } = body;
     
-    console.log('[Request] device_code:', device_code, 'ean:', ean);
+    console.log('[Request] device_code:', device_code, 'ean:', ean, 'demographics:', demographics);
     
     // Validar entrada
     if (!device_code) {
@@ -487,6 +495,32 @@ Deno.serve(async (req) => {
       status: 'success',
       latency_ms: Date.now() - startTime
     });
+    
+    // Registrar analytics com dados demográficos
+    const analyticsData = {
+      device_id: device.id,
+      company_id: device.company_id,
+      store_code: storeCode,
+      ean: normalizedEan,
+      product_name: productData.name,
+      product_data: productData,
+      gender: demographics?.gender || null,
+      age_group: demographics?.age_group || null,
+      age_estimate: demographics?.age_estimate || null,
+      emotion: demographics?.emotion || null,
+      emotion_confidence: demographics?.emotion_confidence || null,
+      lookup_date: new Date().toISOString().split('T')[0],
+    };
+    
+    console.log('[Analytics] Registrando:', JSON.stringify(analyticsData));
+    
+    const { error: analyticsError } = await supabase
+      .from('product_lookup_analytics')
+      .insert(analyticsData);
+    
+    if (analyticsError) {
+      console.error('[Analytics] Erro ao registrar:', analyticsError);
+    }
     
     console.log('[Success] Produto encontrado em', Date.now() - startTime, 'ms');
     

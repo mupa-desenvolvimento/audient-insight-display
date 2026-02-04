@@ -1091,6 +1091,99 @@ export type Database = {
           },
         ]
       }
+      product_lookup_analytics: {
+        Row: {
+          age_estimate: number | null
+          age_group: string | null
+          ai_category: string | null
+          ai_description: string | null
+          ai_enriched: boolean | null
+          ai_enriched_at: string | null
+          ai_tags: string[] | null
+          company_id: string | null
+          created_at: string
+          device_id: string | null
+          ean: string
+          emotion: string | null
+          emotion_confidence: number | null
+          first_lookup_at: string
+          gender: string | null
+          id: string
+          last_lookup_at: string
+          lookup_count: number | null
+          lookup_date: string
+          product_data: Json | null
+          product_name: string | null
+          store_code: string | null
+          updated_at: string
+        }
+        Insert: {
+          age_estimate?: number | null
+          age_group?: string | null
+          ai_category?: string | null
+          ai_description?: string | null
+          ai_enriched?: boolean | null
+          ai_enriched_at?: string | null
+          ai_tags?: string[] | null
+          company_id?: string | null
+          created_at?: string
+          device_id?: string | null
+          ean: string
+          emotion?: string | null
+          emotion_confidence?: number | null
+          first_lookup_at?: string
+          gender?: string | null
+          id?: string
+          last_lookup_at?: string
+          lookup_count?: number | null
+          lookup_date?: string
+          product_data?: Json | null
+          product_name?: string | null
+          store_code?: string | null
+          updated_at?: string
+        }
+        Update: {
+          age_estimate?: number | null
+          age_group?: string | null
+          ai_category?: string | null
+          ai_description?: string | null
+          ai_enriched?: boolean | null
+          ai_enriched_at?: string | null
+          ai_tags?: string[] | null
+          company_id?: string | null
+          created_at?: string
+          device_id?: string | null
+          ean?: string
+          emotion?: string | null
+          emotion_confidence?: number | null
+          first_lookup_at?: string
+          gender?: string | null
+          id?: string
+          last_lookup_at?: string
+          lookup_count?: number | null
+          lookup_date?: string
+          product_data?: Json | null
+          product_name?: string | null
+          store_code?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_lookup_analytics_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_lookup_analytics_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_lookup_logs: {
         Row: {
           company_id: string | null

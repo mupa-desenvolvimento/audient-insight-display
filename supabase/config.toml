@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.product-lookup]
 verify_jwt = false
+
+[functions.product-enrich]
+verify_jwt = false
+
+[functions.delete-media]
+verify_jwt = false
