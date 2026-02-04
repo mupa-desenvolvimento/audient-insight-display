@@ -172,42 +172,18 @@ const DevicePlayer = () => {
   }
 
   return (
-    <div className="relative min-h-screen bg-black overflow-hidden">
-      {/* Conteúdo Principal */}
-      <div className="relative w-full h-screen">
+    <div className="fixed inset-0 bg-black overflow-hidden">
+      {/* Conteúdo Principal - Tela Cheia */}
+      <div className="absolute inset-0">
         <img
           src={currentMedia.url}
           alt={currentMedia.name}
-          className="w-full h-full object-cover transition-opacity duration-1000"
+          className="w-full h-full object-fill"
         />
-        
-        {/* Overlay de Informações */}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-8">
-          <div className="max-w-4xl">
-            <h1 className="text-4xl font-bold text-white mb-2">
-              {currentMedia.name}
-            </h1>
-            <div className="flex items-center space-x-4 text-white/80">
-              <span>Mídia {currentMediaIndex + 1} de {playlist.length}</span>
-              <span>•</span>
-              <span>Dispositivo: {deviceId}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Barra de Progresso */}
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
-          <div 
-            className="h-full bg-primary transition-all duration-1000 ease-linear"
-            style={{ 
-              width: `${((Date.now() % currentMedia.duration) / currentMedia.duration) * 100}%` 
-            }}
-          ></div>
-        </div>
       </div>
 
       {/* Controles (aparecem ao mover o mouse) */}
-      <div className={`absolute top-0 left-0 right-0 p-6 bg-gradient-to-b from-black/60 to-transparent transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/60 to-transparent transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-4">
             <Link to="/admin/devices">
@@ -216,51 +192,30 @@ const DevicePlayer = () => {
                 Voltar
               </Button>
             </Link>
-            <div className="flex items-center space-x-2 text-white">
+            <div className="flex items-center space-x-2 text-white text-sm">
               <Monitor className="w-4 h-4" />
-              <span className="text-sm">Player - {deviceId}</span>
+              <span>{deviceId}</span>
             </div>
           </div>
           
-          <div className="flex items-center space-x-2">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={toggleFullscreen}
-              className="text-white hover:bg-white/20"
-            >
-              {isFullscreen ? 'Sair Tela Cheia' : 'Tela Cheia'}
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Dados da Audiência (Reconhecimento IA) */}
-      <div className={`absolute top-20 left-6 bg-black/50 backdrop-blur-sm rounded-lg p-4 text-white text-sm space-y-2 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-30'}`}>
-        <div className="flex items-center space-x-2 text-blue-400 font-semibold">
-          <Camera className="w-4 h-4" />
-          <span>Reconhecimento IA</span>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Users className="w-3 h-3" />
-          <span>Pessoas detectadas: {audienceData.currentCount}</span>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Clock className="w-3 h-3" />
-          <span>Total hoje: {audienceData.totalToday}</span>
-        </div>
-        <div className="text-xs text-white/70">
-          Status: Ativo • Último envio: agora
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={toggleFullscreen}
+            className="text-white hover:bg-white/20"
+          >
+            {isFullscreen ? 'Sair' : 'Tela Cheia'}
+          </Button>
         </div>
       </div>
 
       {/* Indicadores de Mídia */}
-      <div className={`absolute right-6 top-1/2 transform -translate-y-1/2 space-y-2 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`absolute right-4 top-1/2 transform -translate-y-1/2 space-y-2 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
         {playlist.map((_, index) => (
           <div
             key={index}
-            className={`w-2 h-8 rounded-full transition-all duration-300 ${
-              index === currentMediaIndex ? 'bg-primary' : 'bg-white/30'
+            className={`w-2 h-6 rounded-full transition-all duration-300 ${
+              index === currentMediaIndex ? 'bg-white' : 'bg-white/30'
             }`}
           />
         ))}
