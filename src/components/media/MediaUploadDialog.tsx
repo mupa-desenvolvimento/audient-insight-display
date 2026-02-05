@@ -90,7 +90,7 @@ const getFileType = (mimeType: string): string => {
   return 'document';
 };
 
-export function MediaUploadDialog({ open, onOpenChange, onSuccess }: MediaUploadDialogProps) {
+export function MediaUploadDialog({ open, onOpenChange, onSuccess, folderId }: MediaUploadDialogProps) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   

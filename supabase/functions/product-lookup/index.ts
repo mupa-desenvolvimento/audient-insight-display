@@ -66,7 +66,7 @@ function validateEan(ean: string): { valid: boolean; normalized: string; error?:
 
 // Função para obter novo token da Zaffari
 async function getZaffariToken(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   integrationId: string,
   credentials: { usuario: string; password: string },
   currentCache: TokenCache | null

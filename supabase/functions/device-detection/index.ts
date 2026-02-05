@@ -153,10 +153,11 @@ Deno.serve(async (req) => {
       JSON.stringify({ error: "Método não suportado" }),
       { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (error) {
-    console.error("Erro no endpoint:", error);
-    return new Response(
-      JSON.stringify({ error: "Erro interno do servidor", details: error.message }),
+ } catch (error: unknown) {
+   console.error("Erro no endpoint:", error);
+   const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+   return new Response(
+     JSON.stringify({ error: "Erro interno do servidor", details: errorMessage }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
