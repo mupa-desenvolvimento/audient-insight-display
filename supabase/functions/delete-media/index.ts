@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
     const r2Endpoint = `https://${accountId}.r2.cloudflarestorage.com`
 
     // Delete file from R2 if r2_key exists in metadata
-    const metadata = mediaItem.metadata as Record<string, any> | null
+    const metadata = mediaItem.metadata as { r2_key?: string; thumbnail_key?: string } | null
     if (metadata?.r2_key) {
       const deleteUrl = `${r2Endpoint}/${bucketName}/${metadata.r2_key}`
       console.log('Deleting from R2:', metadata.r2_key)

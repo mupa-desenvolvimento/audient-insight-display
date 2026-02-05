@@ -635,6 +635,41 @@ export type Database = {
           },
         ]
       }
+      folders: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          parent_id: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          parent_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          parent_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "folders_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_logs: {
         Row: {
           completed_at: string | null
@@ -683,6 +718,7 @@ export type Database = {
           duration: number | null
           file_size: number | null
           file_url: string | null
+          folder_id: string | null
           id: string
           metadata: Json | null
           name: string
@@ -697,6 +733,7 @@ export type Database = {
           duration?: number | null
           file_size?: number | null
           file_url?: string | null
+          folder_id?: string | null
           id?: string
           metadata?: Json | null
           name: string
@@ -711,6 +748,7 @@ export type Database = {
           duration?: number | null
           file_size?: number | null
           file_url?: string | null
+          folder_id?: string | null
           id?: string
           metadata?: Json | null
           name?: string

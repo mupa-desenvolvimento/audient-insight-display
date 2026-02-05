@@ -316,29 +316,284 @@ export function MediaUploadDialog({ open, onOpenChange, onSuccess }: MediaUpload
     });
   }, []);
 
+  const compressImage = useCallback(async (file: File): Promise<File> => {
+    // Skip small files or non-resizable formats
+    if (file.size < 500 * 1024) return file; // Skip files smaller than 500KB
+    if (file.type === 'image/svg+xml' || file.type === 'image/gif') return file;
+
+    return new Promise((resolve) => {
+      const img = new Image();
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      img.onload = () => {
+        // Max dimensions (Full HD)
+        const MAX_WIDTH = 1920;
+        const MAX_HEIGHT = 1080;
+        let width = img.width;
+        let height = img.height;
+
+        // Calculate new dimensions
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        // Draw with better quality
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        // Convert to WebP for better compression
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            resolve(file);
+            return;
+          }
+          
+          // If optimized is larger, keep original
+          if (blob.size >= file.size) {
+            resolve(file);
+            return;
+          }
+
+          console.log(`[ImageOptimizer] Reduced ${file.name} from ${(file.size/1024).toFixed(0)}KB to ${(blob.size/1024).toFixed(0)}KB`);
+
+          const optimizedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".webp", {
+            type: 'image/webp',
+            lastModified: Date.now(),
+          });
+          resolve(optimizedFile);
+        }, 'image/webp', 0.8);
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(img.src);
+        resolve(file);
+      };
+
+      img.src = URL.createObjectURL(file);
+    });
+  }, []);
+
+  const compressVideo = useCallback(async (file: File, onProgress?: (progress: number) => void): Promise<File> => {
+    // Skip if not video or too small (e.g. < 20MB)
+    if (!file.type.startsWith('video/') || file.size < 20 * 1024 * 1024) return file;
+
+    // Check browser support for MediaRecorder and WebM
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') 
+      ? 'video/webm;codecs=vp9' 
+      : 'video/webm';
+      
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+      console.warn('Video compression not supported by browser');
+      return file;
+    }
+
+    return new Promise((resolve) => {
+      const video = document.createElement('video');
+      video.muted = true;
+      video.autoplay = true;
+      video.src = URL.createObjectURL(file);
+      
+      // Cleanup helper
+      const cleanup = () => {
+        URL.revokeObjectURL(video.src);
+        video.remove();
+      };
+
+      video.onloadedmetadata = () => {
+        // Target specs
+        const MAX_HEIGHT = 1080;
+        const TARGET_BITRATE = 2500000; // 2.5 Mbps
+        
+        // Current specs
+        let width = video.videoWidth;
+        let height = video.videoHeight;
+        const duration = video.duration;
+        const currentBitrate = (file.size * 8) / duration;
+
+        // If already optimized enough, skip
+        if (height <= MAX_HEIGHT && currentBitrate < TARGET_BITRATE * 1.5) {
+          cleanup();
+          resolve(file);
+          return;
+        }
+
+        // Calculate new dimensions (maintain aspect ratio)
+        if (height > MAX_HEIGHT) {
+          width = Math.round(width * (MAX_HEIGHT / height));
+          height = MAX_HEIGHT;
+        }
+        // Ensure even dimensions (some codecs require it)
+        width = width % 2 === 0 ? width : width - 1;
+        height = height % 2 === 0 ? height : height - 1;
+
+        console.log(`[VideoOptimizer] Compressing ${file.name}...`);
+        console.log(`Original: ${video.videoWidth}x${video.videoHeight} @ ${(currentBitrate/1000000).toFixed(2)}Mbps`);
+        console.log(`Target: ${width}x${height} @ ${(TARGET_BITRATE/1000000).toFixed(2)}Mbps`);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+
+        // Capture stream from canvas
+        const stream = canvas.captureStream(30); // 30 FPS
+
+        // Try to capture audio
+        try {
+          const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+          if (AudioContext) {
+            const audioCtx = new AudioContext();
+            const source = audioCtx.createMediaElementSource(video);
+            const dest = audioCtx.createMediaStreamDestination();
+            source.connect(dest);
+            const audioTrack = dest.stream.getAudioTracks()[0];
+            if (audioTrack) {
+              stream.addTrack(audioTrack);
+            }
+          }
+        } catch (e) {
+          console.warn('Audio compression failed, video will be muted', e);
+        }
+
+        const recorder = new MediaRecorder(stream, {
+          mimeType,
+          videoBitsPerSecond: TARGET_BITRATE
+        });
+
+        const chunks: BlobPart[] = [];
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) chunks.push(e.data);
+        };
+
+        recorder.onstop = () => {
+          const blob = new Blob(chunks, { type: 'video/webm' });
+          
+          console.log(`[VideoOptimizer] Finished. Size: ${(file.size/1024/1024).toFixed(1)}MB -> ${(blob.size/1024/1024).toFixed(1)}MB`);
+
+          if (blob.size < file.size) {
+            const newFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".webm", {
+              type: 'video/webm',
+              lastModified: Date.now()
+            });
+            cleanup();
+            resolve(newFile);
+          } else {
+            cleanup();
+            resolve(file); // Keep original if compression didn't help
+          }
+        };
+
+        // Start processing
+        recorder.start();
+        
+        // Draw loop
+        const draw = () => {
+          if (video.paused || video.ended) return;
+          ctx?.drawImage(video, 0, 0, width, height);
+          requestAnimationFrame(draw);
+        };
+        
+        video.onplay = () => draw();
+        
+        // Update progress
+        video.ontimeupdate = () => {
+          if (duration > 0) {
+             const percent = (video.currentTime / duration) * 100;
+             onProgress?.(percent);
+          }
+        };
+        
+        video.onended = () => {
+          recorder.stop();
+        };
+
+        video.onerror = () => {
+          cleanup();
+          resolve(file);
+        };
+
+        // Start playback to trigger processing
+        video.play().catch(e => {
+          console.error('Video playback failed:', e);
+          cleanup();
+          resolve(file);
+        });
+      };
+
+      video.onerror = () => {
+        cleanup();
+        resolve(file);
+      };
+    });
+  }, []);
+
   const uploadSingleFile = useCallback(async (uploadFile: UploadFile): Promise<boolean> => {
-    const { file, id } = uploadFile;
+    const { file: originalFile, id } = uploadFile;
+    let fileToUpload = originalFile;
 
     try {
       // Update status
       setFiles(prev => prev.map(f => 
-        f.id === id ? { ...f, status: 'uploading' as FileStatus, progress: 10 } : f
+        f.id === id ? { ...f, status: 'uploading' as FileStatus, progress: 5 } : f
       ));
 
+      // Optimize Image
+      if (getFileType(originalFile.type) === 'image') {
+        fileToUpload = await compressImage(originalFile);
+      }
+      // Optimize Video
+      else if (getFileType(originalFile.type) === 'video') {
+        // Show optimization status
+        setFiles(prev => prev.map(f => 
+          f.id === id ? { ...f, progress: 10 } : f
+        )); 
+        
+        fileToUpload = await compressVideo(originalFile, (videoProgress) => {
+            // Map 0-100% video progress to 10-50% overall progress
+            setFiles(prev => prev.map(f => 
+                f.id === id ? { ...f, progress: 10 + (videoProgress * 0.4) } : f
+            ));
+        });
+      }
+
+      // Show optimization feedback
+      if (fileToUpload.size < originalFile.size) {
+        const savedMB = ((originalFile.size - fileToUpload.size) / 1024 / 1024).toFixed(2);
+        const savedKB = ((originalFile.size - fileToUpload.size) / 1024).toFixed(0);
+        const percent = ((1 - fileToUpload.size / originalFile.size) * 100).toFixed(0);
+        
+        toast({
+          title: "Otimização Concluída",
+          description: `${originalFile.name}: Reduzido em ${Number(savedMB) > 0.1 ? savedMB + 'MB' : savedKB + 'KB'} (${percent}%)`,
+          duration: 4000,
+        });
+      }
+
       // Generate thumbnail for images and videos
-      const fileType = getFileType(file.type);
+      const fileType = getFileType(fileToUpload.type);
       let thumbnailBlob: Blob | null = null;
 
       if (fileType === 'video') {
         setFiles(prev => prev.map(f => 
           f.id === id ? { ...f, progress: 20 } : f
         ));
-        thumbnailBlob = await generateVideoThumbnail(file);
+        thumbnailBlob = await generateVideoThumbnail(fileToUpload);
       } else if (fileType === 'image') {
         setFiles(prev => prev.map(f => 
           f.id === id ? { ...f, progress: 20 } : f
         ));
-        thumbnailBlob = await generateImageThumbnail(file);
+        thumbnailBlob = await generateImageThumbnail(fileToUpload);
       }
 
       setFiles(prev => prev.map(f => 
@@ -347,9 +602,10 @@ export function MediaUploadDialog({ open, onOpenChange, onSuccess }: MediaUpload
 
       // Upload to server
       const formData = new FormData();
-      formData.append('file', file);
-      formData.append('fileName', file.name);
-      formData.append('fileType', file.type);
+      formData.append('file', fileToUpload);
+      // Ensure we send the correct name (e.g. with .webp extension if changed)
+      formData.append('fileName', fileToUpload.name); 
+      formData.append('fileType', fileToUpload.type);
 
       const { data: { session } } = await supabase.auth.getSession();
       

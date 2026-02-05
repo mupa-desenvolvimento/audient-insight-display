@@ -35,6 +35,8 @@ import {
 import { DeviceWithRelations } from "@/hooks/useDevices";
 import { useMediaItems } from "@/hooks/useMediaItems";
 import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/services/firebase";
+import { ref, update } from "firebase/database";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow, addHours } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -146,6 +148,7 @@ export function DeviceControlDialog({
     
     setIsSyncing(true);
     try {
+      // 1. Atualizar no Supabase (mantendo compatibilidade)
       const { error } = await supabase
         .from("devices")
         .update({ 
@@ -155,6 +158,19 @@ export function DeviceControlDialog({
         .eq("id", device.id);
 
       if (error) throw error;
+
+      // 2. Atualizar no Firebase Realtime Database
+      const deviceRef = ref(db, `${device.device_code}`);
+      const companyInfo = device.company ? `${device.company.id}_${device.company.name}` : "";
+      const deviceInfo = device.store ? `Loja: ${device.store.name}` : "Sem grupo";
+
+      await update(deviceRef, {
+        "atualizacao_plataforma": "true",
+        "empresa_id": companyInfo,
+        "device_id": device.id,
+        "last-update": new Date().toISOString(),
+        "grupo_device": deviceInfo
+      });
 
       toast({
         title: "Atualização enviada",

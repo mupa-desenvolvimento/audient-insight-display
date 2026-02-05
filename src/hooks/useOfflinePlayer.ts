@@ -82,7 +82,11 @@ export interface DeviceState {
   blocked_message: string | null;
   override_media: OverrideMedia | null;
   last_sync_requested_at: string | null;
+  camera_enabled: boolean;
 }
+
+import { MediaCacheService } from "@/services/mediaCache";
+import { Capacitor } from '@capacitor/core';
 
 const STORAGE_KEY = "device_player_state";
 const SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutos para sync completo
@@ -131,6 +135,31 @@ export const useOfflinePlayer = (deviceCode: string) => {
     const cached = mediaCacheRef.current.get(mediaId);
     if (cached) return cached;
 
+    // Se for nativo, usa MediaCacheService (Filesystem)
+    if (Capacitor.isNativePlatform()) {
+      try {
+        // Verifica se já está em cache
+        const cachedUrl = await MediaCacheService.isCached(url);
+        if (cachedUrl) {
+          mediaCacheRef.current.set(mediaId, cachedUrl);
+          return cachedUrl;
+        }
+
+        // Se não estiver, força o download e aguarda
+        const localUrl = await MediaCacheService.downloadFile(url);
+        if (localUrl) {
+          mediaCacheRef.current.set(mediaId, localUrl);
+          return localUrl;
+        }
+        
+        return url; // Fallback se falhar download
+      } catch (e) {
+        console.error(`[Native] Erro ao baixar mídia ${mediaId}:`, e);
+        return url;
+      }
+    }
+
+    // Se for Web, usa IndexedDB
     try {
       const response = await fetch(url);
       const blob = await response.blob();
@@ -399,8 +428,36 @@ export const useOfflinePlayer = (deviceCode: string) => {
         }
       }
 
-      // Busca playlists associadas ao dispositivo via grupos ou diretamente
-      const { data: playlistsData, error: playlistsError } = await supabase
+      // Busca playlists associadas ao dispositivo (diretas ou via canais de distribuição)
+      let relevantPlaylistIds: string[] = [];
+      let relevantChannelIds: string[] = [];
+
+      // 1. Playlist direta
+      if (device.current_playlist_id) {
+        relevantPlaylistIds.push(device.current_playlist_id);
+      }
+
+      // 2. Playlists via Grupos -> Canais
+      const { data: groupMembers } = await supabase
+        .from("device_group_members")
+        .select("group_id")
+        .eq("device_id", device.id);
+
+      if (groupMembers && groupMembers.length > 0) {
+        const groupIds = groupMembers.map(g => g.group_id);
+        
+        const { data: groupChannels } = await supabase
+          .from("device_group_channels")
+          .select("distribution_channel_id")
+          .in("group_id", groupIds);
+
+        if (groupChannels && groupChannels.length > 0) {
+          relevantChannelIds = groupChannels.map(c => c.distribution_channel_id);
+        }
+      }
+
+      // Constrói query para buscar playlists
+      let query = supabase
         .from("playlists")
         .select(`
           id,
@@ -451,8 +508,39 @@ export const useOfflinePlayer = (deviceCode: string) => {
             )
           )
         `)
-        .eq("is_active", true)
-        .order("priority", { ascending: false });
+        .eq("is_active", true);
+
+      // Aplica filtros de escopo
+      let shouldFetch = false;
+      if (relevantPlaylistIds.length > 0 || relevantChannelIds.length > 0) {
+        const conditions: string[] = [];
+        if (relevantPlaylistIds.length > 0) {
+          conditions.push(`id.in.(${relevantPlaylistIds.join(',')})`);
+        }
+        if (relevantChannelIds.length > 0) {
+          conditions.push(`channel_id.in.(${relevantChannelIds.join(',')})`);
+        }
+        
+        // Se houver condições, aplica com OR. Se não, não busca nada (ou busca tudo se for fallback, mas melhor ser restritivo)
+        if (conditions.length > 0) {
+          query = query.or(conditions.join(','));
+          shouldFetch = true;
+        }
+      } else {
+        // Se não tem playlist direta nem canais, não busca nada para evitar baixar o banco todo
+        console.warn("[useOfflinePlayer] Dispositivo sem playlists ou canais associados.");
+        // Opcional: Buscar uma playlist "default" ou "demo" se necessário
+        // Por enquanto, retornamos array vazio para limpar o player
+      }
+
+      let playlistsData: any[] = [];
+      let playlistsError = null;
+
+      if (shouldFetch) {
+        const result = await query.order("priority", { ascending: false });
+        playlistsData = result.data || [];
+        playlistsError = result.error;
+      }
 
       if (playlistsError) throw playlistsError;
 
@@ -643,9 +731,10 @@ export const useOfflinePlayer = (deviceCode: string) => {
         .update({ last_seen_at: new Date().toISOString() })
         .eq("id", device.id);
 
-    } catch (e) {
+    } catch (e: any) {
       console.error("Erro na sincronização:", e);
-      setSyncError(e instanceof Error ? e.message : "Erro desconhecido");
+      const errorMessage = e?.message || (typeof e === 'string' ? e : "Erro desconhecido");
+      setSyncError(errorMessage);
       
       // Tenta carregar do cache local
       const localState = loadLocalState();
@@ -660,6 +749,10 @@ export const useOfflinePlayer = (deviceCode: string) => {
   // Inicialização
   useEffect(() => {
     const init = async () => {
+      if (Capacitor.isNativePlatform()) {
+        await MediaCacheService.init();
+      }
+
       setIsLoading(true);
       
       // Carrega estado local primeiro
@@ -686,24 +779,32 @@ export const useOfflinePlayer = (deviceCode: string) => {
     init();
   }, [deviceCode]);
 
-  // Verificação rápida de comandos de controle (bloqueio, mídia avulsa)
+  // Verificação rápida de comandos de controle (bloqueio, mídia avulsa) e Heartbeat
   const checkControlCommands = useCallback(async () => {
     if (!deviceState?.device_id) return;
 
     try {
+      // 1. Atualiza Heartbeat (last_seen_at)
+      await supabase
+        .from("devices")
+        .update({ last_seen_at: new Date().toISOString() })
+        .eq("id", deviceState.device_id);
+
+      // 2. Verifica comandos
       const { data: device, error } = await supabase
         .from("devices")
-        .select("is_blocked, blocked_message, override_media_id, override_media_expires_at, last_sync_requested_at")
+        .select("is_blocked, blocked_message, override_media_id, override_media_expires_at, last_sync_requested_at, camera_enabled")
         .eq("device_code", deviceCode)
         .single();
 
       if (error || !device) return;
 
-      // Verifica se houve mudança no bloqueio ou mídia avulsa
+      // Verifica se houve mudança no bloqueio, mídia avulsa ou câmera
       const needsUpdate = 
         device.is_blocked !== deviceState.is_blocked ||
         device.blocked_message !== deviceState.blocked_message ||
-        device.override_media_id !== (deviceState.override_media?.id || null);
+        device.override_media_id !== (deviceState.override_media?.id || null) ||
+        device.camera_enabled !== deviceState.camera_enabled;
 
       // Verifica se foi solicitada uma sincronização forçada
       const lastSyncRequested = device.last_sync_requested_at;

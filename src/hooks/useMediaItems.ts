@@ -16,6 +16,7 @@ export interface MediaItem {
   metadata: Json | null;
   created_at: string;
   updated_at: string;
+  folder_id?: string | null;
 }
 
 export interface MediaItemInsert {
@@ -28,6 +29,7 @@ export interface MediaItemInsert {
   resolution?: string | null;
   status?: string;
   metadata?: Json | null;
+  folder_id?: string | null;
 }
 
 // Helper to convert R2 signed URL to public URL
@@ -50,18 +52,28 @@ const getPublicUrl = (url: string | null): string | null => {
   return url;
 };
 
-export const useMediaItems = () => {
+export const useMediaItems = (folderId?: string | null) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: mediaItems = [], isLoading, error, refetch } = useQuery({
-    queryKey: ["media-items"],
+    queryKey: ["media-items", folderId],
     queryFn: async () => {
-      console.log('[useMediaItems] Fetching media items...');
-      const { data, error } = await supabase
+      console.log('[useMediaItems] Fetching media items...', folderId === undefined ? 'ALL' : folderId);
+      
+      let query = supabase
         .from("media_items")
-        .select("*")
-        .order("created_at", { ascending: false });
+        .select("*");
+
+      if (folderId !== undefined) {
+        if (folderId === null) {
+          query = query.is("folder_id", null);
+        } else {
+          query = query.eq("folder_id", folderId);
+        }
+      }
+
+      const { data, error } = await query.order("created_at", { ascending: false });
 
       if (error) throw error;
       
@@ -157,6 +169,24 @@ export const useMediaItems = () => {
     },
   });
 
+  const moveMediaItem = useMutation({
+    mutationFn: async ({ mediaId, folderId }: { mediaId: string; folderId: string | null }) => {
+      const { error } = await supabase
+        .from("media_items")
+        .update({ folder_id: folderId })
+        .eq("id", mediaId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["media-items"] });
+      toast({ title: "Mídia movida com sucesso" });
+    },
+    onError: (error) => {
+      toast({ title: "Erro ao mover mídia", description: error.message, variant: "destructive" });
+    },
+  });
+
   return {
     mediaItems,
     isLoading,
@@ -165,5 +195,6 @@ export const useMediaItems = () => {
     createMediaItem,
     updateMediaItem,
     deleteMediaItem,
+    moveMediaItem,
   };
 };

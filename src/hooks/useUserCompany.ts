@@ -7,6 +7,7 @@ export interface UserCompany {
   name: string;
   slug: string;
   tenant_id: string | null;
+  code: string;
 }
 
 export function useUserCompany() {
@@ -30,7 +31,7 @@ export function useUserCompany() {
       // Then get the company for that tenant
       const { data: companies, error: companiesError } = await supabase
         .from("companies")
-        .select("id, name, slug, tenant_id")
+        .select("id, name, slug, tenant_id, code")
         .eq("tenant_id", mapping.tenant_id)
         .eq("is_active", true)
         .limit(1);

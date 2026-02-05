@@ -219,8 +219,8 @@ Deno.serve(async (req) => {
     // For images, use the main file as thumbnail; for others, null
     const publicThumbnailUrl = isImage ? publicFileUrl : null
     const thumbnailGenerated = isImage
-    let resolution: string | null = null
-    let duration: number | null = null
+    const resolution: string | null = null
+    const duration: number | null = null
     
     // Default duration based on type
     const defaultDuration = isImage ? 10 : (isDocument ? 30 : null) // 10s images, 30s documents

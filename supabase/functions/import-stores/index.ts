@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -373,7 +373,7 @@ Deno.serve(async (req) => {
   }
 })
 
-async function updateImportLogError(supabase: any, logId: string, errorMessage: string) {
+async function updateImportLogError(supabase: SupabaseClient, logId: string, errorMessage: string) {
   await supabase
     .from('import_logs')
     .update({ 

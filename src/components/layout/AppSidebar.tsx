@@ -23,6 +23,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useUserCompany } from "@/hooks/useUserCompany";
 import { Button } from "@/components/ui/button";
+import packageJson from "../../../package.json";
 import {
   Sidebar,
   SidebarContent,
@@ -193,6 +194,9 @@ const AppSidebar = () => {
           <Button variant="ghost" size="icon" onClick={handleSignOut}>
             <LogOut className="h-4 w-4" />
           </Button>
+        </div>
+        <div className="mt-2 text-xs text-center text-muted-foreground">
+          v{packageJson.version}
         </div>
       </SidebarFooter>
     </Sidebar>

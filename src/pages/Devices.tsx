@@ -7,7 +7,7 @@ import { Monitor, Plus, MapPin, Copy, ExternalLink, Camera, Loader2, Trash2, Pen
 import { useToast } from "@/hooks/use-toast";
 import { useDevices, DeviceInsert, DeviceUpdate, DeviceWithRelations } from "@/hooks/useDevices";
 import { usePlaylists } from "@/hooks/usePlaylists";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, differenceInMinutes } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DeviceFormDialog } from "@/components/devices/DeviceFormDialog";
 import { DeviceControlDialog } from "@/components/devices/DeviceControlDialog";
@@ -39,6 +39,18 @@ const Devices = () => {
     device.store?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     device.device_code.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const getDeviceStatus = (device: DeviceWithRelations) => {
+    if (device.status === 'pending' && !device.last_seen_at) return 'pending';
+    
+    if (!device.last_seen_at) return 'offline';
+    
+    const lastSeenDate = new Date(device.last_seen_at);
+    const now = new Date();
+    const diffInMinutes = differenceInMinutes(now, lastSeenDate);
+    
+    return diffInMinutes < 6 ? 'online' : 'offline'; // 6 minutes threshold (5 min sync + 1 min buffer)
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -171,14 +183,16 @@ const Devices = () => {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredDevices.map((device) => (
+          {filteredDevices.map((device) => {
+            const currentStatus = getDeviceStatus(device);
+            return (
             <Card key={device.id} className="hover:shadow-lg transition-all duration-300">
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-3">
                     <div className="relative">
                       <Monitor className="w-8 h-8 text-primary" />
-                      <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${getStatusColor(device.status)}`}></div>
+                      <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${getStatusColor(currentStatus)}`}></div>
                       {device.camera_enabled && (
                         <Camera className="absolute -bottom-1 -left-1 w-3 h-3 text-blue-500" />
                       )}
@@ -230,8 +244,8 @@ const Devices = () => {
 
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Status</span>
-                  <Badge variant={getStatusVariant(device.status)}>
-                    {getStatusLabel(device.status)}
+                  <Badge variant={getStatusVariant(currentStatus)}>
+                    {getStatusLabel(currentStatus)}
                   </Badge>
                 </div>
                 
@@ -288,7 +302,8 @@ const Devices = () => {
                 </div>
               </CardContent>
             </Card>
-          ))}
+          );
+          })}
         </div>
       )}
 

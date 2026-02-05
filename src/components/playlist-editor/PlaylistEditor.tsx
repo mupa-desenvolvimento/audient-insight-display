@@ -16,6 +16,8 @@ import { ChannelEditor } from "./ChannelEditor";
 import { ChannelsTimeline } from "./ChannelsTimeline";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/services/firebase";
+import { ref, update } from "firebase/database";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Radio, Layers } from "lucide-react";
@@ -310,7 +312,7 @@ export const PlaylistEditor = () => {
 
       const { data: devicesData, error: fetchError } = await supabase
         .from("devices")
-        .select("id")
+        .select("id, device_code")
         .eq("current_playlist_id", activePlaylistId);
 
       if (fetchError) throw fetchError;
@@ -318,12 +320,46 @@ export const PlaylistEditor = () => {
       const deviceIds = devicesData?.map(d => d.id) || [];
 
       if (deviceIds.length > 0) {
+        // 1. Atualizar no Supabase
         const { error: updateError } = await supabase
           .from("devices")
           .update({ updated_at: new Date().toISOString() })
           .in("id", deviceIds);
 
         if (updateError) throw updateError;
+
+        // 2. Atualizar no Firebase para todos os dispositivos
+        const updates: Record<string, any> = {};
+        
+        // Precisamos buscar as relações (empresa/store) para preencher corretamente
+        const { data: devicesWithRelations } = await supabase
+          .from("devices")
+          .select(`
+            id, 
+            device_code,
+            store:stores(name),
+            company:companies(id, name)
+          `)
+          .in("id", deviceIds);
+
+        devicesWithRelations?.forEach((device: any) => {
+          if (device.device_code) {
+            const companyInfo = device.company ? `${device.company.id}_${device.company.name}` : "";
+            const groupInfo = device.store ? `Loja: ${device.store.name}` : "Sem grupo";
+
+            updates[`${device.device_code}`] = {
+              "atualizacao_plataforma": "true",
+              "empresa_id": companyInfo,
+              "device_id": device.id,
+              "last-update": new Date().toISOString(),
+              "grupo_device": groupInfo
+            };
+          }
+        });
+
+        if (Object.keys(updates).length > 0) {
+          await update(ref(db), updates);
+        }
       }
 
       toast({ 
