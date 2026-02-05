@@ -27,7 +27,28 @@
    const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
    const [continuation, setContinuation] = useState<string | null>(null);
    const [isLoadingDesigns, setIsLoadingDesigns] = useState(false);
-   const [isExporting, setIsExporting] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState<string[]>([]);
+  const [selectedDesigns, setSelectedDesigns] = useState<Set<string>>(new Set());
+
+  const toggleSelection = useCallback((designId: string) => {
+    setSelectedDesigns(prev => {
+      const next = new Set(prev);
+      if (next.has(designId)) {
+        next.delete(designId);
+      } else {
+        next.add(designId);
+      }
+      return next;
+    });
+  }, []);
+
+  const selectAll = useCallback(() => {
+    setSelectedDesigns(new Set(designs.map(d => d.id)));
+  }, [designs]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedDesigns(new Set());
+  }, []);
  
    const callCanvaApi = useCallback(async (action: string, body: Record<string, unknown>) => {
      const { data: { session } } = await supabase.auth.getSession();
@@ -255,6 +276,11 @@
      loadFolders,
      loadDesigns,
      exportDesign,
-     checkConnection,
-   };
- }
+    checkConnection,
+    selectedDesigns,
+    toggleSelection,
+    selectAll,
+    clearSelection,
+    exportSelectedDesigns,
+  };
+}

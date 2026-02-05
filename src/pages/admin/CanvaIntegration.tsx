@@ -7,10 +7,11 @@
  import { ScrollArea } from '@/components/ui/scroll-area';
  import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
  import { 
-   Link2, Link2Off, Loader2, Download, FolderOpen, 
-   Image, RefreshCw, CheckCircle2, ExternalLink
- } from 'lucide-react';
- import { useCanvaIntegration } from '@/hooks/useCanvaIntegration';
+  Link2, Link2Off, Loader2, Download, FolderOpen, 
+  Image, RefreshCw, CheckCircle2, ExternalLink, CheckSquare, Square
+} from 'lucide-react';
+import { useCanvaIntegration } from '@/hooks/useCanvaIntegration';
+import { Checkbox } from '@/components/ui/checkbox';
  
  export default function CanvaIntegration() {
    const navigate = useNavigate();
@@ -23,16 +24,21 @@
      designs,
      folders,
      selectedFolder,
-     setSelectedFolder,
-     continuation,
-     isLoadingDesigns,
-     isExporting,
-     connect,
-     disconnect,
-     handleCallback,
-     loadFolders,
-     loadDesigns,
-   } = useCanvaIntegration();
+    setSelectedFolder,
+    continuation,
+    isLoadingDesigns,
+    isExporting,
+    connect,
+    disconnect,
+    handleCallback,
+    loadFolders,
+    loadDesigns,
+    selectedDesigns,
+    toggleSelection,
+    selectAll,
+    clearSelection,
+    exportSelectedDesigns,
+  } = useCanvaIntegration();
  
    // Handle OAuth callback
    useEffect(() => {
@@ -167,42 +173,62 @@
                </SelectContent>
              </Select>
              
-             <Button 
-               variant="outline" 
-               onClick={() => loadDesigns(selectedFolder)} 
-               disabled={isLoadingDesigns}
-             >
-               <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingDesigns ? 'animate-spin' : ''}`} />
-               Atualizar
-             </Button>
-           </div>
- 
-           {/* Designs Grid */}
-           <ScrollArea className="h-[calc(100vh-300px)]">
-             {isLoadingDesigns && designs.length === 0 ? (
-               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                 {Array.from({ length: 10 }).map((_, i) => (
-                   <Skeleton key={i} className="aspect-video rounded-lg" />
-                 ))}
-               </div>
-             ) : designs.length === 0 ? (
-               <Card className="p-8 text-center">
-                 <Image className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                 <p className="text-muted-foreground">Nenhum design encontrado</p>
-               </Card>
-             ) : (
-               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                 {designs.map(design => (
-                   <DesignCard
-                     key={design.id}
-                     design={design}
-                     isExporting={isExporting === design.id}
-                   />
-                 ))}
-               </div>
-             )}
-             
-             {continuation && (
+             {selectedDesigns.size > 0 && (
+              <Button onClick={() => exportSelectedDesigns()}>
+                <Download className="h-4 w-4 mr-2" />
+                Importar ({selectedDesigns.size})
+              </Button>
+            )}
+
+            <Button 
+              variant="outline" 
+              onClick={() => loadDesigns(selectedFolder)} 
+              disabled={isLoadingDesigns}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingDesigns ? 'animate-spin' : ''}`} />
+              Atualizar
+            </Button>
+          </div>
+
+          {/* Designs Grid */}
+          <ScrollArea className="h-[calc(100vh-300px)]">
+            <div className="mb-4 flex items-center gap-2">
+               <Button variant="ghost" size="sm" onClick={selectAll} disabled={designs.length === 0}>
+                 Selecionar tudo
+               </Button>
+               {selectedDesigns.size > 0 && (
+                 <Button variant="ghost" size="sm" onClick={clearSelection}>
+                   Limpar seleção
+                 </Button>
+               )}
+            </div>
+
+            {isLoadingDesigns && designs.length === 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <Skeleton key={i} className="aspect-video rounded-lg" />
+                ))}
+              </div>
+            ) : designs.length === 0 ? (
+              <Card className="p-8 text-center">
+                <Image className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">Nenhum design encontrado</p>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {designs.map(design => (
+                  <DesignCard
+                    key={design.id}
+                    design={design}
+                    isExporting={isExporting.includes(design.id)}
+                    isSelected={selectedDesigns.has(design.id)}
+                    onToggle={() => toggleSelection(design.id)}
+                  />
+                ))}
+              </div>
+            )}
+            
+            {continuation && (
                <div className="flex justify-center py-4">
                  <Button 
                    variant="outline" 
@@ -224,81 +250,99 @@
  }
  
  interface DesignCardProps {
-   design: {
-     id: string;
-     title: string;
-     thumbnail?: { url: string };
-     updated_at: string;
-     type?: string;
-   };
-   isExporting: boolean;
- }
- 
- function DesignCard({ design, isExporting }: DesignCardProps) {
-   const { exportDesign } = useCanvaIntegration();
-   const [importedId, setImportedId] = useState<string | null>(null);
-   
-   const handleImport = async () => {
-     const result = await exportDesign(design.id, design.title);
-     if (result?.id) {
-       setImportedId(result.id);
-     }
-   };
-   
-   return (
-     <Card className="group overflow-hidden hover:ring-2 hover:ring-primary/50 transition-all">
-       <div className="aspect-video relative bg-muted">
-         {design.thumbnail?.url ? (
-           <img
-             src={design.thumbnail.url}
-             alt={design.title}
-             className="w-full h-full object-cover"
-           />
-         ) : (
-           <div className="flex items-center justify-center h-full">
-             <Image className="h-8 w-8 text-muted-foreground" />
+  design: {
+    id: string;
+    title: string;
+    thumbnail?: { url: string };
+    updated_at: string;
+    type?: string;
+  };
+  isExporting: boolean;
+  isSelected: boolean;
+  onToggle: () => void;
+}
+
+function DesignCard({ design, isExporting, isSelected, onToggle }: DesignCardProps) {
+  const { exportDesign } = useCanvaIntegration();
+  const [importedId, setImportedId] = useState<string | null>(null);
+  
+  const handleImport = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const result = await exportDesign(design.id, design.title);
+    if (result?.id) {
+      setImportedId(result.id);
+    }
+  };
+  
+  return (
+    <Card 
+      className={`group overflow-hidden transition-all cursor-pointer ${
+        isSelected ? 'ring-2 ring-primary border-primary bg-primary/5' : 'hover:ring-2 hover:ring-primary/50'
+      }`}
+      onClick={onToggle}
+    >
+      <div className="aspect-video relative bg-muted">
+        {design.thumbnail?.url ? (
+          <img
+            src={design.thumbnail.url}
+            alt={design.title}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <Image className="h-8 w-8 text-muted-foreground" />
+          </div>
+        )}
+        
+        {/* Selection Checkbox Overlay */}
+        <div className={`absolute top-2 left-2 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+           <div className={`bg-background/80 backdrop-blur-sm rounded-sm p-0.5 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`}>
+             {isSelected ? <CheckSquare className="h-5 w-5" /> : <Square className="h-5 w-5" />}
            </div>
-         )}
-         
-         {/* Import overlay */}
-         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-           {importedId ? (
-             <Badge className="bg-green-500 hover:bg-green-600">
-               <CheckCircle2 className="h-4 w-4 mr-1" />
-               Importado
-             </Badge>
-           ) : (
-             <>
-               <Button 
-                 size="sm" 
-                 onClick={handleImport}
-                 disabled={isExporting}
-               >
-                 {isExporting ? (
-                   <Loader2 className="h-4 w-4 animate-spin" />
-                 ) : (
-                   <>
-                     <Download className="h-4 w-4 mr-1" />
-                     Importar
-                   </>
-                 )}
-               </Button>
-               <Button
-                 size="sm"
-                 variant="secondary"
-                 onClick={() => window.open(`https://www.canva.com/design/${design.id}`, '_blank')}
-               >
-                 <ExternalLink className="h-4 w-4" />
-               </Button>
-             </>
-           )}
-         </div>
-       </div>
-       
-       <CardContent className="p-3">
-         <p className="font-medium text-sm truncate" title={design.title}>
-           {design.title}
-         </p>
+        </div>
+        
+        {/* Import overlay */}
+        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+          {importedId ? (
+            <Badge className="bg-green-500 hover:bg-green-600">
+              <CheckCircle2 className="h-4 w-4 mr-1" />
+              Importado
+            </Badge>
+          ) : (
+            <>
+              <Button 
+                size="sm" 
+                onClick={handleImport}
+                disabled={isExporting}
+              >
+                {isExporting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-1" />
+                    Importar
+                  </>
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.open(`https://www.canva.com/design/${design.id}`, '_blank');
+                }}
+              >
+                <ExternalLink className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+      
+      <CardContent className="p-3">
+        <p className="font-medium text-sm truncate" title={design.title}>
+          {design.title}
+        </p>
          {design.type && (
            <Badge variant="secondary" className="text-xs mt-1">
              {design.type}
