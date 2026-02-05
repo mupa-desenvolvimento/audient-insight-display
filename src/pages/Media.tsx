@@ -2,7 +2,9 @@ import { DndContext, DragOverlay, useSensor, useSensors, PointerSensor, DragEndE
 import { FolderPlus, ChevronLeft, ChevronRight, Folder as FolderIcon } from "lucide-react";
 import { useFolders, Folder as FolderType } from "@/hooks/useFolders";
 import { FolderGridItem } from "@/components/media/FolderGridItem";
+import { FolderListItem } from "@/components/media/FolderListItem";
 import { DraggableMediaWrapper } from "@/components/media/DraggableMediaWrapper";
+import { DraggableMediaRow } from "@/components/media/DraggableMediaRow";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useState } from "react";
@@ -457,7 +459,7 @@ const Media = () => {
           </div>
 
           <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-          {folders && folders.length > 0 && (
+          {folders && folders.length > 0 && viewMode === "grid" && (
              <div className="space-y-2">
                <h3 className="text-sm font-medium text-muted-foreground">Pastas</h3>
                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
@@ -689,95 +691,32 @@ const Media = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredMedia.map((media, index) => {
-                    const isSelected = selectedMediaIds.has(media.id);
-                    const thumbnailUrl = media.thumbnail_url || media.file_url;
-
-                    return (
-                      <TableRow key={media.id} className={isSelected ? "bg-muted/50" : ""}>
-                        <TableCell>
-                          <Checkbox 
-                            checked={isSelected}
-                            onCheckedChange={() => toggleSelection(media.id)}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div 
-                            className="w-16 h-10 bg-muted rounded overflow-hidden relative cursor-pointer"
-                            onClick={() => {
-                              setLightboxIndex(index);
-                              setLightboxOpen(true);
-                            }}
-                          >
-                            {thumbnailUrl ? (
-                              <img 
-                                src={thumbnailUrl} 
-                                alt={media.name}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="flex items-center justify-center w-full h-full">
-                                {media.type === 'video' ? (
-                                  <Video className="w-4 h-4 text-muted-foreground" />
-                                ) : (
-                                  <Image className="w-4 h-4 text-muted-foreground" />
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          <div className="flex flex-col">
-                            <span className="truncate max-w-[200px]" title={media.name}>{media.name}</span>
-                            <span className="text-xs text-muted-foreground">{media.resolution || "-"}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {media.type === 'video' ? (
-                              <Video className="w-4 h-4 text-muted-foreground" />
-                            ) : (
-                              <Image className="w-4 h-4 text-muted-foreground" />
-                            )}
-                            <span className="capitalize">{media.type}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>{formatFileSize(media.file_size)}</TableCell>
-                        <TableCell>
-                          {media.duration ? (
-                            <div className="flex items-center gap-1">
-                              <Clock className="w-3 h-3 text-muted-foreground" />
-                              <span>{Math.floor(media.duration / 60)}:{String(media.duration % 60).padStart(2, '0')}</span>
-                            </div>
-                          ) : "-"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={getStatusVariant(media.status)} className="text-xs">
-                            {getStatusLabel(media.status)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              onClick={(e) => handleEdit(media, e as unknown as React.MouseEvent)}
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              className="text-destructive hover:text-destructive"
-                              onClick={(e) => handleDelete(media, e as unknown as React.MouseEvent)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                  {folders && folders.map(folder => (
+                    <FolderListItem 
+                      key={folder.id} 
+                      folder={folder} 
+                      onClick={() => navigateToFolder(folder)}
+                      onDelete={(id) => deleteFolder.mutate(id)}
+                    />
+                  ))}
+                  {filteredMedia.map((media, index) => (
+                    <DraggableMediaRow
+                      key={media.id}
+                      media={media}
+                      index={index}
+                      isSelected={selectedMediaIds.has(media.id)}
+                      onToggleSelection={toggleSelection}
+                      onOpenLightbox={(idx) => {
+                        setLightboxIndex(idx);
+                        setLightboxOpen(true);
+                      }}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      formatFileSize={formatFileSize}
+                      getStatusVariant={getStatusVariant}
+                      getStatusLabel={getStatusLabel}
+                    />
+                  ))}
                 </TableBody>
               </Table>
             </div>
