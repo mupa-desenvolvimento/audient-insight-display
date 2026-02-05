@@ -1,5 +1,5 @@
  import { useEffect, useState } from 'react';
- import { useSearchParams, useNavigate } from 'react-router-dom';
+ import { useNavigate } from 'react-router-dom';
  import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
  import { Button } from '@/components/ui/button';
  import { Badge } from '@/components/ui/badge';
@@ -16,8 +16,6 @@ import { Checkbox } from '@/components/ui/checkbox';
  
  export default function CanvaIntegration() {
    const navigate = useNavigate();
-   const [searchParams] = useSearchParams();
-   const [isProcessingCallback, setIsProcessingCallback] = useState(false);
    
   const {
     isConnected,
@@ -42,31 +40,14 @@ import { Checkbox } from '@/components/ui/checkbox';
     exportSelectedDesigns,
   } = useCanvaIntegration();
  
-   // Handle OAuth callback
-  useEffect(() => {
-    const code = searchParams.get('code');
-    const state = searchParams.get('state');
-    
-    if (code && state && !isProcessingCallback) {
-      setIsProcessingCallback(true);
-      handleCallback(code, state).then((success) => {
-        // Clean URL
-        navigate('/admin/canva', { replace: true });
-        if (success) {
-          loadFolderItems('root');
-        }
-      });
-    }
-  }, [searchParams, handleCallback, navigate, isProcessingCallback, loadFolderItems]);
- 
   // Load designs when connected
   useEffect(() => {
-    if (isConnected && !isProcessingCallback) {
+    if (isConnected) {
       loadFolderItems('root');
     }
-  }, [isConnected, loadFolderItems, isProcessingCallback]);
+  }, [isConnected, loadFolderItems]);
  
-   if (isLoading || isProcessingCallback) {
+   if (isLoading) {
      return (
        <div className="p-6 space-y-6">
          <div className="flex items-center justify-center min-h-[400px]">

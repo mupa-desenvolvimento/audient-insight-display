@@ -24,6 +24,7 @@ import CameraFullscreen from "./pages/CameraFullscreen";
 import LiveMonitoring from "./pages/LiveMonitoring";
 import DeviceDemo from "./pages/DeviceDemo";
 import Auth from "./pages/Auth";
+import CanvaCallback from "./pages/admin/CanvaCallback";
 import Stores from "./pages/admin/Stores";
 import Regions from "./pages/admin/Regions";
 import Channels from "./pages/admin/Channels";
@@ -82,6 +83,8 @@ function AppContent() {
           <Route path="/camera" element={<Camera />} />
           <Route path="/camera-fullscreen" element={<CameraFullscreen />} />
           <Route path="/demo" element={<DeviceDemo />} />
+          {/* Canva OAuth callback - must be outside ProtectedRoute to handle redirect properly */}
+          <Route path="/admin/canva/callback" element={<CanvaCallback />} />
           <Route
             path="/admin/*"
             element={
@@ -109,7 +112,6 @@ function AppContent() {
                         <Route path="companies/:companyId/display-config" element={<ProductDisplayConfig />} />
                         <Route path="product-analytics" element={<ProductAnalytics />} />
                         <Route path="canva" element={<CanvaIntegration />} />
-                        <Route path="canva/callback" element={<CanvaIntegration />} />
                         <Route path="integrations/canva/editor" element={<CanvaEditor />} />
                       </Routes>
                     </AppLayout>
