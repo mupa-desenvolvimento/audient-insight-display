@@ -18,8 +18,11 @@
     * Check if user has a valid Canva connection
     */
    async isConnected(): Promise<boolean> {
-     const { data, error } = await supabase.functions.invoke('canva-auth', {
-       body: { action: 'status' }
+     const { data: userData } = await supabase.auth.getUser();
+     if (!userData?.user?.id) return false;
+     
+     const { data, error } = await supabase.functions.invoke('canva-auth?action=status', {
+       body: { user_id: userData.user.id }
      });
  
      if (error) {
@@ -58,21 +61,24 @@
     */
    async exportDesign(designId: string, format: 'png' | 'jpg' | 'mp4'): Promise<Blob | null> {
      try {
-       const { data, error } = await supabase.functions.invoke('canva-auth', {
-         body: { 
-           action: 'export',
-           designId,
+       const { data: userData } = await supabase.auth.getUser();
+       if (!userData?.user?.id) return null;
+       
+       const { data, error } = await supabase.functions.invoke('canva-auth?action=export_design', {
+         body: {
+           user_id: userData.user.id,
+           design_id: designId,
            format
          }
        });
  
-       if (error || !data?.exportUrl) {
+       if (error || !data?.url) {
          console.error('Failed to export design from Canva:', error || data?.error);
          return null;
        }
  
        // Download the exported file
-       const response = await fetch(data.exportUrl);
+       const response = await fetch(data.url);
        if (!response.ok) {
          console.error('Failed to download exported file');
          return null;
