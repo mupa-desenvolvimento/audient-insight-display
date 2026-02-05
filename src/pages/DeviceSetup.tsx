@@ -146,8 +146,29 @@ export default function DeviceSetup() {
   }, [selectedStoreId]);
 
   const fetchDeviceGroups = async (storeId: string) => {
+    if (!validatedCompany) return;
+    
     setIsLoadingData(true);
     try {
+      // Primeiro, verificar se a loja pertence ao tenant da empresa
+      const { data: storeData, error: storeError } = await supabase
+        .from('stores')
+        .select('id, tenant_id')
+        .eq('id', storeId)
+        .single();
+      
+      if (storeError) throw storeError;
+      
+      // Validar que a loja pertence ao mesmo tenant da empresa
+      if (validatedCompany.tenant_id && storeData.tenant_id !== validatedCompany.tenant_id) {
+        toast.error('Loja não pertence a esta empresa');
+        setSelectedStoreId('');
+        setDeviceGroups([]);
+        return;
+      }
+      
+      // Buscar grupos que pertencem à loja selecionada ou são globais (sem loja)
+      // Filtrando também pela loja do tenant
       const { data, error } = await supabase
         .from('device_groups')
         .select('id, name, description, store_id, screen_type')
@@ -230,9 +251,30 @@ export default function DeviceSetup() {
       toast.error('Selecione um grupo');
       return;
     }
+    
+    if (!validatedCompany) {
+      toast.error('Empresa não validada');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
+      // Validação final: verificar se a loja pertence ao tenant da empresa
+      const { data: storeData, error: storeError } = await supabase
+        .from('stores')
+        .select('id, tenant_id, code')
+        .eq('id', selectedStoreId)
+        .single();
+      
+      if (storeError) {
+        throw new Error('Erro ao validar loja');
+      }
+      
+      if (validatedCompany.tenant_id && storeData.tenant_id !== validatedCompany.tenant_id) {
+        toast.error('Loja não pertence a esta empresa');
+        return;
+      }
+      
       // Check if device exists, if not create it
       const { data: existingDevice, error: fetchError } = await supabase
         .from('devices')
@@ -243,6 +285,9 @@ export default function DeviceSetup() {
       if (fetchError && fetchError.code !== 'PGRST116') {
         throw fetchError;
       }
+      
+      // Usar o código da loja selecionada se não foi definido manualmente
+      const finalStoreCode = storeCode || storeData.code;
 
       if (existingDevice) {
         // Update existing device
@@ -250,10 +295,11 @@ export default function DeviceSetup() {
           .from('devices')
           .update({ 
             store_id: selectedStoreId,
+            company_id: validatedCompany.id,
             name: deviceName || `Dispositivo ${deviceId?.slice(0, 8)}`,
             status: 'online',
             is_active: true,
-            store_code: storeCode || null
+            store_code: finalStoreCode
           })
           .eq('id', existingDevice.id);
 
@@ -271,16 +317,17 @@ export default function DeviceSetup() {
           console.error('Error adding to group:', memberError);
         }
       } else {
-        // Create new device
+        // Create new device with company_id
         const { data: newDevice, error: createError } = await supabase
           .from('devices')
           .insert({
             device_code: deviceId,
             name: deviceName || `Dispositivo ${deviceId?.slice(0, 8)}`,
             store_id: selectedStoreId,
+            company_id: validatedCompany.id,
             status: 'online',
             is_active: true,
-            store_code: storeCode || null
+            store_code: finalStoreCode
           })
           .select()
           .single();
