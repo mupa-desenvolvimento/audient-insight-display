@@ -1,5 +1,5 @@
 import { DndContext, DragOverlay, useSensor, useSensors, PointerSensor, DragEndEvent } from "@dnd-kit/core";
-import { FolderPlus, ChevronLeft, Folder as FolderIcon } from "lucide-react";
+import { FolderPlus, ChevronLeft, ChevronRight, Folder as FolderIcon } from "lucide-react";
 import { useFolders, Folder as FolderType } from "@/hooks/useFolders";
 import { FolderGridItem } from "@/components/media/FolderGridItem";
 import { DraggableMediaWrapper } from "@/components/media/DraggableMediaWrapper";

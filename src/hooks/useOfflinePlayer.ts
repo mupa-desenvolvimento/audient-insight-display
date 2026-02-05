@@ -55,6 +55,7 @@ export interface CachedPlaylist {
   items: CachedPlaylistItem[];
   channels: CachedChannel[];
   synced_at: number;
+  content_scale?: string | null;
 }
 
 export interface OverrideMedia {
@@ -393,7 +394,7 @@ export const useOfflinePlayer = (deviceCode: string) => {
         .from("devices")
         .select(`
           id, name, store_id, current_playlist_id, company_id,
-          is_blocked, blocked_message, 
+          is_blocked, blocked_message, camera_enabled,
           override_media_id, override_media_expires_at,
           last_sync_requested_at,
           companies(id, slug),
@@ -720,6 +721,7 @@ export const useOfflinePlayer = (deviceCode: string) => {
         blocked_message: device.blocked_message || null,
         override_media: overrideMedia,
         last_sync_requested_at: device.last_sync_requested_at || null,
+        camera_enabled: device.camera_enabled || false,
       };
 
       setDeviceState(newState);

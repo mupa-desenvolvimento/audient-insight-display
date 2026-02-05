@@ -12,7 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Upload, X, FileImage, FileVideo, Loader2, AlertCircle, CheckCircle2,
-  FileText, FileSpreadsheet, File, Trash2
+  FileText, FileSpreadsheet, File as FileIcon, Trash2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -76,10 +76,10 @@ interface UploadFile {
 const getFileIcon = (mimeType: string) => {
   if (mimeType.startsWith('image/')) return FileImage;
   if (mimeType.startsWith('video/')) return FileVideo;
-  if (mimeType.startsWith('audio/')) return File;
+  if (mimeType.startsWith('audio/')) return FileIcon;
   if (mimeType.includes('spreadsheet') || mimeType.includes('excel') || mimeType === 'text/csv') return FileSpreadsheet;
   if (mimeType.includes('pdf') || mimeType.includes('word') || mimeType.includes('document') || mimeType.startsWith('text/')) return FileText;
-  return File;
+  return FileIcon;
 };
 
 const getFileType = (mimeType: string): string => {
