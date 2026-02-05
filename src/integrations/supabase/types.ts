@@ -695,6 +695,72 @@ export type Database = {
           },
         ]
       }
+      external_editor_sessions: {
+        Row: {
+          asset_type: string
+          completed_at: string | null
+          created_at: string
+          id: string
+          metadata: Json | null
+          provider: string
+          provider_design_id: string | null
+          result_media_id: string | null
+          session_type: string
+          started_at: string | null
+          status: string
+          target_folder_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          asset_type?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          provider?: string
+          provider_design_id?: string | null
+          result_media_id?: string | null
+          session_type?: string
+          started_at?: string | null
+          status?: string
+          target_folder_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          asset_type?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          provider?: string
+          provider_design_id?: string | null
+          result_media_id?: string | null
+          session_type?: string
+          started_at?: string | null
+          status?: string
+          target_folder_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_editor_sessions_result_media_id_fkey"
+            columns: ["result_media_id"]
+            isOneToOne: false
+            referencedRelation: "media_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "external_editor_sessions_target_folder_id_fkey"
+            columns: ["target_folder_id"]
+            isOneToOne: false
+            referencedRelation: "folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       folders: {
         Row: {
           created_at: string | null
