@@ -34,6 +34,7 @@ import Tenants from "./pages/admin/Tenants";
 import Companies from "./pages/admin/Companies";
 import ProductDisplayConfig from "./pages/admin/ProductDisplayConfig";
 import ProductAnalytics from "./pages/admin/ProductAnalytics";
+import CanvaIntegration from "./pages/admin/CanvaIntegration";
 import Install from "./pages/Install";
 import { OfflineIndicator } from "./components/OfflineIndicator";
 import { PWAUpdatePrompt, InstallPrompt } from "./components/PWAPrompts";
@@ -106,6 +107,8 @@ function AppContent() {
                         <Route path="companies" element={<Companies />} />
                         <Route path="companies/:companyId/display-config" element={<ProductDisplayConfig />} />
                         <Route path="product-analytics" element={<ProductAnalytics />} />
+                        <Route path="canva" element={<CanvaIntegration />} />
+                        <Route path="canva/callback" element={<CanvaIntegration />} />
                       </Routes>
                     </AppLayout>
                   </div>

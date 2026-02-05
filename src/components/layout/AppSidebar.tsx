@@ -16,6 +16,7 @@ import {
   Plug2,
   Palette,
   ShoppingBag,
+  Brush,
 } from "lucide-react";
 import logoHorizontal from "@/assets/logo_horizontal.svg";
 import { NavLink, useNavigate } from "react-router-dom";
@@ -46,6 +47,7 @@ const menuItems = [
   { title: "Canais", url: "/admin/channels", icon: Tv },
   { title: "Playlists", url: "/admin/playlists", icon: ListVideo },
   { title: "Galeria", url: "/admin/media", icon: Image },
+  { title: "Canva", url: "/admin/canva", icon: Brush },
   { title: "Câmera", url: "/admin/camera", icon: Camera },
   { title: "Monitoramento", url: "/admin/monitoring", icon: Eye },
   { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },

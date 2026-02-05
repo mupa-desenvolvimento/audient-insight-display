@@ -1,5 +1,8 @@
 project_id = "bgcnvyoseexfmrynqbfb"
 
+[functions.canva-auth]
+verify_jwt = false
+
 [functions.create-user]
 verify_jwt = false
 
