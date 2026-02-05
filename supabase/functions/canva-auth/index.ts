@@ -133,13 +133,12 @@
          method: 'POST',
          headers: {
            'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
          },
          body: new URLSearchParams({
            grant_type: 'authorization_code',
            code,
            redirect_uri,
-           client_id: clientId,
-           client_secret: clientSecret,
            code_verifier: authState.code_verifier,
          }).toString(),
        });
@@ -210,12 +209,13 @@
          
          const refreshResponse = await fetch(CANVA_TOKEN_URL, {
            method: 'POST',
-           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: { 
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
+        },
            body: new URLSearchParams({
              grant_type: 'refresh_token',
              refresh_token: connection.refresh_token,
-             client_id: clientId,
-             client_secret: clientSecret,
            }).toString(),
          });
          
