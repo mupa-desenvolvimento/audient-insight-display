@@ -65,59 +65,51 @@
      checkConnection();
    }, [checkConnection]);
  
-   const connect = useCallback(async () => {
-     try {
-       const redirectUri = `${window.location.origin}/admin/canva/callback`;
-       const result = await callCanvaApi('get_auth_url', { redirect_uri: redirectUri });
-       
-       if (result.auth_url) {
-         // Store state for verification
-         sessionStorage.setItem('canva_oauth_state', result.state);
-         window.location.href = result.auth_url;
-       } else {
-         throw new Error(result.error || 'Failed to get auth URL');
-       }
-     } catch (error) {
-       console.error('Error connecting to Canva:', error);
-       toast({
-         title: 'Erro ao conectar',
-         description: 'Não foi possível iniciar a conexão com o Canva',
-         variant: 'destructive',
-       });
-     }
-   }, [callCanvaApi, toast]);
+  const connect = useCallback(async () => {
+    try {
+      const redirectUri = `${window.location.origin}/admin/canva/callback`;
+      const result = await callCanvaApi('get_auth_url', { redirect_uri: redirectUri });
+      
+      if (result.auth_url) {
+        window.location.href = result.auth_url;
+      } else {
+        throw new Error(result.error || 'Failed to get auth URL');
+      }
+    } catch (error) {
+      console.error('Error connecting to Canva:', error);
+      toast({
+        title: 'Erro ao conectar',
+        description: 'Não foi possível iniciar a conexão com o Canva',
+        variant: 'destructive',
+      });
+    }
+  }, [callCanvaApi, toast]);
  
-   const handleCallback = useCallback(async (code: string, state: string) => {
-     try {
-       const storedState = sessionStorage.getItem('canva_oauth_state');
-       if (storedState !== state) {
-         throw new Error('Invalid state');
-       }
-       
-       const redirectUri = `${window.location.origin}/admin/canva/callback`;
-       const result = await callCanvaApi('exchange_code', { code, state, redirect_uri: redirectUri });
-       
-       if (result.success) {
-         sessionStorage.removeItem('canva_oauth_state');
-         setIsConnected(true);
-         toast({
-           title: 'Conectado!',
-           description: 'Sua conta do Canva foi conectada com sucesso',
-         });
-         return true;
-       } else {
-         throw new Error(result.error || 'Failed to exchange code');
-       }
-     } catch (error) {
-       console.error('Error handling callback:', error);
-       toast({
-         title: 'Erro na autenticação',
-         description: 'Não foi possível completar a conexão com o Canva',
-         variant: 'destructive',
-       });
-       return false;
-     }
-   }, [callCanvaApi, toast]);
+  const handleCallback = useCallback(async (code: string, state: string) => {
+    try {
+      const redirectUri = `${window.location.origin}/admin/canva/callback`;
+      const result = await callCanvaApi('exchange_code', { code, state, redirect_uri: redirectUri });
+      
+      if (result.success) {
+        setIsConnected(true);
+        toast({
+          title: 'Conectado!',
+          description: 'Sua conta do Canva foi conectada com sucesso',
+        });
+        return true;
+      } else {
+        throw new Error(result.error || 'Failed to exchange code');
+      }
+    } catch (error) {
+      console.error('Error handling callback:', error);
+      toast({
+        title: 'Erro na autenticação',
+        description: 'Não foi possível completar a conexão com o Canva',
+        variant: 'destructive',
+      });
+      return false;
+    }
+  }, [callCanvaApi, toast]);
  
    const disconnect = useCallback(async () => {
      try {
