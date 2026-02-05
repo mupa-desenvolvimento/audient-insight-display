@@ -39,6 +39,7 @@ interface Company {
   id: string;
   slug: string;
   name: string;
+  tenant_id: string | null;
 }
 
 type SetupStep = 'login' | 'store' | 'group' | 'complete';
@@ -101,15 +102,23 @@ export default function DeviceSetup() {
     }
   }, [validatedCompany]);
 
-  // Fetch stores when user is authenticated
+  // Fetch stores filtered by the validated company's tenant
   const fetchUserStores = async () => {
+    if (!validatedCompany) return;
+    
     setIsLoadingData(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('stores')
         .select('id, code, name')
-        .eq('is_active', true)
-        .order('name');
+        .eq('is_active', true);
+      
+      // Filter by tenant_id if the company has one
+      if (validatedCompany.tenant_id) {
+        query = query.eq('tenant_id', validatedCompany.tenant_id);
+      }
+      
+      const { data, error } = await query.order('name');
 
       if (error) throw error;
       setStores(data || []);
@@ -174,7 +183,7 @@ export default function DeviceSetup() {
       // Busca empresa pelo campo code (gerado automaticamente na tabela companies)
       const { data: company, error } = await supabase
         .from('companies')
-        .select('id, slug, name, code')
+        .select('id, slug, name, code, tenant_id')
         .eq('is_active', true)
         .eq('code', normalizedCode)
         .single();
@@ -188,7 +197,8 @@ export default function DeviceSetup() {
       setValidatedCompany({
         id: company.id,
         slug: company.slug,
-        name: company.name
+        name: company.name,
+        tenant_id: company.tenant_id
       });
       toast.success(`Empresa: ${company.name}`);
     } catch (error) {
