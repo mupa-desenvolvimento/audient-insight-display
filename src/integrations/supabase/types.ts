@@ -462,6 +462,7 @@ export type Database = {
           name: string
           screen_type: string | null
           store_id: string | null
+          tenant_id: string | null
           updated_at: string
         }
         Insert: {
@@ -471,6 +472,7 @@ export type Database = {
           name: string
           screen_type?: string | null
           store_id?: string | null
+          tenant_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -480,6 +482,7 @@ export type Database = {
           name?: string
           screen_type?: string | null
           store_id?: string | null
+          tenant_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -488,6 +491,13 @@ export type Database = {
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "device_groups_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]

@@ -168,12 +168,18 @@ export default function DeviceSetup() {
       }
       
       // Buscar grupos que pertencem à loja selecionada ou são globais (sem loja)
-      // Filtrando também pela loja do tenant
-      const { data, error } = await supabase
+      // Filtrando também pelo tenant_id da empresa
+      let groupsQuery = supabase
         .from('device_groups')
-        .select('id, name, description, store_id, screen_type')
-        .or(`store_id.eq.${storeId},store_id.is.null`)
-        .order('name');
+        .select('id, name, description, store_id, screen_type, tenant_id')
+        .or(`store_id.eq.${storeId},store_id.is.null`);
+      
+      // Filtrar por tenant_id se a empresa tiver um
+      if (validatedCompany.tenant_id) {
+        groupsQuery = groupsQuery.eq('tenant_id', validatedCompany.tenant_id);
+      }
+      
+      const { data, error } = await groupsQuery.order('name');
 
       if (error) throw error;
       setDeviceGroups(data || []);

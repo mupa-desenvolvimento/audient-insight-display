@@ -7,6 +7,7 @@ export interface DeviceGroup {
   name: string;
   description: string | null;
   store_id: string | null;
+  tenant_id: string | null;
   screen_type: string;
   created_at: string;
   updated_at: string;
@@ -14,6 +15,7 @@ export interface DeviceGroup {
 
 export interface DeviceGroupWithDetails extends DeviceGroup {
   store?: { id: string; name: string; code: string } | null;
+  tenant?: { id: string; name: string } | null;
   device_count?: number;
   channel_count?: number;
 }
@@ -22,6 +24,7 @@ export interface DeviceGroupInsert {
   name: string;
   description?: string | null;
   store_id?: string | null;
+  tenant_id?: string | null;
   screen_type?: string;
 }
 
@@ -45,7 +48,8 @@ export const useDeviceGroups = () => {
         .from("device_groups")
         .select(`
           *,
-          store:stores(id, name, code)
+          store:stores(id, name, code),
+          tenant:tenants(id, name)
         `)
         .order("name", { ascending: true });
 
