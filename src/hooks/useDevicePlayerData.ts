@@ -115,8 +115,18 @@ export const useDevicePlayerData = (deviceCode: string | undefined) => {
           .order("position", { ascending: true });
 
         if (channels && channels.length > 0) {
+          const currentDateStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
+          
           // Find the active channel
           let activeChannel = channels.find(channel => {
+            // Skip fallback channels in initial search
+            if (channel.is_fallback) return false;
+            
+            // Check date range
+            if (channel.start_date && currentDateStr < channel.start_date) return false;
+            if (channel.end_date && currentDateStr > channel.end_date) return false;
+            
+            // Check days of week
             const daysOfWeek = channel.days_of_week || [0, 1, 2, 3, 4, 5, 6];
             if (!daysOfWeek.includes(currentDay)) return false;
 
