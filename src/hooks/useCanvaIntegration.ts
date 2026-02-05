@@ -18,7 +18,10 @@
    name: string;
  }
  
- export function useCanvaIntegration() {
+  // Production domain for Canva OAuth redirect (must match Canva app configuration)
+  const CANVA_REDIRECT_DOMAIN = 'https://midias.mupa.app';
+  
+  export function useCanvaIntegration() {
    const { toast } = useToast();
    const [isConnected, setIsConnected] = useState(false);
    const [isLoading, setIsLoading] = useState(true);
@@ -88,7 +91,8 @@
  
   const connect = useCallback(async () => {
     try {
-      const redirectUri = `${window.location.origin}/admin/canva/callback`;
+      // Always use production domain for OAuth redirect
+      const redirectUri = `${CANVA_REDIRECT_DOMAIN}/admin/canva/callback`;
       const result = await callCanvaApi('get_auth_url', { redirect_uri: redirectUri });
       
       if (result.auth_url) {
@@ -108,7 +112,8 @@
  
   const handleCallback = useCallback(async (code: string, state: string) => {
     try {
-      const redirectUri = `${window.location.origin}/admin/canva/callback`;
+      // Must match the redirect_uri used during authorization
+      const redirectUri = `${CANVA_REDIRECT_DOMAIN}/admin/canva/callback`;
       const result = await callCanvaApi('exchange_code', { code, state, redirect_uri: redirectUri });
       
       if (result.success) {
