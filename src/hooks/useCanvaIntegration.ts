@@ -27,7 +27,7 @@
    const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
    const [continuation, setContinuation] = useState<string | null>(null);
    const [isLoadingDesigns, setIsLoadingDesigns] = useState(false);
-  const [isExporting, setIsExporting] = useState<string[]>([]);
+ const [isExporting, setIsExporting] = useState<string | null>(null);
   const [selectedDesigns, setSelectedDesigns] = useState<Set<string>>(new Set());
 
   const toggleSelection = useCallback((designId: string) => {
@@ -198,10 +198,9 @@
    }, [callCanvaApi, continuation, toast]);
  
    const exportDesign = useCallback(async (designId: string, designTitle: string, format: 'png' | 'jpg' | 'pdf' = 'png') => {
-     try {
-       setIsExporting(designId);
-       
-       const result = await callCanvaApi('export_design', { design_id: designId, format });
+    try {
+      setIsExporting(designId);
+      const result = await callCanvaApi('export_design', { design_id: designId, format });
        
        if (result.success && result.export_urls?.length > 0) {
          // Download and upload to our storage
@@ -260,6 +259,21 @@
      }
    }, [callCanvaApi, toast]);
  
+  const exportSelectedDesigns = useCallback(async (format: 'png' | 'jpg' | 'pdf' = 'png') => {
+    const designsToExport = designs.filter(d => selectedDesigns.has(d.id));
+    const results = [];
+    
+    for (const design of designsToExport) {
+      const result = await exportDesign(design.id, design.title, format);
+      if (result) {
+        results.push(result);
+      }
+    }
+    
+    clearSelection();
+    return results;
+  }, [designs, selectedDesigns, exportDesign, clearSelection]);
+
    return {
      isConnected,
      isLoading,
