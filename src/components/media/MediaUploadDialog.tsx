@@ -21,6 +21,7 @@ interface MediaUploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  folderId?: string | null;
 }
 
 // Expanded file types
@@ -606,6 +607,9 @@ export function MediaUploadDialog({ open, onOpenChange, onSuccess }: MediaUpload
       // Ensure we send the correct name (e.g. with .webp extension if changed)
       formData.append('fileName', fileToUpload.name); 
       formData.append('fileType', fileToUpload.type);
+      if (folderId) {
+        formData.append('folderId', folderId);
+      }
 
       const { data: { session } } = await supabase.auth.getSession();
       

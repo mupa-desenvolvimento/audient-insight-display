@@ -4,10 +4,12 @@
  import { Checkbox } from "@/components/ui/checkbox";
  import { Button } from "@/components/ui/button";
  import { Badge } from "@/components/ui/badge";
- import { Video, Image, Clock, Pencil, Trash2, GripVertical } from "lucide-react";
- import { cn } from "@/lib/utils";
- 
- interface DraggableMediaRowProps {
+ import { Video, Image, Clock, Pencil, Trash2, GripVertical, Eye } from "lucide-react";
+  import { cn } from "@/lib/utils";
+  import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+  import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+  
+  interface DraggableMediaRowProps {
    media: MediaItem;
    index: number;
    isSelected: boolean;
@@ -42,11 +44,9 @@
  
    const thumbnailUrl = media.thumbnail_url || media.file_url;
  
-   const style = transform ? {
-     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-     zIndex: isDragging ? 50 : undefined,
-     opacity: isDragging ? 0.5 : 1,
-   } : undefined;
+   const style = {
+    opacity: isDragging ? 0.5 : 1,
+  };
  
    return (
      <TableRow 
@@ -69,77 +69,119 @@
            />
          </div>
        </TableCell>
-       <TableCell>
-         <div 
-           className="w-16 h-10 bg-muted rounded overflow-hidden relative cursor-pointer"
-           onClick={() => onOpenLightbox(index)}
-         >
-           {thumbnailUrl ? (
-             <img 
-               src={thumbnailUrl} 
-               alt={media.name}
-               className="w-full h-full object-cover"
-             />
-           ) : (
-             <div className="flex items-center justify-center w-full h-full">
-               {media.type === 'video' ? (
-                 <Video className="w-4 h-4 text-muted-foreground" />
-               ) : (
-                 <Image className="w-4 h-4 text-muted-foreground" />
-               )}
+      <TableCell>
+        <HoverCard>
+          <HoverCardTrigger asChild>
+            <div 
+              className="w-16 h-10 bg-muted rounded overflow-hidden relative cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
+              onClick={() => onOpenLightbox(index)}
+            >
+              {thumbnailUrl ? (
+                <img 
+                  src={thumbnailUrl} 
+                  alt={media.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="flex items-center justify-center w-full h-full">
+                  {media.type === 'video' ? (
+                    <Video className="w-4 h-4 text-muted-foreground" />
+                  ) : (
+                    <Image className="w-4 h-4 text-muted-foreground" />
+                  )}
+                </div>
+              )}
+            </div>
+          </HoverCardTrigger>
+          <HoverCardContent className="w-80 p-0 overflow-hidden" align="start">
+             {thumbnailUrl && (
+               <div className="aspect-video w-full bg-muted flex items-center justify-center overflow-hidden">
+                 <img 
+                   src={thumbnailUrl} 
+                   alt={media.name}
+                   className="w-full h-full object-contain"
+                 />
+               </div>
+             )}
+             <div className="p-4 bg-card">
+               <h4 className="font-semibold text-sm truncate mb-1">{media.name}</h4>
+               <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>{media.type.toUpperCase()}</span>
+                  <span>{media.resolution || "N/A"}</span>
+               </div>
              </div>
-           )}
-         </div>
-       </TableCell>
-       <TableCell className="font-medium">
-         <div className="flex flex-col">
-           <span className="truncate max-w-[200px]" title={media.name}>{media.name}</span>
-           <span className="text-xs text-muted-foreground">{media.resolution || "-"}</span>
-         </div>
-       </TableCell>
-       <TableCell>
-         <div className="flex items-center gap-2">
-           {media.type === 'video' ? (
-             <Video className="w-4 h-4 text-muted-foreground" />
-           ) : (
-             <Image className="w-4 h-4 text-muted-foreground" />
-           )}
-           <span className="capitalize">{media.type}</span>
-         </div>
-       </TableCell>
-       <TableCell>{formatFileSize(media.file_size)}</TableCell>
-       <TableCell>
-         {media.duration ? (
-           <div className="flex items-center gap-1">
-             <Clock className="w-3 h-3 text-muted-foreground" />
-             <span>{Math.floor(media.duration / 60)}:{String(media.duration % 60).padStart(2, '0')}</span>
-           </div>
-         ) : "-"}
-       </TableCell>
-       <TableCell>
-         <Badge variant={getStatusVariant(media.status)} className="text-xs">
-           {getStatusLabel(media.status)}
-         </Badge>
-       </TableCell>
-       <TableCell className="text-right">
-         <div className="flex justify-end gap-2">
-           <Button 
-             variant="ghost" 
-             size="icon"
-             onClick={(e) => onEdit(media, e)}
-           >
-             <Pencil className="w-4 h-4" />
-           </Button>
-           <Button 
-             variant="ghost" 
-             size="icon"
-             className="text-destructive hover:text-destructive"
-             onClick={(e) => onDelete(media, e)}
-           >
-             <Trash2 className="w-4 h-4" />
-           </Button>
-         </div>
-       </TableCell>
+          </HoverCardContent>
+        </HoverCard>
+      </TableCell>
+      <TableCell className="font-medium">
+        <div className="flex flex-col">
+          <span className="truncate max-w-[200px] font-bold text-foreground" title={media.name}>{media.name}</span>
+          <span className="text-xs text-muted-foreground">{media.resolution || "-"}</span>
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2 text-muted-foreground">
+          {media.type === 'video' ? (
+            <Video className="w-4 h-4" />
+          ) : (
+            <Image className="w-4 h-4" />
+          )}
+          <span className="capitalize text-sm">{media.type}</span>
+        </div>
+      </TableCell>
+      <TableCell className="text-sm text-muted-foreground">{formatFileSize(media.file_size)}</TableCell>
+      <TableCell>
+        {media.duration ? (
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Clock className="w-3 h-3" />
+            <span>{Math.floor(media.duration / 60)}:{String(media.duration % 60).padStart(2, '0')}</span>
+          </div>
+        ) : <span className="text-muted-foreground">-</span>}
+      </TableCell>
+      <TableCell>
+        <Badge variant={getStatusVariant(media.status)} className="text-xs font-semibold">
+          {getStatusLabel(media.status)}
+        </Badge>
+      </TableCell>
+      <TableCell className="text-right">
+        <div className="flex justify-end gap-1">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                  onClick={(e) => onEdit(media, e)}
+                >
+                  <Pencil className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Editar</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  onClick={(e) => onDelete(media, e)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Excluir</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </TableCell>
      </TableRow>
    );
  };

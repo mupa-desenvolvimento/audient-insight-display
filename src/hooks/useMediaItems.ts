@@ -187,6 +187,23 @@ export const useMediaItems = (folderId?: string | null) => {
     },
   });
 
+  const moveMediaItems = useMutation({
+    mutationFn: async ({ mediaIds, folderId }: { mediaIds: string[]; folderId: string | null }) => {
+      const { error } = await supabase
+        .from("media_items")
+        .update({ folder_id: folderId })
+        .in("id", mediaIds);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["media-items"] });
+    },
+    onError: (error) => {
+      toast({ title: "Erro ao mover mídias", description: error.message, variant: "destructive" });
+    },
+  });
+
   return {
     mediaItems,
     isLoading,
@@ -196,5 +213,6 @@ export const useMediaItems = (folderId?: string | null) => {
     updateMediaItem,
     deleteMediaItem,
     moveMediaItem,
+    moveMediaItems,
   };
 };

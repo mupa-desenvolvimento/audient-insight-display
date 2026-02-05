@@ -207,6 +207,11 @@ export const EditorCanvas = ({
                 <span className="px-2 py-1 bg-black/70 backdrop-blur-sm rounded text-[10px] text-white/60 truncate max-w-[200px]">
                   {currentItem.media.name}
                 </span>
+                {currentItem.media.resolution && (
+                  <span className="px-2 py-1 bg-black/70 backdrop-blur-sm rounded text-[10px] text-white/60 font-mono">
+                    {currentItem.media.resolution}
+                  </span>
+                )}
               </div>
               
               {currentItem.media.type === "video" && (

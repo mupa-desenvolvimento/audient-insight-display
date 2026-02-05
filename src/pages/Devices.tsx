@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,11 +34,13 @@ const Devices = () => {
   const { devices, isLoading, createDevice, updateDevice, deleteDevice, refetch } = useDevices();
   const { playlists } = usePlaylists();
 
-  const filteredDevices = devices.filter(device =>
-    device.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    device.store?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    device.device_code.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredDevices = useMemo(() => {
+    return devices.filter(device =>
+      device.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      device.store?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      device.device_code.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [devices, searchTerm]);
 
   const getDeviceStatus = (device: DeviceWithRelations) => {
     if (device.status === 'pending' && !device.last_seen_at) return 'pending';
@@ -228,14 +230,14 @@ const Devices = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Status especiais: Bloqueado ou Mídia Avulsa */}
-                {(device as any).is_blocked && (
+                {device.is_blocked && (
                   <div className="flex items-center gap-2 p-2 bg-destructive/10 border border-destructive/30 rounded-lg">
                     <Lock className="w-4 h-4 text-destructive" />
                     <span className="text-sm font-medium text-destructive">Bloqueado</span>
                   </div>
                 )}
                 
-                {!(device as any).is_blocked && (device as any).override_media_id && (
+                {!device.is_blocked && device.override_media_id && (
                   <div className="flex items-center gap-2 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                     <Image className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
                     <span className="text-sm font-medium text-yellow-700 dark:text-yellow-400">Mídia Avulsa Ativa</span>

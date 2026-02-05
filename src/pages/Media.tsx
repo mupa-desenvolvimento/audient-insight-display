@@ -1,8 +1,7 @@
-import { DndContext, DragOverlay, useSensor, useSensors, PointerSensor, DragEndEvent } from "@dnd-kit/core";
-import { FolderPlus, ChevronLeft, ChevronRight, Folder as FolderIcon } from "lucide-react";
+import { DndContext, DragOverlay, useSensor, useSensors, PointerSensor, DragEndEvent, DragStartEvent } from "@dnd-kit/core";
+import { FolderPlus, ChevronLeft, ChevronRight, Folder as FolderIcon, HardDrive, Plus, Image as ImageIcon, Video, Clock, Grid2x2, Loader2, Play, Eye, MoreVertical, Pencil, Trash2, LayoutGrid, LayoutList, AlertTriangle, Upload, Filter, SortAsc, SortDesc } from "lucide-react";
 import { useFolders, Folder as FolderType } from "@/hooks/useFolders";
-import { FolderGridItem } from "@/components/media/FolderGridItem";
-import { FolderListItem } from "@/components/media/FolderListItem";
+import { FolderSidebar } from "@/components/media/FolderSidebar";
 import { DraggableMediaWrapper } from "@/components/media/DraggableMediaWrapper";
 import { DraggableMediaRow } from "@/components/media/DraggableMediaRow";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -12,34 +11,20 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
   DropdownMenuSeparator, 
-  DropdownMenuTrigger 
+  DropdownMenuTrigger,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuLabel
 } from "@/components/ui/dropdown-menu";
-import { 
-  Plus, 
-  Image, 
-  Video, 
-  Clock, 
-  Grid2x2, 
-  Loader2, 
-  Play, 
-  Eye, 
-  MoreVertical, 
-  Pencil, 
-  Trash2,
-  LayoutGrid,
-  LayoutList,
-  AlertTriangle,
-  HardDrive
-} from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Progress } from "@/components/ui/progress";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,13 +36,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useMediaItems, MediaItem } from "@/hooks/useMediaItems";
-import { usePlaylists } from "@/hooks/usePlaylists";
 import { MediaUploadDialog } from "@/components/media/MediaUploadDialog";
 import { MediaLightbox } from "@/components/media/MediaLightbox";
 import { MediaEditDialog } from "@/components/media/MediaEditDialog";
 import { MediaDeleteDialog } from "@/components/media/MediaDeleteDialog";
 import { useQueryClient } from "@tanstack/react-query";
-
 import { useToast } from "@/hooks/use-toast";
 
 const Media = () => {
@@ -76,14 +59,19 @@ const Media = () => {
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
+  // Filter and Sort state
+  const [filterType, setFilterType] = useState<"all" | "image" | "video">("all");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "name" | "size">("newest");
+
   // Folder state
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [folderPath, setFolderPath] = useState<{id: string, name: string}[]>([]);
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [activeDragItem, setActiveDragItem] = useState<MediaItem | null>(null);
 
-  const { folders, createFolder, deleteFolder } = useFolders(currentFolderId);
-  const { mediaItems, isLoading: loadingMedia, updateMediaItem, deleteMediaItem, moveMediaItem, refetch } = useMediaItems(currentFolderId);
+  const { folders, createFolder, deleteFolder, renameFolder } = useFolders(currentFolderId);
+  const { mediaItems, isLoading: loadingMedia, updateMediaItem, deleteMediaItem, moveMediaItem, moveMediaItems, refetch } = useMediaItems(currentFolderId);
 
   // DnD sensors
   const sensors = useSensors(
@@ -94,16 +82,58 @@ const Media = () => {
     })
   );
 
+  const handleDragStart = (event: DragStartEvent) => {
+    if (event.active.data.current?.type === 'media') {
+      const media = event.active.data.current.media;
+      setActiveDragItem(media);
+
+      // Logic for selection during drag
+      // If dragging an item that is NOT in the selection, clear selection and select ONLY the dragged item
+      // This mimics standard OS file manager behavior
+      if (!selectedMediaIds.has(media.id)) {
+        setSelectedMediaIds(new Set([media.id]));
+      }
+      // If dragging an item that IS in the selection, keep the selection (allows dragging the group)
+    }
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
+    setActiveDragItem(null);
     if (!over) return;
     
     const activeId = active.id as string;
     const overId = over.id as string;
     
-    // Check if we dropped a media item onto a folder
-    if (active.data.current?.type === 'media' && over.data.current?.type === 'folder') {
-        moveMediaItem.mutate({ mediaId: activeId, folderId: overId });
+    // Determine target folder ID
+    let targetFolderId: string | null = null;
+    
+    if (overId === 'root') {
+        targetFolderId = null;
+    } else if (over.data.current?.type === 'folder') {
+        targetFolderId = overId;
+    } else {
+        // Dropped somewhere else (not a folder)
+        return;
+    }
+
+    // Check if dragging a media item
+    if (active.data.current?.type === 'media') {
+        // If multiple items are selected AND the dragged item is one of them
+        if (selectedMediaIds.has(activeId) && selectedMediaIds.size > 1) {
+             // Move all selected items using bulk mutation
+             moveMediaItems.mutate({ 
+               mediaIds: Array.from(selectedMediaIds), 
+               folderId: targetFolderId 
+             });
+             
+             // Clear selection after move to avoid confusion
+             setSelectedMediaIds(new Set());
+             toast({ title: `${selectedMediaIds.size} itens movidos com sucesso` });
+        } else {
+             // Move single item
+             moveMediaItem.mutate({ mediaId: activeId, folderId: targetFolderId });
+        }
     }
   };
 
@@ -120,11 +150,6 @@ const Media = () => {
     });
   };
 
-  const navigateToFolder = (folder: FolderType) => {
-    setFolderPath([...folderPath, { id: folder.id, name: folder.name }]);
-    setCurrentFolderId(folder.id);
-  };
-
   const navigateUp = () => {
     const newPath = folderPath.slice(0, -1);
     setFolderPath(newPath);
@@ -132,15 +157,24 @@ const Media = () => {
   };
   
   const queryClient = useQueryClient();
-  const { playlists, isLoading: loadingPlaylists } = usePlaylists();
 
-  const filteredMedia = mediaItems.filter(media =>
-    media.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredMedia = mediaItems.filter(media => {
+    const matchesSearch = media.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = filterType === 'all' || media.type === filterType;
+    return matchesSearch && matchesType;
+  }).sort((a, b) => {
+    if (sortBy === 'newest') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    if (sortBy === 'oldest') return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    if (sortBy === 'name') return a.name.localeCompare(b.name);
+    if (sortBy === 'size') return (b.file_size || 0) - (a.file_size || 0);
+    return 0;
+  });
 
   // Calculate total storage
   const totalStorageBytes = mediaItems.reduce((acc, item) => acc + (item.file_size || 0), 0);
   const totalStorageMB = (totalStorageBytes / (1024 * 1024)).toFixed(1);
+  const storageLimitMB = 5120; // 5GB default limit
+  const storagePercentage = Math.min((parseFloat(totalStorageMB) / storageLimitMB) * 100, 100);
 
   // Selection handlers
   const toggleSelection = (id: string) => {
@@ -224,7 +258,7 @@ const Media = () => {
     await deleteMediaItem.mutateAsync(id);
   };
 
-  const isLoading = loadingMedia || loadingPlaylists;
+  const isLoading = loadingMedia;
 
   if (isLoading) {
     return (
@@ -235,550 +269,537 @@ const Media = () => {
   }
 
   return (
-    <div className="flex flex-col gap-6 animate-fade-in">
-      <div className="flex flex-col gap-4">
-        {/* Navigation and Actions */}
-        <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
-          <div className="flex items-center gap-2 overflow-hidden w-full md:w-auto">
-             {currentFolderId && (
-               <Button variant="ghost" onClick={navigateUp} className="mr-2 shrink-0">
-                 <ChevronLeft className="w-4 h-4 mr-1" />
-                 Voltar
-               </Button>
-             )}
-             <div className="flex items-center text-sm font-medium overflow-x-auto no-scrollbar whitespace-nowrap">
-                <span 
-                  className={`flex items-center hover:bg-accent px-2 py-1 rounded cursor-pointer ${!currentFolderId ? "font-bold text-foreground" : "text-muted-foreground"}`}
-                  onClick={() => {
-                    setCurrentFolderId(null);
-                    setFolderPath([]);
-                  }}
-                >
-                  <HardDrive className="w-4 h-4 mr-1" />
-                  Raiz
-                </span>
-                {folderPath.map((folder, index) => (
-                  <span key={folder.id} className="flex items-center">
-                    <ChevronRight className="w-4 h-4 mx-1 text-muted-foreground shrink-0" />
-                    <span 
-                       className={`hover:bg-accent px-2 py-1 rounded cursor-pointer ${index === folderPath.length - 1 ? "font-bold text-foreground" : "text-muted-foreground"}`}
-                       onClick={() => {
-                         const newPath = folderPath.slice(0, index + 1);
-                         setFolderPath(newPath);
-                         setCurrentFolderId(folder.id);
-                       }}
-                    >
-                      {folder.name}
-                    </span>
-                  </span>
-                ))}
-             </div>
-          </div>
-          
-          <div className="flex items-center gap-2 shrink-0">
-            <Dialog open={createFolderOpen} onOpenChange={setCreateFolderOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <FolderPlus className="w-4 h-4 mr-2" />
-                  Nova Pasta
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Criar Nova Pasta</DialogTitle>
-                </DialogHeader>
-                <div className="py-4">
-                  <Label htmlFor="name">Nome da Pasta</Label>
-                  <Input 
-                    id="name" 
-                    value={newFolderName} 
-                    onChange={(e) => setNewFolderName(e.target.value)} 
-                    placeholder="Nome da pasta"
-                    onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
-                  />
-                </div>
-                <DialogFooter>
-                  <Button onClick={handleCreateFolder}>Criar</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-            
-            <Button className="gradient-primary text-white" onClick={() => setUploadDialogOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Upload Mídia
-            </Button>
-          </div>
-        </div>
-      </div>
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <div className="flex h-[calc(100vh-140px)] gap-4 animate-fade-in">
+        {/* Sidebar */}
+        <FolderSidebar 
+          currentFolderId={currentFolderId}
+          onSelectFolder={(folder, path) => {
+            setCurrentFolderId(folder ? folder.id : null);
+            setFolderPath(path);
+          }}
+          className="w-64 shrink-0 rounded-lg border bg-card/50"
+        />
 
-      <MediaUploadDialog 
-        open={uploadDialogOpen} 
-        onOpenChange={setUploadDialogOpen}
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["media-items"] });
-          refetch();
-        }}
-      />
-
-      <MediaLightbox
-        open={lightboxOpen}
-        onOpenChange={setLightboxOpen}
-        mediaItems={filteredMedia}
-        initialIndex={lightboxIndex}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-      />
-
-      <MediaEditDialog
-        open={editDialogOpen}
-        onOpenChange={setEditDialogOpen}
-        media={selectedMedia}
-        onSave={handleSaveMedia}
-      />
-
-      <MediaDeleteDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        media={selectedMedia}
-        onConfirm={handleConfirmDelete}
-      />
-
-      <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir mídias selecionadas</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir {selectedMediaIds.size} itens selecionados?
-              <br />
-              Esta ação não pode ser desfeita e os arquivos serão removidos permanentemente.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isBulkDeleting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                handleBulkDelete();
-              }}
-              disabled={isBulkDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isBulkDeleting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Excluindo...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Excluir Selecionados
-                </>
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <Tabs defaultValue="media" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
-          <TabsTrigger value="media">Mídias</TabsTrigger>
-          <TabsTrigger value="playlists">Playlists</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="media" className="space-y-6">
-            <Alert variant="destructive" className="bg-red-50 border-red-200 text-red-800">
-              <AlertTriangle className="h-4 w-4 text-red-800" />
-              <AlertTitle>Atenção</AlertTitle>
-              <AlertDescription>
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col gap-4 overflow-hidden min-w-0">
+            {/* Storage Warning */}
+            <Alert className="bg-red-50 border-red-200 shadow-sm shrink-0">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              <AlertTitle className="text-red-800 font-semibold ml-2">Atenção</AlertTitle>
+              <AlertDescription className="text-red-700 ml-2">
                 Mídias não utilizadas por mais de 30 dias serão removidas automaticamente do sistema.
               </AlertDescription>
             </Alert>
 
-            <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-              <div className="flex items-center space-x-2 w-full md:w-auto">
-                <Input
-                  placeholder="Buscar mídias..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="max-w-sm"
-                />
-              </div>
-            
-            <div className="flex items-center gap-4 w-full md:w-auto justify-end">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-md">
-                <HardDrive className="w-4 h-4" />
-                <span>Uso: {totalStorageMB} MB</span>
-              </div>
-
-              {selectedMediaIds.size > 0 && (
-                <div className="flex items-center gap-2">
-                   {selectedMediaIds.size === 1 && (
-                    <Button 
-                      variant="outline" 
-                      size="sm"
+            <div className="flex flex-col gap-4 shrink-0">
+            {/* Navigation and Actions */}
+            <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
+              <div className="flex items-center gap-2 overflow-hidden w-full md:w-auto">
+                {currentFolderId && (
+                  <Button variant="ghost" onClick={navigateUp} className="mr-2 shrink-0">
+                    <ChevronLeft className="w-4 h-4 mr-1" />
+                    Voltar
+                  </Button>
+                )}
+                <div className="flex items-center text-sm font-medium overflow-x-auto no-scrollbar whitespace-nowrap">
+                    <span 
+                      className={`flex items-center hover:bg-accent px-2 py-1 rounded cursor-pointer ${!currentFolderId ? "font-bold text-foreground" : "text-muted-foreground"}`}
                       onClick={() => {
-                        const id = Array.from(selectedMediaIds)[0];
-                        const item = mediaItems.find(m => m.id === id);
-                        if (item) handleEdit(item);
+                        setCurrentFolderId(null);
+                        setFolderPath([]);
                       }}
                     >
-                      <Pencil className="w-4 h-4 mr-2" />
-                      Editar
-                    </Button>
-                  )}
-                  <Button 
-                    variant="destructive" 
-                    size="sm"
-                    onClick={() => setBulkDeleteDialogOpen(true)}
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Excluir ({selectedMediaIds.size})
-                  </Button>
+                      <HardDrive className="w-4 h-4 mr-1" />
+                      Raiz
+                    </span>
+                    {folderPath.map((folder, index) => (
+                      <span key={folder.id} className="flex items-center">
+                        <ChevronRight className="w-4 h-4 mx-1 text-muted-foreground shrink-0" />
+                        <span 
+                          className={`hover:bg-accent px-2 py-1 rounded cursor-pointer ${index === folderPath.length - 1 ? "font-bold text-foreground" : "text-muted-foreground"}`}
+                          onClick={() => {
+                            const newPath = folderPath.slice(0, index + 1);
+                            setFolderPath(newPath);
+                            setCurrentFolderId(folder.id);
+                          }}
+                        >
+                          {folder.name}
+                        </span>
+                      </span>
+                    ))}
                 </div>
-              )}
-
-              <div className="flex items-center border rounded-md bg-background">
-                <Button
-                  variant={viewMode === "grid" ? "secondary" : "ghost"}
-                  size="icon"
-                  className="h-9 w-9 rounded-r-none"
-                  onClick={() => setViewMode("grid")}
+              </div>
+              
+              <div className="flex items-center gap-2 shrink-0">
+                <Dialog open={createFolderOpen} onOpenChange={setCreateFolderOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline">
+                      <FolderPlus className="w-4 h-4 mr-2" />
+                      Nova Pasta
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Criar Nova Pasta</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-4">
+                      <Label htmlFor="name">Nome da Pasta</Label>
+                      <Input 
+                        id="name" 
+                        value={newFolderName} 
+                        onChange={(e) => setNewFolderName(e.target.value)} 
+                        placeholder="Nome da pasta"
+                        onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
+                      />
+                    </div>
+                    <DialogFooter>
+                      <Button onClick={handleCreateFolder}>Criar</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+                
+                <Button 
+                  className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm" 
+                  onClick={() => setUploadDialogOpen(true)}
                 >
-                  <LayoutGrid className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant={viewMode === "list" ? "secondary" : "ghost"}
-                  size="icon"
-                  className="h-9 w-9 rounded-l-none"
-                  onClick={() => setViewMode("list")}
-                >
-                  <LayoutList className="w-4 h-4" />
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload Mídia
                 </Button>
               </div>
             </div>
           </div>
 
-          <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-          {folders && folders.length > 0 && viewMode === "grid" && (
-             <div className="space-y-2">
-               <h3 className="text-sm font-medium text-muted-foreground">Pastas</h3>
-               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                  {folders.map(folder => (
-                    <FolderGridItem 
-                      key={folder.id} 
-                      folder={folder} 
-                      onClick={() => navigateToFolder(folder)}
-                      onDelete={(id) => deleteFolder.mutate(id)}
+          <MediaUploadDialog 
+            open={uploadDialogOpen} 
+            onOpenChange={setUploadDialogOpen}
+            onSuccess={() => {
+              refetch();
+              toast({ title: "Mídia enviada com sucesso" });
+            }}
+            folderId={currentFolderId}
+          />
+
+          <MediaLightbox
+            open={lightboxOpen}
+            onOpenChange={setLightboxOpen}
+            mediaItems={filteredMedia}
+            initialIndex={lightboxIndex}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
+
+          <MediaEditDialog
+            open={editDialogOpen}
+            onOpenChange={setEditDialogOpen}
+            media={selectedMedia}
+            onSave={handleSaveMedia}
+          />
+
+          <MediaDeleteDialog
+            open={deleteDialogOpen}
+            onOpenChange={setDeleteDialogOpen}
+            media={selectedMedia}
+            onConfirm={handleConfirmDelete}
+          />
+
+          <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Excluir mídias selecionadas</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Tem certeza que deseja excluir {selectedMediaIds.size} itens selecionados?
+                  <br />
+                  Esta ação não pode ser desfeita e os arquivos serão removidos permanentemente.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={isBulkDeleting}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleBulkDelete();
+                  }}
+                  disabled={isBulkDeleting}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {isBulkDeleting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Excluindo...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Excluir Selecionados
+                    </>
+                  )}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          <div className="flex-1 overflow-y-auto pr-2 space-y-6">
+                <div className="flex flex-col md:flex-row gap-4 items-center justify-between sticky top-0 bg-background/95 backdrop-blur z-10 py-2 border-b">
+                  <div className="flex items-center space-x-2 w-full md:w-auto">
+                    <Input
+                      placeholder="Buscar mídias..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="max-w-sm w-full"
                     />
-                  ))}
-               </div>
-             </div>
-          )}
-
-          {filteredMedia.length === 0 && (!folders || folders.length === 0) ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Image className="w-12 h-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">Nenhuma mídia encontrada</h3>
-                <p className="text-muted-foreground text-center max-w-md">
-                  {searchTerm 
-                    ? "Nenhuma mídia corresponde à sua busca."
-                    : "Faça upload da sua primeira mídia para começar."}
-                </p>
-              </CardContent>
-            </Card>
-          ) : viewMode === "grid" ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {filteredMedia.map((media, index) => {
-                // Use thumbnail_url field directly, fallback to file_url
-                const thumbnailUrl = media.thumbnail_url || media.file_url;
-                const isSelected = selectedMediaIds.has(media.id);
-                
-                const openLightbox = () => {
-                  if (selectedMediaIds.size > 0) {
-                    toggleSelection(media.id);
-                    return;
-                  }
-                  setLightboxIndex(index);
-                  setLightboxOpen(true);
-                };
-                
-                return (
-                  <DraggableMediaWrapper key={media.id} media={media}>
-                  <Card 
-                    className={`group hover:shadow-lg transition-all duration-300 overflow-hidden cursor-pointer border-2 ${isSelected ? 'border-primary' : 'border-transparent'} h-full`}
-                    onClick={openLightbox}
-                  >
-                    {/* Thumbnail */}
-                    <div className="relative aspect-video bg-muted overflow-hidden">
-                      <div className="absolute top-2 left-2 z-10" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox 
-                          checked={isSelected}
-                          onCheckedChange={() => toggleSelection(media.id)}
-                          className={`bg-white/90 border-black/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}
-                        />
-                      </div>
-
-                      {thumbnailUrl ? (
-                        media.type === "video" ? (
-                          <>
-                            <video
-                              src={media.file_url || ''}
-                              className="w-full h-full object-cover"
-                              muted
-                              preload="metadata"
-                              onLoadedData={(e) => {
-                                const video = e.currentTarget;
-                                if (video.duration > 1) {
-                                  video.currentTime = 1;
-                                }
-                              }}
-                              onMouseEnter={(e) => {
-                                const video = e.currentTarget;
-                                video.play().catch(() => {});
-                              }}
-                              onMouseLeave={(e) => {
-                                const video = e.currentTarget;
-                                video.pause();
-                                if (video.duration > 1) {
-                                  video.currentTime = 1;
-                                } else {
-                                  video.currentTime = 0;
-                                }
-                              }}
-                              onError={() => {
-                                console.warn('Video preview error:', media.name);
-                              }}
-                            />
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition-colors pointer-events-none">
-                              <div className="w-10 h-10 rounded-full bg-black/60 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <Play className="w-5 h-5 text-white ml-0.5" />
-                              </div>
-                            </div>
-                          </>
-                        ) : (
-                          <img
-                            src={thumbnailUrl}
-                            alt={media.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            loading="lazy"
-                            onError={(e) => {
-                              console.warn('Image preview error:', media.name);
-                              e.currentTarget.style.display = 'none';
-                            }}
-                          />
-                        )
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          {media.type === "video" ? (
-                            <Video className="w-10 h-10 text-muted-foreground" />
-                          ) : (
-                            <Image className="w-10 h-10 text-muted-foreground" />
-                          )}
-                        </div>
-                      )}
-                      
-                      {/* Status badge overlay */}
-                      <div className="absolute top-2 right-2">
-                        <Badge variant={getStatusVariant(media.status)} className="text-xs">
-                          {getStatusLabel(media.status)}
-                        </Badge>
-                      </div>
-                      
-                      {/* Duration badge for videos */}
-                      {media.type === "video" && media.duration && (
-                        <div className="absolute bottom-2 right-2">
-                          <span className="px-1.5 py-0.5 bg-black/70 text-white text-xs rounded">
-                            {Math.floor(media.duration / 60)}:{String(media.duration % 60).padStart(2, '0')}
-                          </span>
-                        </div>
-                      )}
-                      
-                      {/* Type icon overlay */}
-                      <div className="absolute bottom-2 left-2">
-                        <div className="w-6 h-6 rounded bg-black/60 flex items-center justify-center">
-                          {media.type === "video" ? (
-                            <Video className="w-3.5 h-3.5 text-white" />
-                          ) : (
-                            <Image className="w-3.5 h-3.5 text-white" />
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Hover overlay with action buttons */}
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            className="h-8"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openLightbox();
-                            }}
-                          >
-                            <Eye className="w-4 h-4 mr-1" />
-                            Ver
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Actions menu */}
-                      <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity pl-8">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                            <Button variant="secondary" size="icon" className="h-7 w-7">
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start">
-                            <DropdownMenuItem onClick={(e) => handleEdit(media, e as unknown as React.MouseEvent)}>
-                              <Pencil className="w-4 h-4 mr-2" />
-                              Editar
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem 
-                              onClick={(e) => handleDelete(media, e as unknown as React.MouseEvent)}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Excluir
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  
-                    {/* Info */}
-                    <CardContent className="p-3">
-                      <h3 className="font-medium text-sm truncate" title={media.name}>
-                        {media.name}
-                      </h3>
-                      <div className="flex items-center justify-between mt-1 text-xs text-muted-foreground">
-                        <span>{media.resolution || "-"}</span>
-                        <span>{formatFileSize(media.file_size)}</span>
-                      </div>
-                      {media.type === "image" && (
-                        <div className="flex items-center mt-1 text-xs text-muted-foreground">
-                          <Clock className="w-3 h-3 mr-1" />
-                          <span>{media.duration || 10}s</span>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                  </DraggableMediaWrapper>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[50px]">
-                      <Checkbox 
-                        checked={selectedMediaIds.size === filteredMedia.length && filteredMedia.length > 0}
-                        onCheckedChange={toggleAllSelection}
-                      />
-                    </TableHead>
-                    <TableHead className="w-[100px]">Preview</TableHead>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Tamanho</TableHead>
-                    <TableHead>Duração</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {folders && folders.map(folder => (
-                    <FolderListItem 
-                      key={folder.id} 
-                      folder={folder} 
-                      onClick={() => navigateToFolder(folder)}
-                      onDelete={(id) => deleteFolder.mutate(id)}
-                    />
-                  ))}
-                  {filteredMedia.map((media, index) => (
-                    <DraggableMediaRow
-                      key={media.id}
-                      media={media}
-                      index={index}
-                      isSelected={selectedMediaIds.has(media.id)}
-                      onToggleSelection={toggleSelection}
-                      onOpenLightbox={(idx) => {
-                        setLightboxIndex(idx);
-                        setLightboxOpen(true);
-                      }}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
-                      formatFileSize={formatFileSize}
-                      getStatusVariant={getStatusVariant}
-                      getStatusLabel={getStatusLabel}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-          </DndContext>
-        </TabsContent>
-
-        <TabsContent value="playlists" className="space-y-6">
-          {playlists.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Grid2x2 className="w-12 h-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">Nenhuma playlist encontrada</h3>
-                <p className="text-muted-foreground text-center max-w-md">
-                  Crie sua primeira playlist para organizar suas mídias.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {playlists.map((playlist) => (
-                <Card key={playlist.id} className="hover:shadow-lg transition-all duration-300">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center">
-                          <Grid2x2 className="w-6 h-6 text-primary" />
-                        </div>
-                        <div>
-                          <CardTitle className="text-lg">{playlist.name}</CardTitle>
-                          <CardDescription>
-                            {playlist.channel?.name || "Sem canal"}
-                          </CardDescription>
-                        </div>
-                      </div>
-                      <Badge variant={playlist.is_active ? "default" : "secondary"}>
-                        {playlist.is_active ? "Ativo" : "Inativo"}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Canal</span>
-                      <span className="text-sm font-medium">{playlist.channel?.type || "-"}</span>
-                    </div>
                     
-                    <div className="flex space-x-2 pt-2">
-                      <Button variant="outline" size="sm" className="flex-1">
-                        Editar
-                      </Button>
-                      <Button size="sm" className="flex-1">
-                        Publicar
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="icon" className="shrink-0">
+                          <Filter className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-48">
+                        <DropdownMenuLabel>Filtrar por Tipo</DropdownMenuLabel>
+                        <DropdownMenuRadioGroup value={filterType} onValueChange={(v) => setFilterType(v as any)}>
+                          <DropdownMenuRadioItem value="all">Todos</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="image">Imagens</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="video">Vídeos</DropdownMenuRadioItem>
+                        </DropdownMenuRadioGroup>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel>Ordenar por</DropdownMenuLabel>
+                        <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+                          <DropdownMenuRadioItem value="newest">Mais Recentes</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="oldest">Mais Antigos</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="name">Nome (A-Z)</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="size">Tamanho</DropdownMenuRadioItem>
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                
+                <div className="flex items-center gap-4 w-full md:w-auto justify-end">
+                  <div className="flex flex-col gap-1 w-32 md:w-48">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Uso: {totalStorageMB} MB</span>
+                      <span>{storagePercentage.toFixed(0)}%</span>
+                    </div>
+                    <Progress value={storagePercentage} className="h-2" />
+                  </div>
+
+                  {selectedMediaIds.size > 0 && (
+                    <div className="flex items-center gap-2">
+                       {selectedMediaIds.size === 1 && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            const id = Array.from(selectedMediaIds)[0];
+                            const item = mediaItems.find(m => m.id === id);
+                            if (item) handleEdit(item);
+                          }}
+                        >
+                          <Pencil className="w-4 h-4 mr-2" />
+                          Editar
+                        </Button>
+                      )}
+                      <Button 
+                        variant="destructive" 
+                        size="sm"
+                        onClick={() => setBulkDeleteDialogOpen(true)}
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Excluir ({selectedMediaIds.size})
                       </Button>
                     </div>
+                  )}
+
+                  <div className="flex items-center border rounded-md bg-background">
+                    <Button
+                      variant={viewMode === "grid" ? "secondary" : "ghost"}
+                      size="icon"
+                      className="h-9 w-9 rounded-r-none"
+                      onClick={() => setViewMode("grid")}
+                    >
+                      <LayoutGrid className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant={viewMode === "list" ? "secondary" : "ghost"}
+                      size="icon"
+                      className="h-9 w-9 rounded-l-none"
+                      onClick={() => setViewMode("list")}
+                    >
+                      <LayoutList className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {filteredMedia.length === 0 ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-12">
+                    <ImageIcon className="w-12 h-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium mb-2">Nenhuma mídia encontrada</h3>
+                    <p className="text-muted-foreground text-center max-w-md">
+                      {searchTerm 
+                        ? "Nenhuma mídia corresponde à sua busca."
+                        : "Faça upload da sua primeira mídia para começar."}
+                    </p>
                   </CardContent>
                 </Card>
-              ))}
+              ) : viewMode === "grid" ? (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-10">
+                  {filteredMedia.map((media, index) => {
+                    const thumbnailUrl = media.thumbnail_url || media.file_url;
+                    const isSelected = selectedMediaIds.has(media.id);
+                    
+                    const openLightbox = () => {
+                      if (selectedMediaIds.size > 0) {
+                        toggleSelection(media.id);
+                        return;
+                      }
+                      setLightboxIndex(index);
+                      setLightboxOpen(true);
+                    };
+                    
+                    return (
+                      <DraggableMediaWrapper key={media.id} media={media}>
+                      <Card 
+                        className={`group hover:shadow-lg transition-all duration-300 overflow-hidden cursor-pointer border-2 ${isSelected ? 'border-primary' : 'border-transparent'} h-full`}
+                        onClick={openLightbox}
+                      >
+                        <div className="relative aspect-video bg-muted overflow-hidden">
+                          <div className="absolute top-2 left-2 z-10" onClick={(e) => e.stopPropagation()}>
+                            <Checkbox 
+                              checked={isSelected}
+                              onCheckedChange={() => toggleSelection(media.id)}
+                              className={`bg-white/90 border-black/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}
+                            />
+                          </div>
+
+                          {thumbnailUrl ? (
+                            media.type === "video" ? (
+                              <>
+                                <video
+                                  src={media.file_url || ''}
+                                  className="w-full h-full object-cover"
+                                  muted
+                                  preload="metadata"
+                                  onLoadedData={(e) => {
+                                    const video = e.currentTarget;
+                                    if (video.duration > 1) {
+                                      video.currentTime = 1;
+                                    }
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    const video = e.currentTarget;
+                                    video.play().catch(() => {});
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    const video = e.currentTarget;
+                                    video.pause();
+                                    if (video.duration > 1) {
+                                      video.currentTime = 1;
+                                    } else {
+                                      video.currentTime = 0;
+                                    }
+                                  }}
+                                  onError={() => {
+                                    console.warn('Video preview error:', media.name);
+                                  }}
+                                />
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition-colors pointer-events-none">
+                                  <div className="w-10 h-10 rounded-full bg-black/60 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                    <Play className="w-5 h-5 text-white ml-0.5" />
+                                  </div>
+                                </div>
+                              </>
+                            ) : (
+                              <img
+                                src={thumbnailUrl}
+                                alt={media.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                loading="lazy"
+                                onError={(e) => {
+                                  console.warn('Image preview error:', media.name);
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                              />
+                            )
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              {media.type === "video" ? (
+                                <Video className="w-10 h-10 text-muted-foreground" />
+                              ) : (
+                                <ImageIcon className="w-10 h-10 text-muted-foreground" />
+                              )}
+                            </div>
+                          )}
+                          
+                          <div className="absolute top-2 right-2">
+                            <Badge variant={getStatusVariant(media.status)} className="text-xs">
+                              {getStatusLabel(media.status)}
+                            </Badge>
+                          </div>
+                          
+                          {media.type === "video" && media.duration && (
+                            <div className="absolute bottom-2 right-2">
+                              <span className="px-1.5 py-0.5 bg-black/70 text-white text-xs rounded">
+                                {Math.floor(media.duration / 60)}:{String(media.duration % 60).padStart(2, '0')}
+                              </span>
+                            </div>
+                          )}
+                          
+                          <div className="absolute bottom-2 left-2">
+                            <div className="w-6 h-6 rounded bg-black/60 flex items-center justify-center">
+                              {media.type === "video" ? (
+                                <Video className="w-3.5 h-3.5 text-white" />
+                              ) : (
+                                <ImageIcon className="w-3.5 h-3.5 text-white" />
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="h-8"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openLightbox();
+                                }}
+                              >
+                                <Eye className="w-4 h-4 mr-1" />
+                                Ver
+                              </Button>
+                            </div>
+                          </div>
+
+                          <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity pl-8">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                <Button variant="secondary" size="icon" className="h-7 w-7">
+                                  <MoreVertical className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start">
+                                <DropdownMenuItem onClick={(e) => handleEdit(media, e as unknown as React.MouseEvent)}>
+                                  <Pencil className="w-4 h-4 mr-2" />
+                                  Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  onClick={(e) => handleDelete(media, e as unknown as React.MouseEvent)}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Excluir
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
+                      
+                        <CardContent className="p-3">
+                          <h3 className="font-medium text-sm truncate" title={media.name}>
+                            {media.name}
+                          </h3>
+                          <div className="flex items-center justify-between mt-1 text-xs text-muted-foreground">
+                            <span>{media.resolution || "-"}</span>
+                            <span>{formatFileSize(media.file_size)}</span>
+                          </div>
+                          {media.type === "image" && (
+                            <div className="flex items-center mt-1 text-xs text-muted-foreground">
+                              <Clock className="w-3 h-3 mr-1" />
+                              <span>{media.duration || 10}s</span>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                      </DraggableMediaWrapper>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-md border pb-10">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]">
+                          <Checkbox 
+                            checked={selectedMediaIds.size === filteredMedia.length && filteredMedia.length > 0}
+                            onCheckedChange={toggleAllSelection}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[100px]">Preview</TableHead>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Tamanho</TableHead>
+                        <TableHead>Duração</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredMedia.map((media, index) => (
+                        <DraggableMediaRow
+                          key={media.id}
+                          media={media}
+                          index={index}
+                          isSelected={selectedMediaIds.has(media.id)}
+                          onToggleSelection={toggleSelection}
+                          onOpenLightbox={(idx) => {
+                            setLightboxIndex(idx);
+                            setLightboxOpen(true);
+                          }}
+                          onEdit={handleEdit}
+                          onDelete={handleDelete}
+                          formatFileSize={formatFileSize}
+                          getStatusVariant={getStatusVariant}
+                          getStatusLabel={getStatusLabel}
+                        />
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+          </div>
+        </div>
+      </div>
+      <DragOverlay>
+        {activeDragItem ? (
+          <div className="relative">
+            {selectedMediaIds.size > 1 && selectedMediaIds.has(activeDragItem.id) && (
+              <>
+                <div className="absolute top-1 left-1 w-48 h-14 bg-card/50 border rounded-md shadow-sm" />
+                <div className="absolute top-2 left-2 w-48 h-14 bg-card/30 border rounded-md shadow-sm" />
+              </>
+            )}
+            <div className="bg-card border rounded-md shadow-xl p-2 w-48 flex items-center gap-2 opacity-95 cursor-grabbing relative z-10 h-14">
+              <div className="w-10 h-10 bg-muted rounded overflow-hidden shrink-0 flex items-center justify-center">
+                {activeDragItem.thumbnail_url || activeDragItem.file_url ? (
+                  activeDragItem.type === 'video' ? (
+                     <Video className="w-5 h-5 text-muted-foreground" />
+                  ) : (
+                     <img 
+                       src={activeDragItem.thumbnail_url || activeDragItem.file_url || ''} 
+                       alt={activeDragItem.name}
+                       className="w-full h-full object-cover" 
+                     />
+                  )
+                ) : (
+                  activeDragItem.type === 'video' ? <Video className="w-5 h-5 text-muted-foreground" /> : <ImageIcon className="w-5 h-5 text-muted-foreground" />
+                )}
+              </div>
+              <span className="text-sm font-medium truncate flex-1">{activeDragItem.name}</span>
+              {selectedMediaIds.size > 1 && selectedMediaIds.has(activeDragItem.id) && (
+                  <Badge variant="secondary" className="ml-auto text-xs shrink-0">
+                      {selectedMediaIds.size}
+                  </Badge>
+              )}
             </div>
-          )}
-        </TabsContent>
-      </Tabs>
-    </div>
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   );
 };
 

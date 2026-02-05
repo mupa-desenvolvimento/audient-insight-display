@@ -17,7 +17,9 @@ import {
   ChevronUp,
   ChevronDown,
   Settings,
-  Calendar
+  Calendar,
+  ArrowUpDown,
+  Type
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -26,6 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 interface EditorTimelineProps {
@@ -204,6 +207,30 @@ export const EditorTimeline = ({
     setDropTargetIndex(null);
   }, []);
 
+  const handleSort = (type: 'name' | 'duration' | 'date') => {
+    const sorted = [...items].sort((a, b) => {
+      switch (type) {
+        case 'name':
+          return (a.media?.name || '').localeCompare(b.media?.name || '');
+        case 'duration':
+          const durA = a.duration_override || a.media?.duration || 0;
+          const durB = b.duration_override || b.media?.duration || 0;
+          return durA - durB;
+        case 'date':
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        default:
+          return 0;
+      }
+    });
+
+    const reordered = sorted.map((item, index) => ({
+      id: item.id,
+      position: index
+    }));
+    
+    onReorderItems(reordered);
+  };
+
   // Calculate cumulative time for each item
   const itemTimes = items.reduce<{ startTime: number; endTime: number }[]>((acc, item, index) => {
     const duration = item.duration_override || item.media?.duration || 10;
@@ -238,6 +265,31 @@ export const EditorTimeline = ({
             <span className="opacity-50">•</span>
             <span>{items.length} {items.length === 1 ? "item" : "itens"}</span>
           </div>
+
+          <div className="h-4 w-px bg-border mx-2" />
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-6 text-xs gap-1.5 px-2">
+                <ArrowUpDown className="w-3 h-3" />
+                Ordenar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => handleSort('name')}>
+                <Type className="w-4 h-4 mr-2" />
+                Nome
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleSort('duration')}>
+                <Clock className="w-4 h-4 mr-2" />
+                Duração
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleSort('date')}>
+                <Calendar className="w-4 h-4 mr-2" />
+                Data de inclusão
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -281,154 +333,175 @@ export const EditorTimeline = ({
                   const width = Math.max(100, duration * 10);
 
                   return (
-                    <div key={item.id} className="relative flex items-center h-full">
-                      {/* Drop Indicator - Left side */}
-                      {isDropTarget && draggedIndex !== null && draggedIndex > index && (
-                        <div className="absolute -left-1.5 top-0 bottom-0 w-1 bg-primary rounded-full z-20 animate-pulse" />
-                      )}
-                      
-                      <div
-                        draggable
-                        onDragStart={(e) => handleItemDragStart(e, index)}
-                        onDragOver={(e) => handleItemDragOver(e, index)}
-                        onDragLeave={handleItemDragLeave}
-                        onDrop={(e) => handleItemDrop(e, index)}
-                        onDragEnd={handleDragEnd}
-                        onClick={() => {
-                          onSelectItem(item.id);
-                          onSetPreviewIndex(index);
-                        }}
-                        className={cn(
-                          "group relative flex-shrink-0 rounded-lg overflow-hidden cursor-pointer h-full",
-                          "border-2 transition-all duration-200",
-                          isSelected ? "border-primary ring-2 ring-primary/30" : isCurrent ? "border-foreground/30" : "border-transparent hover:border-muted-foreground/50",
-                          isDragging ? "opacity-40 scale-95 rotate-1" : "opacity-100",
-                          isDropTarget ? "scale-[0.98] border-primary/50" : ""
-                        )}
-                        style={{ width: `${width}px` }}
-                      >
-                        {/* Thumbnail */}
-                        <div className="absolute inset-0 bg-muted">
-                          {item.media?.file_url && (
-                            item.media.type === "video" ? (
-                              <video
-                                src={item.media.file_url}
-                                className={cn(
-                                  "w-full h-full object-cover transition-opacity duration-200",
-                                  isDragging ? "opacity-50" : "opacity-80"
-                                )}
-                                muted
-                              />
-                            ) : (
-                              <img
-                                src={item.media.file_url}
-                                alt=""
-                                className={cn(
-                                  "w-full h-full object-cover transition-opacity duration-200",
-                                  isDragging ? "opacity-50" : "opacity-80"
-                                )}
-                              />
-                            )
-                          )}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                        </div>
-
-                        {/* Content */}
-                        <div className="absolute inset-0 flex flex-col justify-between p-2">
-                          {/* Top Row */}
-                          <div className="flex items-start justify-between">
-                            <div className={cn(
-                              "flex items-center gap-1 transition-opacity duration-200",
-                              isDragging ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                            )}>
-                              <div className="p-1 bg-black/50 rounded cursor-grab active:cursor-grabbing hover:bg-black/70 transition-colors">
-                                <GripVertical className="w-3 h-3 text-white/70" />
-                              </div>
-                            </div>
+                    <TooltipProvider key={item.id}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="relative flex items-center h-full">
+                            {/* Drop Indicator - Left side */}
+                            {isDropTarget && draggedIndex !== null && draggedIndex > index && (
+                              <div className="absolute -left-1.5 top-0 bottom-0 w-1 bg-primary rounded-full z-20 animate-pulse" />
+                            )}
                             
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 opacity-0 group-hover:opacity-100 bg-black/50 hover:bg-black/70 text-white/70 hover:text-white transition-all"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <MoreVertical className="w-3 h-3" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSettingsItem(item);
-                                  }}
-                                >
-                                  <Settings className="w-4 h-4 mr-2" />
-                                  Configurações
-                                </DropdownMenuItem>
-                                <DropdownMenuItem 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onDuplicateItem(item);
-                                  }}
-                                >
-                                  <Copy className="w-4 h-4 mr-2" />
-                                  Duplicar
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onRemoveItem(item.id);
-                                  }}
-                                  className="text-destructive focus:text-destructive"
-                                >
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Remover
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
+                            <div
+                              draggable
+                              onDragStart={(e) => handleItemDragStart(e, index)}
+                              onDragOver={(e) => handleItemDragOver(e, index)}
+                              onDragLeave={handleItemDragLeave}
+                              onDrop={(e) => handleItemDrop(e, index)}
+                              onDragEnd={handleDragEnd}
+                              onClick={() => {
+                                onSelectItem(item.id);
+                                onSetPreviewIndex(index);
+                              }}
+                              className={cn(
+                                "group relative flex-shrink-0 rounded-lg overflow-hidden cursor-pointer h-full",
+                                "border-2 transition-all duration-200",
+                                isSelected ? "border-primary ring-2 ring-primary/30" : isCurrent ? "border-foreground/30" : "border-transparent hover:border-muted-foreground/50",
+                                isDragging ? "opacity-40 scale-95 rotate-1" : "opacity-100",
+                                isDropTarget ? "scale-[0.98] border-primary/50" : ""
+                              )}
+                              style={{ width: `${width}px` }}
+                            >
+                              {/* Thumbnail */}
+                              <div className="absolute inset-0 bg-muted">
+                                {item.media?.file_url && (
+                                  item.media.type === "video" ? (
+                                    <video
+                                      src={item.media.file_url}
+                                      className={cn(
+                                        "w-full h-full object-cover transition-opacity duration-200",
+                                        isDragging ? "opacity-50" : "opacity-80"
+                                      )}
+                                      muted
+                                    />
+                                  ) : (
+                                    <img
+                                      src={item.media.file_url}
+                                      alt=""
+                                      className={cn(
+                                        "w-full h-full object-cover transition-opacity duration-200",
+                                        isDragging ? "opacity-50" : "opacity-80"
+                                      )}
+                                    />
+                                  )
+                                )}
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                              </div>
 
-                          {/* Bottom Row */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1.5">
-                              <Icon className="w-3 h-3 text-white/70" />
-                              <span className="text-[10px] text-white/80 font-medium truncate max-w-[60px]">
-                                {item.media?.name || "Sem nome"}
+                              {/* Content */}
+                              <div className="absolute inset-0 flex flex-col justify-between p-2">
+                                {/* Top Row */}
+                                <div className="flex items-start justify-between">
+                                  <div className={cn(
+                                    "flex items-center gap-1 transition-opacity duration-200",
+                                    isDragging ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                                  )}>
+                                    <div className="p-1 bg-black/50 rounded cursor-grab active:cursor-grabbing hover:bg-black/70 transition-colors">
+                                      <GripVertical className="w-3 h-3 text-white/70" />
+                                    </div>
+                                  </div>
+                                  
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 opacity-0 group-hover:opacity-100 bg-black/50 hover:bg-black/70 text-white/70 hover:text-white transition-all"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <MoreVertical className="w-3 h-3" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSettingsItem(item);
+                                        }}
+                                      >
+                                        <Settings className="w-4 h-4 mr-2" />
+                                        Configurações
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onDuplicateItem(item);
+                                        }}
+                                      >
+                                        <Copy className="w-4 h-4 mr-2" />
+                                        Duplicar
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onRemoveItem(item.id);
+                                        }}
+                                        className="text-destructive focus:text-destructive"
+                                      >
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        Remover
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+
+                                {/* Bottom Row */}
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-1.5">
+                                    <Icon className="w-3 h-3 text-white/70" />
+                                    <span className="text-[10px] text-white/80 font-medium truncate max-w-[60px]">
+                                      {item.media?.name || "Sem nome"}
+                                    </span>
+                                  </div>
+                                  <span className="text-[10px] text-white/50 flex items-center gap-0.5">
+                                    <Clock className="w-2.5 h-2.5" />
+                                    {formatDuration(duration)}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Playing Indicator */}
+                              {isCurrent && isPlaying && (
+                                <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                              )}
+
+                              {/* Schedule Override Indicator */}
+                              {hasScheduleOverride && !isDragging && (
+                                <div className="absolute top-2 right-8 opacity-80">
+                                  <Calendar className="w-3 h-3 text-blue-400" />
+                                </div>
+                              )}
+
+                              {/* Drag overlay */}
+                              {isDragging && (
+                                <div className="absolute inset-0 bg-primary/20 rounded-lg" />
+                              )}
+                            </div>
+
+                            {/* Drop Indicator - Right side */}
+                            {isDropTarget && draggedIndex !== null && draggedIndex < index && (
+                              <div className="absolute -right-1.5 top-0 bottom-0 w-1 bg-primary rounded-full z-20 animate-pulse" />
+                            )}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          <div className="flex flex-col gap-1 text-xs">
+                            <p className="font-semibold">{item.media?.name}</p>
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {formatDuration(duration)}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                {new Date(item.created_at).toLocaleDateString()}
                               </span>
                             </div>
-                            <span className="text-[10px] text-white/50 flex items-center gap-0.5">
-                              <Clock className="w-2.5 h-2.5" />
-                              {formatDuration(duration)}
-                            </span>
                           </div>
-                        </div>
-
-                        {/* Playing Indicator */}
-                        {isCurrent && isPlaying && (
-                          <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                        )}
-
-                        {/* Schedule Override Indicator */}
-                        {hasScheduleOverride && !isDragging && (
-                          <div className="absolute top-2 right-8 opacity-80">
-                            <Calendar className="w-3 h-3 text-blue-400" />
-                          </div>
-                        )}
-
-                        {/* Drag overlay */}
-                        {isDragging && (
-                          <div className="absolute inset-0 bg-primary/20 rounded-lg" />
-                        )}
-                      </div>
-
-                      {/* Drop Indicator - Right side */}
-                      {isDropTarget && draggedIndex !== null && draggedIndex < index && (
-                        <div className="absolute -right-1.5 top-0 bottom-0 w-1 bg-primary rounded-full z-20 animate-pulse" />
-                      )}
-                    </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   );
                 })}
 

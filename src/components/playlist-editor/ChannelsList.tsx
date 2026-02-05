@@ -27,6 +27,7 @@ import {
   Film,
   Calendar
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 const DAYS_OF_WEEK = [
@@ -343,9 +344,25 @@ export const ChannelsList = ({
         </Button>
       </div>
 
+      {/* Legend */}
+      <div className="px-4 py-2 bg-muted/30 border-b flex gap-3 text-[10px] text-muted-foreground overflow-x-auto shrink-0">
+        <div className="flex items-center gap-1.5 whitespace-nowrap">
+          <div className="w-2 h-2 rounded-full bg-green-500" />
+          <span>Ao Vivo</span>
+        </div>
+        <div className="flex items-center gap-1.5 whitespace-nowrap">
+          <div className="w-2 h-2 rounded-full bg-blue-500" />
+          <span>Programado</span>
+        </div>
+        <div className="flex items-center gap-1.5 whitespace-nowrap">
+          <div className="w-2 h-2 rounded-full bg-yellow-500" />
+          <span>Fallback</span>
+        </div>
+      </div>
+
       {/* Channels List - Scrollable */}
       <ScrollArea className="flex-1 min-h-0" showScrollbar="always">
-        <div className="p-4 space-y-2">
+        <div className="p-4 space-y-4">
           {channels.length === 0 ? (
             <Card className="border-dashed">
               <CardContent className="py-6 text-center">
@@ -372,41 +389,58 @@ export const ChannelsList = ({
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDrop={(e) => handleDrop(e, index)}
                 className={cn(
-                  "cursor-pointer transition-all group",
-                  "hover:border-primary/50 hover:shadow-sm",
-                  activeChannelId === channel.id && "border-primary ring-1 ring-primary",
+                  "cursor-pointer transition-all group relative overflow-hidden",
+                  "hover:border-primary/50 hover:shadow-md",
+                  activeChannelId === channel.id 
+                    ? "border-primary bg-primary/10 ring-2 ring-primary shadow-md" 
+                    : "border-border/60 bg-card/50 shadow-sm",
                   draggedChannel?.id === channel.id && "opacity-50",
                   dragOverIndex === index && draggedChannel?.id !== channel.id && "border-primary border-dashed border-2",
                   isLive && "ring-1 ring-green-500/50 shadow-[0_0_12px_rgba(34,197,94,0.15)]"
                 )}
                 onClick={() => onSelectChannel(channel)}
               >
-                <CardContent className="p-3">
+                {/* Priority Indicator */}
+                <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-transparent via-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                
+                <CardContent className="p-4">
                   {/* Row 1: Status + Name + Actions */}
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-3 mb-4">
                     {/* Drag Handle */}
                     <div 
-                      className="text-muted-foreground/50 hover:text-muted-foreground cursor-grab shrink-0"
+                      className="text-muted-foreground/30 hover:text-muted-foreground cursor-grab shrink-0 transition-colors"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <GripVertical className="w-4 h-4" />
+                      <GripVertical className="w-5 h-5" />
                     </div>
                     
-                    {/* Status Icon */}
-                    <div className={cn(
-                      "w-7 h-7 rounded-md flex items-center justify-center shrink-0",
-                      status.type === "live" && "bg-green-500/20",
-                      status.type === "fallback" && "bg-yellow-500/20",
-                      status.type === "scheduled" && "bg-blue-500/20",
-                      status.type === "inactive" && "bg-muted"
-                    )}>
-                      {getStatusIcon(channel)}
-                    </div>
+                    {/* Status Icon with Tooltip */}
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className={cn(
+                            "w-9 h-9 rounded-lg flex items-center justify-center shrink-0 shadow-sm transition-colors",
+                            status.type === "live" && "bg-green-500/10 text-green-600 border border-green-200",
+                            status.type === "fallback" && "bg-yellow-500/10 text-yellow-600 border border-yellow-200",
+                            status.type === "scheduled" && "bg-blue-500/10 text-blue-600 border border-blue-200",
+                            status.type === "inactive" && "bg-muted text-muted-foreground border border-border"
+                          )}>
+                            {getStatusIcon(channel)}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                          <p>{status.label}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {status.type === 'fallback' ? 'Conteúdo padrão' : 'Conteúdo programado'}
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                     
                     {/* Name + Badge */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm truncate">{channel.name}</span>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="font-semibold text-base truncate">{channel.name}</span>
                         <Badge 
                           variant="outline" 
                           className={cn("text-[10px] px-1.5 py-0 h-4 shrink-0", status.color)}
@@ -414,96 +448,133 @@ export const ChannelsList = ({
                           {status.label}
                         </Badge>
                       </div>
+                      <div className="text-xs text-muted-foreground flex items-center gap-2">
+                         <span className="bg-muted px-1.5 py-0.5 rounded text-[10px] font-mono">
+                           #{index + 1}
+                         </span>
+                         {channel.description && <span className="truncate max-w-[200px]">{channel.description}</span>}
+                      </div>
                     </div>
                     
                     {/* Actions */}
-                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openEditDialog(channel);
-                        }}
-                      >
-                        <Edit className="w-3 h-3" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        className="h-6 w-6 text-destructive hover:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteId(channel.id);
-                        }}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditDialog(channel);
+                              }}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Configurar canal (ordem, horários e comportamento)</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="h-8 w-8 text-destructive/70 hover:text-destructive hover:bg-destructive/10"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteId(channel.id);
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Excluir canal</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
-                    
-                    <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
                   </div>
                   
-                  {/* Row 2: Date + Time + Media Count */}
-                  <div className="flex items-center justify-between pl-6">
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      {formatDateRange(channel.start_date, channel.end_date, channel.is_fallback) && (
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          {formatDateRange(channel.start_date, channel.end_date, channel.is_fallback)}
+                  {/* Row 2: Info Grid */}
+                  <div className="grid grid-cols-2 gap-3 pl-12">
+                    {/* Time */}
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Horário</span>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="font-medium">
+                          {channel.start_time.slice(0, 5)}
+                          {!channel.is_fallback && ` – ${channel.end_time.slice(0, 5)}`}
+                          {channel.is_fallback && " – ∞"}
                         </span>
-                      )}
-                      
-                      <span className="flex items-center gap-1 font-mono">
-                        <Clock className="w-3 h-3" />
-                        {channel.start_time.slice(0, 5)}
-                        {!channel.is_fallback && `–${channel.end_time.slice(0, 5)}`}
-                        {channel.is_fallback && "–∞"}
-                      </span>
-                      
-                      <span className="flex items-center gap-1 font-medium text-foreground">
-                        <Film className="w-3 h-3 text-primary" />
-                        {channel.item_count || 0}
-                      </span>
+                      </div>
                     </div>
-                    
-                    {/* Days - Collapsible */}
-                    <Collapsible 
-                      open={expandedDays[channel.id]}
-                      onOpenChange={(open) => setExpandedDays(prev => ({ ...prev, [channel.id]: open }))}
-                    >
-                      <CollapsibleTrigger 
-                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Calendar className="w-3 h-3" />
-                        <span className="max-w-[80px] truncate">
-                          {formatDaysLabel(channel.days_of_week)}
+
+                    {/* Date */}
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Período</span>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="truncate">
+                          {formatDateRange(channel.start_date, channel.end_date, channel.is_fallback) || "Permanente"}
                         </span>
-                        <ChevronDown className={cn(
-                          "w-3 h-3 transition-transform",
-                          expandedDays[channel.id] && "rotate-180"
-                        )} />
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="absolute mt-1 right-0 z-10">
-                        <div className="bg-popover border rounded-md shadow-lg p-2 flex gap-1">
-                          {DAYS_OF_WEEK.map((day) => (
-                            <div
-                              key={day.value}
-                              className={cn(
-                                "w-6 h-6 rounded text-[10px] font-medium flex items-center justify-center",
-                                channel.days_of_week.includes(day.value)
-                                  ? "bg-primary text-primary-foreground"
-                                  : "bg-muted text-muted-foreground"
-                              )}
-                            >
-                              {day.short}
-                            </div>
-                          ))}
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
+                      </div>
+                    </div>
+
+                    {/* Days */}
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Dias</span>
+                      <Collapsible 
+                        open={expandedDays[channel.id]}
+                        onOpenChange={(open) => setExpandedDays(prev => ({ ...prev, [channel.id]: open }))}
+                      >
+                        <CollapsibleTrigger 
+                          className="flex items-center gap-2 text-sm hover:text-primary transition-colors group/days"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <span className="truncate max-w-[120px]">
+                            {formatDaysLabel(channel.days_of_week)}
+                          </span>
+                          <ChevronDown className={cn(
+                            "w-3 h-3 transition-transform text-muted-foreground group-hover/days:text-primary",
+                            expandedDays[channel.id] && "rotate-180"
+                          )} />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="absolute mt-1 left-0 z-10">
+                          <div className="bg-popover border rounded-md shadow-xl p-2 flex gap-1 animate-in fade-in zoom-in-95 duration-200">
+                            {DAYS_OF_WEEK.map((day) => (
+                              <div
+                                key={day.value}
+                                className={cn(
+                                  "w-6 h-6 rounded text-[10px] font-medium flex items-center justify-center transition-colors",
+                                  channel.days_of_week.includes(day.value)
+                                    ? "bg-primary text-primary-foreground shadow-sm"
+                                    : "bg-muted/50 text-muted-foreground"
+                                )}
+                              >
+                                {day.short}
+                              </div>
+                            ))}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    </div>
+
+                    {/* Media Count */}
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Mídias</span>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Film className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span>{channel.item_count || 0} itens</span>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { 
   ArrowLeft, 
   Save, 
@@ -143,16 +144,23 @@ export const EditorHeader = ({
 
         <Button
           onClick={onSave}
-          disabled={isSaving}
+          disabled={isSaving || !hasUnsavedChanges}
           size="sm"
-          className="h-8 gap-2"
+          className={cn(
+            "h-8 gap-2 transition-all min-w-[140px]",
+            hasUnsavedChanges 
+              ? "bg-amber-600 hover:bg-amber-700 text-white shadow-sm" 
+              : "bg-muted text-muted-foreground hover:bg-muted/80 opacity-70"
+          )}
         >
           {isSaving ? (
             <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
+          ) : hasUnsavedChanges ? (
             <Save className="w-4 h-4" />
+          ) : (
+            <Check className="w-4 h-4" />
           )}
-          Salvar
+          {isSaving ? "Salvando..." : hasUnsavedChanges ? "Salvar alterações" : "Salvo"}
         </Button>
       </div>
     </header>

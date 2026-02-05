@@ -112,6 +112,7 @@ Deno.serve(async (req) => {
     const file = formData.get('file') as File
     const fileName = formData.get('fileName') as string || file.name
     const fileType = formData.get('fileType') as string || file.type
+    const folderId = formData.get('folderId') as string || null
 
     if (!file) {
       return new Response(
@@ -259,6 +260,7 @@ Deno.serve(async (req) => {
         resolution: resolution,
         status: 'active', // Always active once uploaded successfully
         thumbnail_url: publicThumbnailUrl,
+        folder_id: folderId,
         metadata: {
           r2_key: fileKey,
           thumbnail_key: thumbnailKey,

@@ -16,23 +16,25 @@ export interface FolderInsert {
   parent_id?: string | null;
 }
 
-export const useFolders = (currentFolderId: string | null = null) => {
+export const useFolders = (currentFolderId: string | null = null, options?: { fetchAll?: boolean }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: folders = [], isLoading, error } = useQuery({
-    queryKey: ["folders", currentFolderId],
+    queryKey: ["folders", currentFolderId, options?.fetchAll],
     queryFn: async () => {
-      console.log('[useFolders] Fetching folders for parent:', currentFolderId);
+      console.log('[useFolders] Fetching folders. Parent:', currentFolderId, 'FetchAll:', options?.fetchAll);
       let query = supabase
         .from("folders")
         .select("*")
         .order("name", { ascending: true });
       
-      if (currentFolderId) {
-        query = query.eq("parent_id", currentFolderId);
-      } else {
-        query = query.is("parent_id", null);
+      if (!options?.fetchAll) {
+        if (currentFolderId) {
+          query = query.eq("parent_id", currentFolderId);
+        } else {
+          query = query.is("parent_id", null);
+        }
       }
 
       const { data, error } = await query;
@@ -80,11 +82,30 @@ export const useFolders = (currentFolderId: string | null = null) => {
     },
   });
 
+  const renameFolder = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { error } = await supabase
+        .from("folders")
+        .update({ name })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["folders"] });
+      toast({ title: "Pasta renomeada com sucesso" });
+    },
+    onError: (error) => {
+      toast({ title: "Erro ao renomear pasta", description: error.message, variant: "destructive" });
+    },
+  });
+
   return {
     folders,
     isLoading,
     error,
     createFolder,
-    deleteFolder
+    deleteFolder,
+    renameFolder
   };
 };

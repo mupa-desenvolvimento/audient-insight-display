@@ -15,11 +15,9 @@ export const DraggableMediaWrapper = ({ media, children }: DraggableMediaWrapper
     }
   });
   
-  const style = transform ? {
-    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-    zIndex: isDragging ? 50 : undefined,
+  const style = {
     opacity: isDragging ? 0.5 : 1,
-  } : undefined;
+  };
 
   return (
     <div ref={setNodeRef} style={style} {...listeners} {...attributes} className="h-full">
