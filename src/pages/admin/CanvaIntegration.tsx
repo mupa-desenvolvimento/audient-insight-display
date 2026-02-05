@@ -6,9 +6,10 @@
  import { Skeleton } from '@/components/ui/skeleton';
  import { ScrollArea } from '@/components/ui/scroll-area';
  import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
- import { 
+import { 
   Link2, Link2Off, Loader2, Download, FolderOpen, 
-  Image, RefreshCw, CheckCircle2, ExternalLink, CheckSquare, Square
+  Image, RefreshCw, CheckCircle2, ExternalLink, CheckSquare, Square,
+  ChevronRight, Home
 } from 'lucide-react';
 import { useCanvaIntegration } from '@/hooks/useCanvaIntegration';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -18,21 +19,22 @@ import { Checkbox } from '@/components/ui/checkbox';
    const [searchParams] = useSearchParams();
    const [isProcessingCallback, setIsProcessingCallback] = useState(false);
    
-   const {
-     isConnected,
-     isLoading,
-     designs,
-     folders,
-     selectedFolder,
-    setSelectedFolder,
+  const {
+    isConnected,
+    isLoading,
+    designs,
+    folders,
     continuation,
     isLoadingDesigns,
     isExporting,
     connect,
     disconnect,
     handleCallback,
-    loadFolders,
-    loadDesigns,
+    loadFolderItems,
+    navigateToFolder,
+    navigateToBreadcrumb,
+    currentFolderId,
+    folderBreadcrumbs,
     selectedDesigns,
     toggleSelection,
     selectAll,
@@ -41,37 +43,28 @@ import { Checkbox } from '@/components/ui/checkbox';
   } = useCanvaIntegration();
  
    // Handle OAuth callback
-   useEffect(() => {
-     const code = searchParams.get('code');
-     const state = searchParams.get('state');
-     
-     if (code && state && !isProcessingCallback) {
-       setIsProcessingCallback(true);
-       handleCallback(code, state).then((success) => {
-         // Clean URL
-         navigate('/admin/canva', { replace: true });
-         if (success) {
-           loadDesigns();
-           loadFolders();
-         }
-       });
-     }
-   }, [searchParams, handleCallback, navigate, isProcessingCallback, loadDesigns, loadFolders]);
+  useEffect(() => {
+    const code = searchParams.get('code');
+    const state = searchParams.get('state');
+    
+    if (code && state && !isProcessingCallback) {
+      setIsProcessingCallback(true);
+      handleCallback(code, state).then((success) => {
+        // Clean URL
+        navigate('/admin/canva', { replace: true });
+        if (success) {
+          loadFolderItems('root');
+        }
+      });
+    }
+  }, [searchParams, handleCallback, navigate, isProcessingCallback, loadFolderItems]);
  
-   // Load designs when connected
-   useEffect(() => {
-     if (isConnected && !isProcessingCallback) {
-       loadDesigns();
-       loadFolders();
-     }
-   }, [isConnected, loadDesigns, loadFolders, isProcessingCallback]);
- 
-   // Handle folder change
-   const handleFolderChange = (value: string) => {
-     const folderId = value === 'all' ? null : value;
-     setSelectedFolder(folderId);
-     loadDesigns(folderId);
-   };
+  // Load designs when connected
+  useEffect(() => {
+    if (isConnected && !isProcessingCallback) {
+      loadFolderItems('root');
+    }
+  }, [isConnected, loadFolderItems, isProcessingCallback]);
  
    if (isLoading || isProcessingCallback) {
      return (
@@ -154,41 +147,42 @@ import { Checkbox } from '@/components/ui/checkbox';
          </Card>
        ) : (
          <div className="space-y-4">
-           {/* Filters */}
-           <div className="flex items-center gap-4">
-             <Select value={selectedFolder || 'all'} onValueChange={handleFolderChange}>
-               <SelectTrigger className="w-[250px]">
-                 <SelectValue placeholder="Selecione uma pasta" />
-               </SelectTrigger>
-               <SelectContent>
-                 <SelectItem value="all">Todos os designs</SelectItem>
-                 {folders.map(folder => (
-                   <SelectItem key={folder.id} value={folder.id}>
-                     <span className="flex items-center gap-2">
-                       <FolderOpen className="h-4 w-4" />
-                       {folder.name}
-                     </span>
-                   </SelectItem>
-                 ))}
-               </SelectContent>
-             </Select>
-             
-             {selectedDesigns.size > 0 && (
-              <Button onClick={() => exportSelectedDesigns()}>
-                <Download className="h-4 w-4 mr-2" />
-                Importar ({selectedDesigns.size})
-              </Button>
-            )}
+            {/* Breadcrumbs */}
+            <div className="flex items-center gap-1 text-sm flex-wrap">
+              {folderBreadcrumbs.map((crumb, index) => (
+                <div key={crumb.id} className="flex items-center">
+                  {index > 0 && <ChevronRight className="h-4 w-4 text-muted-foreground mx-1" />}
+                  <Button 
+                    variant={index === folderBreadcrumbs.length - 1 ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => navigateToBreadcrumb(index)}
+                    className="h-7"
+                  >
+                    {index === 0 ? <Home className="h-4 w-4 mr-1" /> : null}
+                    {crumb.name}
+                  </Button>
+                </div>
+              ))}
+            </div>
 
-            <Button 
-              variant="outline" 
-              onClick={() => loadDesigns(selectedFolder)} 
-              disabled={isLoadingDesigns}
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingDesigns ? 'animate-spin' : ''}`} />
-              Atualizar
-            </Button>
-          </div>
+            {/* Actions */}
+            <div className="flex items-center gap-3">
+              {selectedDesigns.size > 0 && (
+                <Button onClick={() => exportSelectedDesigns()}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Importar ({selectedDesigns.size})
+                </Button>
+              )}
+
+              <Button 
+                variant="outline" 
+                onClick={() => loadFolderItems(currentFolderId)} 
+                disabled={isLoadingDesigns}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingDesigns ? 'animate-spin' : ''}`} />
+                Atualizar
+              </Button>
+            </div>
 
           {/* Designs Grid */}
           <ScrollArea className="h-[calc(100vh-300px)]">
@@ -203,36 +197,66 @@ import { Checkbox } from '@/components/ui/checkbox';
                )}
             </div>
 
-            {isLoadingDesigns && designs.length === 0 ? (
+            {/* Loading state */}
+            {isLoadingDesigns && designs.length === 0 && folders.length === 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {Array.from({ length: 10 }).map((_, i) => (
                   <Skeleton key={i} className="aspect-video rounded-lg" />
                 ))}
               </div>
-            ) : designs.length === 0 ? (
+            ) : designs.length === 0 && folders.length === 0 ? (
               <Card className="p-8 text-center">
                 <Image className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">Nenhum design encontrado</p>
+                <p className="text-muted-foreground">Nenhum item encontrado nesta pasta</p>
               </Card>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {designs.map(design => (
-                  <DesignCard
-                    key={design.id}
-                    design={design}
-                    isExporting={isExporting === design.id}
-                    isSelected={selectedDesigns.has(design.id)}
-                    onToggle={() => toggleSelection(design.id)}
-                  />
-                ))}
-              </div>
+              <>
+                {/* Folders grid */}
+                {folders.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-medium text-muted-foreground mb-3">Pastas</h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                      {folders.map(folder => (
+                        <Card 
+                          key={folder.id}
+                          className="p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                          onClick={() => navigateToFolder(folder.id, folder.name)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <FolderOpen className="h-8 w-8 text-primary" />
+                            <span className="font-medium text-sm truncate">{folder.name}</span>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Designs section */}
+                {designs.length > 0 && (
+                  <>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-3">Designs</h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                      {designs.map(design => (
+                        <DesignCard
+                          key={design.id}
+                          design={design}
+                          isExporting={isExporting === design.id}
+                          isSelected={selectedDesigns.has(design.id)}
+                          onToggle={() => toggleSelection(design.id)}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
             )}
             
             {continuation && (
                <div className="flex justify-center py-4">
                  <Button 
                    variant="outline" 
-                   onClick={() => loadDesigns(selectedFolder, true)}
+                    onClick={() => loadFolderItems(currentFolderId, true)}
                    disabled={isLoadingDesigns}
                  >
                    {isLoadingDesigns ? (

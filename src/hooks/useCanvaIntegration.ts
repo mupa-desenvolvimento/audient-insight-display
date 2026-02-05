@@ -2,21 +2,26 @@
  import { supabase } from '@/integrations/supabase/client';
  import { useToast } from '@/hooks/use-toast';
  
- interface CanvaDesign {
-   id: string;
-   title: string;
-   thumbnail?: {
-     url: string;
-   };
-   created_at: string;
-   updated_at: string;
-   type?: string;
- }
- 
- interface CanvaFolder {
-   id: string;
-   name: string;
- }
+interface CanvaDesign {
+  id: string;
+  title: string;
+  thumbnail?: {
+    url: string;
+  };
+  created_at: string;
+  updated_at: string;
+  type?: string;
+}
+
+interface CanvaFolder {
+  id: string;
+  name: string;
+}
+
+interface FolderBreadcrumb {
+  id: string;
+  name: string;
+}
  
   // Production domain for Canva OAuth redirect (must match Canva app configuration)
   const CANVA_REDIRECT_DOMAIN = 'https://midias.mupa.app';
@@ -32,6 +37,8 @@
    const [isLoadingDesigns, setIsLoadingDesigns] = useState(false);
  const [isExporting, setIsExporting] = useState<string | null>(null);
   const [selectedDesigns, setSelectedDesigns] = useState<Set<string>>(new Set());
+ const [currentFolderId, setCurrentFolderId] = useState<string>('root');
+ const [folderBreadcrumbs, setFolderBreadcrumbs] = useState<FolderBreadcrumb[]>([{ id: 'root', name: 'Meus Projetos' }]);
 
   const toggleSelection = useCallback((designId: string) => {
     setSelectedDesigns(prev => {
@@ -157,50 +164,67 @@
      }
    }, [callCanvaApi, toast]);
  
-   const loadFolders = useCallback(async () => {
-     try {
-       const result = await callCanvaApi('list_folders', {});
-       if (result.success) {
-         setFolders(result.folders || []);
-       }
-     } catch (error) {
-       console.error('Error loading folders:', error);
-     }
-   }, [callCanvaApi]);
- 
-   const loadDesigns = useCallback(async (folderId?: string | null, loadMore = false) => {
-     try {
-       setIsLoadingDesigns(true);
-       
-       const result = await callCanvaApi('list_designs', {
-         folder_id: folderId,
-         continuation: loadMore ? continuation : undefined,
-       });
-       
-       if (result.connected === false) {
-         setIsConnected(false);
-         return;
-       }
-       
-       if (result.success) {
-         if (loadMore) {
-           setDesigns(prev => [...prev, ...(result.designs || [])]);
-         } else {
-           setDesigns(result.designs || []);
-         }
-         setContinuation(result.continuation || null);
-       }
-     } catch (error) {
-       console.error('Error loading designs:', error);
-       toast({
-         title: 'Erro',
-         description: 'Não foi possível carregar os designs do Canva',
-         variant: 'destructive',
-       });
-     } finally {
-       setIsLoadingDesigns(false);
-     }
-   }, [callCanvaApi, continuation, toast]);
+  // Load folder items (designs and subfolders) using folder_id
+  const loadFolderItems = useCallback(async (folderId: string = 'root', loadMore = false) => {
+    try {
+      setIsLoadingDesigns(true);
+      
+      const result = await callCanvaApi('list_folder_items', {
+        folder_id: folderId,
+        continuation: loadMore ? continuation : undefined,
+      });
+      
+      if (result.connected === false) {
+        setIsConnected(false);
+        return;
+      }
+      
+      if (result.success) {
+        if (loadMore) {
+          setDesigns(prev => [...prev, ...(result.designs || [])]);
+          setFolders(prev => [...prev, ...(result.folders || [])]);
+        } else {
+          setDesigns(result.designs || []);
+          setFolders(result.folders || []);
+        }
+        setContinuation(result.continuation || null);
+        setCurrentFolderId(folderId);
+      }
+    } catch (error) {
+      console.error('Error loading folder items:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível carregar os itens do Canva',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingDesigns(false);
+    }
+  }, [callCanvaApi, continuation, toast]);
+
+  // Navigate into a folder
+  const navigateToFolder = useCallback((folderId: string, folderName: string) => {
+    setFolderBreadcrumbs(prev => [...prev, { id: folderId, name: folderName }]);
+    loadFolderItems(folderId);
+  }, [loadFolderItems]);
+
+  // Navigate back to a specific breadcrumb
+  const navigateToBreadcrumb = useCallback((index: number) => {
+    const breadcrumb = folderBreadcrumbs[index];
+    if (breadcrumb) {
+      setFolderBreadcrumbs(prev => prev.slice(0, index + 1));
+      loadFolderItems(breadcrumb.id);
+    }
+  }, [folderBreadcrumbs, loadFolderItems]);
+
+  // Legacy methods for backward compatibility
+  const loadFolders = useCallback(async () => {
+    // Now part of loadFolderItems
+  }, []);
+
+  const loadDesigns = useCallback(async (folderId?: string | null, loadMore = false) => {
+    await loadFolderItems(folderId || 'root', loadMore);
+  }, [loadFolderItems]);
  
    const exportDesign = useCallback(async (designId: string, designTitle: string, format: 'png' | 'jpg' | 'pdf' = 'png') => {
     try {
@@ -301,5 +325,10 @@
     selectAll,
     clearSelection,
     exportSelectedDesigns,
+    loadFolderItems,
+    navigateToFolder,
+    navigateToBreadcrumb,
+    currentFolderId,
+    folderBreadcrumbs,
   };
 }

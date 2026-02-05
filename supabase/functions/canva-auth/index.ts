@@ -74,7 +74,7 @@
          expires_at: expiresAt,
        });
        
-       const scopes = 'design:content:read folder:read asset:read';
+const scopes = 'design:meta:read design:content:read folder:read asset:read';
        
        const authUrl = `${CANVA_AUTH_URL}?` +
          `client_id=${encodeURIComponent(clientId)}&` +
@@ -275,61 +275,115 @@
        );
      }
      
-     // Action: List folders
-     if (action === 'list_folders') {
-       const body = await req.json();
-       const { user_id, continuation } = body;
-       
-       if (!user_id) {
-         return new Response(
-           JSON.stringify({ error: 'user_id is required' }),
-           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-         );
-       }
-       
-       const { data: connection } = await supabase
-         .from('canva_connections')
-         .select('access_token')
-         .eq('user_id', user_id)
-         .single();
-       
-       if (!connection) {
-         return new Response(
-           JSON.stringify({ error: 'Not connected to Canva', connected: false }),
-           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-         );
-       }
-       
-       let foldersUrl = `${CANVA_API_BASE}/folders?limit=50`;
-       if (continuation) {
-         foldersUrl += `&continuation=${encodeURIComponent(continuation)}`;
-       }
-       
-       const foldersResponse = await fetch(foldersUrl, {
-         headers: { 'Authorization': `Bearer ${connection.access_token}` },
-       });
-       
-       if (!foldersResponse.ok) {
-         const errorData = await foldersResponse.text();
-         console.error('[Canva API] Failed to list folders:', foldersResponse.status, errorData);
-         return new Response(
-           JSON.stringify({ error: 'Failed to fetch folders from Canva' }),
-           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-         );
-       }
-       
-       const foldersData = await foldersResponse.json();
-       
-       return new Response(
-         JSON.stringify({ 
-           success: true, 
-           folders: foldersData.items || foldersData.folders || [],
-           continuation: foldersData.continuation,
-           connected: true,
-         }),
-         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-       );
-     }
+      // Action: List folder items (use folder_id='root' for root folder)
+      if (action === 'list_folder_items') {
+        const body = await req.json();
+        const { user_id, folder_id = 'root', continuation } = body;
+        
+        if (!user_id) {
+          return new Response(
+            JSON.stringify({ error: 'user_id is required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        // Get access token with refresh handling
+        const { data: connection } = await supabase
+          .from('canva_connections')
+          .select('access_token, refresh_token, expires_at')
+          .eq('user_id', user_id)
+          .single();
+        
+        if (!connection) {
+          return new Response(
+            JSON.stringify({ error: 'Not connected to Canva', connected: false }),
+            { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        let accessToken = connection.access_token;
+        
+        // Check if token needs refresh
+        if (new Date(connection.expires_at) <= new Date()) {
+          console.log('[Canva Auth] Token expired, refreshing...');
+          
+          const refreshResponse = await fetch(CANVA_TOKEN_URL, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Authorization': `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
+            },
+            body: new URLSearchParams({
+              grant_type: 'refresh_token',
+              refresh_token: connection.refresh_token,
+            }).toString(),
+          });
+          
+          const refreshData = await refreshResponse.json();
+          
+          if (!refreshResponse.ok) {
+            console.error('[Canva Auth] Token refresh failed:', refreshData);
+            await supabase.from('canva_connections').delete().eq('user_id', user_id);
+            return new Response(
+              JSON.stringify({ error: 'Token expired, please reconnect', connected: false }),
+              { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+          
+          accessToken = refreshData.access_token;
+          const newExpiresAt = new Date(Date.now() + (refreshData.expires_in || 3600) * 1000).toISOString();
+          
+          await supabase.from('canva_connections').update({
+            access_token: accessToken,
+            refresh_token: refreshData.refresh_token || connection.refresh_token,
+            expires_at: newExpiresAt,
+          }).eq('user_id', user_id);
+        }
+        
+        let itemsUrl = `${CANVA_API_BASE}/folders/${folder_id}/items?limit=50`;
+        if (continuation) {
+          itemsUrl += `&continuation=${encodeURIComponent(continuation)}`;
+        }
+        
+        console.log('[Canva API] Fetching folder items:', itemsUrl);
+        
+        const itemsResponse = await fetch(itemsUrl, {
+          headers: { 'Authorization': `Bearer ${accessToken}` },
+        });
+        
+        if (!itemsResponse.ok) {
+          const errorData = await itemsResponse.text();
+          console.error('[Canva API] Failed to list folder items:', itemsResponse.status, errorData);
+          return new Response(
+            JSON.stringify({ error: 'Failed to fetch folder items from Canva' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        const itemsData = await itemsResponse.json();
+        
+        // Separate folders and designs from items
+        const folders = (itemsData.items || []).filter((item: any) => item.type === 'folder');
+        const designs = (itemsData.items || []).filter((item: any) => item.type === 'design');
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            items: itemsData.items || [],
+            folders: folders.map((f: any) => ({ id: f.folder?.id, name: f.folder?.name })),
+            designs: designs.map((d: any) => ({
+              id: d.design?.id,
+              title: d.design?.title,
+              thumbnail: d.design?.thumbnail,
+              created_at: d.design?.created_at,
+              updated_at: d.design?.updated_at,
+            })),
+            continuation: itemsData.continuation,
+            connected: true,
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
      
      // Action: Export design
      if (action === 'export_design') {
