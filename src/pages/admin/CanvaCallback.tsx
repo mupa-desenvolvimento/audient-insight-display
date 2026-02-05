@@ -1,4 +1,4 @@
- import { useEffect, useState } from 'react';
+ import { useEffect, useState, useRef } from 'react';
  import { useSearchParams, useNavigate } from 'react-router-dom';
  import { supabase } from '@/integrations/supabase/client';
  import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
@@ -10,43 +10,78 @@
  export default function CanvaCallback() {
    const navigate = useNavigate();
    const [searchParams] = useSearchParams();
-   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
+   const [status, setStatus] = useState<'processing' | 'waiting_session' | 'success' | 'error'>('processing');
+   const hasProcessed = useRef(false);
    const [errorMessage, setErrorMessage] = useState<string>('');
  
+   // First effect: Wait for session to be ready
    useEffect(() => {
+     const code = searchParams.get('code');
+     const state = searchParams.get('state');
+     const error = searchParams.get('error');
+ 
+     // Check for OAuth errors immediately
+     if (error) {
+       console.error('[Canva Callback] OAuth error:', error);
+       setStatus('error');
+       setErrorMessage('Autorização cancelada ou negada pelo Canva');
+       return;
+     }
+ 
+     if (!code || !state) {
+       console.error('[Canva Callback] Missing code or state');
+       setStatus('error');
+       setErrorMessage('Parâmetros de callback inválidos');
+       return;
+     }
+ 
+     // Wait for session with retry logic
+     setStatus('waiting_session');
+   }, [searchParams]);
+ 
+   // Second effect: Process callback once we have params
+   useEffect(() => {
+     if (status !== 'waiting_session' || hasProcessed.current) return;
+ 
      const processCallback = async () => {
        const code = searchParams.get('code');
        const state = searchParams.get('state');
-       const error = searchParams.get('error');
- 
-       // Check for OAuth errors
-       if (error) {
-         console.error('[Canva Callback] OAuth error:', error);
-         setStatus('error');
-         setErrorMessage('Autorização cancelada ou negada pelo Canva');
-         return;
-       }
  
        if (!code || !state) {
-         console.error('[Canva Callback] Missing code or state');
-         setStatus('error');
-         setErrorMessage('Parâmetros de callback inválidos');
          return;
        }
  
-       try {
-         // Get the current session
-         const { data: { session } } = await supabase.auth.getSession();
+       // Retry getting session for up to 5 seconds
+       let session = null;
+       let attempts = 0;
+       const maxAttempts = 10;
+ 
+       while (!session && attempts < maxAttempts) {
+         const { data } = await supabase.auth.getSession();
+         session = data.session;
          
          if (!session) {
-           console.error('[Canva Callback] No session found');
-           setStatus('error');
-           setErrorMessage('Sessão expirada. Por favor, faça login novamente.');
-           return;
+           attempts++;
+           console.log(`[Canva Callback] Waiting for session... attempt ${attempts}/${maxAttempts}`);
+           await new Promise(r => setTimeout(r, 500));
          }
+       }
  
+       if (!session) {
+         console.error('[Canva Callback] No session found after retries');
+         setStatus('error');
+         setErrorMessage('Sessão expirada. Por favor, faça login novamente.');
+         return;
+       }
+ 
+       hasProcessed.current = true;
+       setStatus('processing');
+ 
+       try {
          // Exchange the code for tokens
          const redirectUri = `${CANVA_REDIRECT_DOMAIN}/admin/canva/callback`;
+         
+         console.log('[Canva Callback] Exchanging code for tokens...');
          
          const response = await fetch(
            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/canva-auth?action=exchange_code`,
@@ -87,7 +122,7 @@
      };
  
      processCallback();
-   }, [searchParams, navigate]);
+   }, [status, searchParams, navigate]);
  
    return (
      <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -98,6 +133,12 @@
                <>
                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
                  Conectando ao Canva...
+               </>
+             )}
+             {status === 'waiting_session' && (
+               <>
+                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                 Restaurando sessão...
                </>
              )}
              {status === 'success' && (
@@ -114,7 +155,8 @@
              )}
            </CardTitle>
            <CardDescription>
-             {status === 'processing' && 'Finalizando a autenticação com o Canva...'}
+             {status === 'processing' && 'Trocando código por tokens...'}
+             {status === 'waiting_session' && 'Aguardando restauração da sessão...'}
              {status === 'success' && 'Você será redirecionado em instantes...'}
              {status === 'error' && errorMessage}
            </CardDescription>
