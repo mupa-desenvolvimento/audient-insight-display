@@ -6,7 +6,7 @@
  };
  
  const CANVA_AUTH_URL = 'https://www.canva.com/api/oauth/authorize';
- const CANVA_TOKEN_URL = 'https://www.canva.com/api/oauth/token';
+ const CANVA_TOKEN_URL = 'https://api.canva.com/rest/v1/oauth/token';
  const CANVA_API_BASE = 'https://api.canva.com/rest/v1';
  
  // Generate code verifier for PKCE
