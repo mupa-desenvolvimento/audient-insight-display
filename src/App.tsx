@@ -38,6 +38,7 @@ import ProductAnalytics from "./pages/admin/ProductAnalytics";
 import CanvaIntegration from "./pages/admin/CanvaIntegration";
 import CanvaEditor from "./pages/admin/CanvaEditor";
 import Install from "./pages/Install";
+ import Presentation from "./pages/Presentation";
 import { OfflineIndicator } from "./components/OfflineIndicator";
 import { PWAUpdatePrompt, InstallPrompt } from "./components/PWAPrompts";
 import { useSyncManager } from "./hooks/useSyncManager";
@@ -83,6 +84,7 @@ function AppContent() {
           <Route path="/camera" element={<Camera />} />
           <Route path="/camera-fullscreen" element={<CameraFullscreen />} />
           <Route path="/demo" element={<DeviceDemo />} />
+           <Route path="/apresentacao" element={<Presentation />} />
           {/* Canva OAuth callback - must be outside ProtectedRoute to handle redirect properly */}
           <Route path="/admin/canva/callback" element={<CanvaCallback />} />
           <Route
