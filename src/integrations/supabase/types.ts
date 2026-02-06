@@ -1420,6 +1420,63 @@ export type Database = {
           },
         ]
       }
+      product_recommendations: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          description: string | null
+          ean: string
+          id: string
+          image_url: string | null
+          is_active: boolean | null
+          name: string
+          score: number | null
+          source_data: Json | null
+          tags: string[] | null
+          target_age_max: number | null
+          target_age_min: number | null
+          target_gender: string | null
+          target_mood: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          ean: string
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          name: string
+          score?: number | null
+          source_data?: Json | null
+          tags?: string[] | null
+          target_age_max?: number | null
+          target_age_min?: number | null
+          target_gender?: string | null
+          target_mood?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          ean?: string
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          name?: string
+          score?: number | null
+          source_data?: Json | null
+          tags?: string[] | null
+          target_age_max?: number | null
+          target_age_min?: number | null
+          target_gender?: string | null
+          target_mood?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
