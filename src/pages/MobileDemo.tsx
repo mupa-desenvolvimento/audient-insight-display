@@ -35,12 +35,65 @@ const deduplicateByName = (products: any[]): any[] => {
   });
 };
 
+const scoreProduct = (p: any, gender: string, age: number, targetMoods: string[]): number => {
+  let score = p.score ?? 50;
+  
+  // Bonus for gender-specific match (not "all")
+  if (p.target_gender === gender) score += 30;
+  // Penalty for generic "all" gender
+  if (p.target_gender === 'all') score -= 10;
+  
+  // Bonus for mood-specific match (not "all")
+  if (p.target_mood !== 'all' && targetMoods.includes(p.target_mood)) score += 20;
+  
+  // Bonus for tighter age range (more specific = better)
+  const ageRange = (p.target_age_max ?? 100) - (p.target_age_min ?? 0);
+  if (ageRange < 20) score += 25;
+  else if (ageRange < 40) score += 15;
+  else if (ageRange < 60) score += 5;
+  // Penalty for very broad ranges
+  if (ageRange >= 80) score -= 15;
+  
+  // Bonus for age being near the center of the range
+  const center = ((p.target_age_min ?? 0) + (p.target_age_max ?? 100)) / 2;
+  const distFromCenter = Math.abs(age - center);
+  if (distFromCenter < 5) score += 10;
+  else if (distFromCenter < 15) score += 5;
+  
+  return score;
+};
+
+const diversifyByCategory = (products: any[], count: number): any[] => {
+  const result: any[] = [];
+  const usedCategories = new Set<string>();
+  
+  // First pass: pick one from each category
+  for (const p of products) {
+    if (result.length >= count) break;
+    const cat = (p.category || 'Geral').toLowerCase();
+    if (!usedCategories.has(cat)) {
+      usedCategories.add(cat);
+      result.push(p);
+    }
+  }
+  
+  // Second pass: fill remaining with best scored
+  for (const p of products) {
+    if (result.length >= count) break;
+    if (!result.find(r => r.id === p.id)) {
+      result.push(p);
+    }
+  }
+  
+  return result;
+};
+
 const fetchRecommendedProducts = async (gender: 'male' | 'female', mood: 'good' | 'bad', expression: string, age: number) => {
   const targetMoods = mapMoodToTargetMood(mood, expression);
   const genderFilters = [gender, 'all'];
 
-  const mapProducts = (data: any[], checkRange = true) => {
-    const mapped = data.map(p => ({
+  const mapAndRank = (data: any[]) => {
+    const scored = data.map(p => ({
       id: p.id,
       name: p.name,
       ean: p.ean,
@@ -48,39 +101,44 @@ const fetchRecommendedProducts = async (gender: 'male' | 'female', mood: 'good' 
       image: getProductImageUrl(p.ean, p.image_url),
       minAge: p.target_age_min ?? 0,
       maxAge: p.target_age_max ?? 100,
-      inRange: checkRange ? age >= (p.target_age_min ?? 0) && age <= (p.target_age_max ?? 100) : true,
-      score: p.score ?? 50,
+      inRange: age >= (p.target_age_min ?? 0) && age <= (p.target_age_max ?? 100),
+      score: scoreProduct(p, gender, age, targetMoods),
+      targetGender: p.target_gender,
     }));
-    return deduplicateByName(mapped).slice(0, 4);
+    
+    // Deduplicate, sort by computed score, then diversify categories
+    const deduped = deduplicateByName(scored).sort((a, b) => b.score - a.score);
+    return diversifyByCategory(deduped, 4);
   };
 
+  // Fetch a broad set – age-filtered only
   const { data, error } = await supabase
     .from('product_recommendations')
     .select('*')
     .eq('is_active', true)
     .in('target_gender', genderFilters)
-    .in('target_mood', targetMoods)
     .lte('target_age_min', age)
     .gte('target_age_max', age)
     .order('score', { ascending: false })
-    .limit(50);
+    .limit(100);
 
-  if (error || !data || data.length === 0) {
-    console.warn('[MobileDemo] No DB recommendations, using fallback query');
-    const { data: fallback } = await supabase
-      .from('product_recommendations')
-      .select('*')
-      .eq('is_active', true)
-      .in('target_gender', genderFilters)
-      .lte('target_age_min', age)
-      .gte('target_age_max', age)
-      .order('score', { ascending: false })
-      .limit(50);
-    
-    return mapProducts(fallback || [], false);
+  if (!error && data && data.length > 0) {
+    console.log(`[MobileDemo] Found ${data.length} candidates for gender=${gender}, age=${age}, moods=${targetMoods.join(',')}`);
+    return mapAndRank(data);
   }
 
-  return mapProducts(data);
+  // Fallback: broader query without mood/gender filter
+  console.warn('[MobileDemo] No results, broadening search');
+  const { data: fallback } = await supabase
+    .from('product_recommendations')
+    .select('*')
+    .eq('is_active', true)
+    .lte('target_age_min', age)
+    .gte('target_age_max', age)
+    .order('score', { ascending: false })
+    .limit(100);
+  
+  return mapAndRank(fallback || []);
 };
 
 const MobileDemo = () => {
