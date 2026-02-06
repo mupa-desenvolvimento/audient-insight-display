@@ -36,7 +36,7 @@ const containerVariants = {
       delayChildren: 0.3
     }
   }
-};
+} as const;
 
 const itemVariants = {
   hidden: { y: 20, opacity: 0 },
@@ -44,7 +44,7 @@ const itemVariants = {
     y: 0,
     opacity: 1,
     transition: {
-      type: "spring",
+      type: "spring" as const,
       stiffness: 100
     }
   }

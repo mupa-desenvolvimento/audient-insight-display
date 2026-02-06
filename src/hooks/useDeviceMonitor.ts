@@ -112,10 +112,9 @@ export const useDeviceMonitor = (deviceCode: string) => {
     lastKnown.forEach((face, trackId) => {
       if (!currentFaceIds.has(trackId)) {
         // Log to Supabase
-        if (face.lookingDuration >= 1) { // Only log if looked for 1s+
-            // Using a raw fetch or Supabase client
-            supabase.from('detection_logs').insert({
-                device_code: deviceCode,
+        if (face.lookingDuration >= 1) {
+            supabase.from('device_detection_logs').insert({
+                device_serial: deviceCode,
                 age_group: face.ageGroup,
                 gender: face.gender,
                 emotion: face.emotion.emotion,
