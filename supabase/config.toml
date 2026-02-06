@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.delete-media]
 verify_jwt = false
+
+[functions.import-product-catalog]
+verify_jwt = false
