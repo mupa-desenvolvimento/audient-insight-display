@@ -22,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
+import { useDeviceMonitor } from "@/hooks/useDeviceMonitor";
 
 type PlayerMode = "media" | "product" | "blocked" | "override";
 
@@ -41,6 +42,9 @@ const OfflinePlayer = () => {
     isPlaylistActiveNow,
     clearAllData,
   } = useOfflinePlayer(deviceCode || "");
+
+  // Initialize Camera Monitoring & AI Analytics
+  const { videoRef: cameraVideoRef, canvasRef: cameraCanvasRef } = useDeviceMonitor(deviceCode || "");
 
   // Estado do player
   const [playerMode, setPlayerMode] = useState<PlayerMode>("media");
@@ -565,6 +569,11 @@ const OfflinePlayer = () => {
           Última sinc.: {new Date(deviceState.last_sync).toLocaleTimeString("pt-BR")}
         </div>
       )}
+      {/* Hidden elements for Camera Monitoring */}
+      <div className="hidden">
+        <video ref={cameraVideoRef} autoPlay muted playsInline />
+        <canvas ref={cameraCanvasRef} />
+      </div>
     </div>
   );
 };

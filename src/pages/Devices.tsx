@@ -11,6 +11,7 @@ import { formatDistanceToNow, differenceInMinutes } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DeviceFormDialog } from "@/components/devices/DeviceFormDialog";
 import { DeviceControlDialog } from "@/components/devices/DeviceControlDialog";
+import { DeviceMonitorDialog } from "@/components/devices/DeviceMonitorDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,8 +27,10 @@ const Devices = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [controlDialogOpen, setControlDialogOpen] = useState(false);
+  const [monitorDialogOpen, setMonitorDialogOpen] = useState(false);
   const [editingDevice, setEditingDevice] = useState<DeviceWithRelations | null>(null);
   const [controlDevice, setControlDevice] = useState<DeviceWithRelations | null>(null);
+  const [monitorDevice, setMonitorDevice] = useState<DeviceWithRelations | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deviceToDelete, setDeviceToDelete] = useState<DeviceWithRelations | null>(null);
   const { toast } = useToast();
@@ -116,6 +119,11 @@ const Devices = () => {
   const handleOpenControl = (device: DeviceWithRelations) => {
     setControlDevice(device);
     setControlDialogOpen(true);
+  };
+
+  const handleOpenMonitor = (device: DeviceWithRelations) => {
+    setMonitorDevice(device);
+    setMonitorDialogOpen(true);
   };
 
   const handleConfirmDelete = async () => {
@@ -211,6 +219,17 @@ const Devices = () => {
                     </div>
                   </div>
                   <div className="flex gap-1">
+                    {device.camera_enabled && (
+                        <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => handleOpenMonitor(device)}
+                        title="Monitoramento IA"
+                        className="text-blue-500 hover:text-blue-600 hover:bg-blue-50"
+                        >
+                        <Camera className="w-4 h-4" />
+                        </Button>
+                    )}
                     <Button 
                       variant="ghost" 
                       size="sm" 
@@ -322,6 +341,12 @@ const Devices = () => {
         onOpenChange={setControlDialogOpen}
         device={controlDevice}
         onUpdate={() => refetch()}
+      />
+
+      <DeviceMonitorDialog
+        open={monitorDialogOpen}
+        onOpenChange={setMonitorDialogOpen}
+        device={monitorDevice}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

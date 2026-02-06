@@ -222,7 +222,7 @@ import { Checkbox } from '@/components/ui/checkbox';
                         <DesignCard
                           key={design.id}
                           design={design}
-                          isExporting={isExporting === design.id}
+                          isExporting={isExporting.includes(design.id)}
                           isSelected={selectedDesigns.has(design.id)}
                           onToggle={() => toggleSelection(design.id)}
                         />

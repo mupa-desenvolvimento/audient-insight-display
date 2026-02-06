@@ -35,9 +35,9 @@ interface FolderBreadcrumb {
    const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
    const [continuation, setContinuation] = useState<string | null>(null);
    const [isLoadingDesigns, setIsLoadingDesigns] = useState(false);
- const [isExporting, setIsExporting] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState<string[]>([]);
   const [selectedDesigns, setSelectedDesigns] = useState<Set<string>>(new Set());
- const [currentFolderId, setCurrentFolderId] = useState<string>('root');
+  const [currentFolderId, setCurrentFolderId] = useState<string>('root');
  const [folderBreadcrumbs, setFolderBreadcrumbs] = useState<FolderBreadcrumb[]>([{ id: 'root', name: 'Meus Projetos' }]);
 
   const toggleSelection = useCallback((designId: string) => {
@@ -226,67 +226,81 @@ interface FolderBreadcrumb {
     await loadFolderItems(folderId || 'root', loadMore);
   }, [loadFolderItems]);
  
-   const exportDesign = useCallback(async (designId: string, designTitle: string, format: 'png' | 'jpg' | 'pdf' = 'png') => {
+  const exportDesign = useCallback(async (designId: string, designTitle: string, format: 'png' | 'jpg' | 'pdf' = 'png') => {
     try {
-      setIsExporting(designId);
-      const result = await callCanvaApi('export_design', { design_id: designId, format });
-       
-       if (result.success && result.export_urls?.length > 0) {
-         // Download and upload to our storage
-         const exportUrl = result.export_urls[0];
-         
-         // Fetch the exported file
-         const fileResponse = await fetch(exportUrl);
-         const blob = await fileResponse.blob();
-         
-         // Create file from blob
-         const fileName = `${designTitle.replace(/[^a-zA-Z0-9]/g, '_')}.${format}`;
-         const file = new File([blob], fileName, { type: blob.type });
-         
-         // Upload to our system
-         const formData = new FormData();
-         formData.append('file', file);
-         formData.append('fileName', fileName);
-         formData.append('fileType', blob.type);
-         
-         const { data: { session } } = await supabase.auth.getSession();
-         if (!session) throw new Error('Not authenticated');
-         
-         const uploadResponse = await fetch(
-           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-media`,
-           {
-             method: 'POST',
-             headers: { 'Authorization': `Bearer ${session.access_token}` },
-             body: formData,
-           }
-         );
-         
-         const uploadResult = await uploadResponse.json();
-         
-         if (uploadResponse.ok) {
-           toast({
-             title: 'Importado!',
-             description: `"${designTitle}" foi importado para sua biblioteca de mídia`,
-           });
-           return uploadResult.mediaItem;
-         } else {
-           throw new Error(uploadResult.error || 'Upload failed');
-         }
-       } else {
-         throw new Error(result.error || 'Export failed');
-       }
-     } catch (error) {
-       console.error('Error exporting design:', error);
-       toast({
-         title: 'Erro ao importar',
-         description: 'Não foi possível importar o design do Canva',
-         variant: 'destructive',
-       });
-       return null;
-     } finally {
-       setIsExporting(null);
-     }
-   }, [callCanvaApi, toast]);
+      setIsExporting(prev => [...prev, designId]);
+      
+      // 1. Export from Canva
+      const result = await callCanvaApi('export-design', {
+        designId,
+        format,
+      });
+
+      if (result.success && result.jobId) {
+        // Poll for completion
+        let jobResult = await callCanvaApi('get-job', { jobId: result.jobId });
+        while (jobResult.status === 'in_progress') {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          jobResult = await callCanvaApi('get-job', { jobId: result.jobId });
+        }
+
+        if (jobResult.status !== 'success' || !jobResult.urls || jobResult.urls.length === 0) {
+          throw new Error('Export failed or no URLs returned');
+        }
+
+        const imageUrl = jobResult.urls[0];
+
+        // 2. Upload to Supabase Storage
+        const imageResponse = await fetch(imageUrl);
+        const blob = await imageResponse.blob();
+        const file = new File([blob], `${designTitle}.${format}`, { type: blob.type });
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('title', designTitle);
+        formData.append('description', `Importado do Canva em ${new Date().toLocaleString()}`);
+        formData.append('duration', '10');
+        formData.append('type', blob.type.startsWith('image/') ? 'image' : 'video');
+        formData.append('fileType', blob.type);
+        
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Not authenticated');
+        
+        const uploadResponse = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-media`,
+          {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${session.access_token}` },
+            body: formData,
+          }
+        );
+        
+        const uploadResult = await uploadResponse.json();
+        
+        if (uploadResponse.ok) {
+          toast({
+            title: 'Importado!',
+            description: `"${designTitle}" foi importado para sua biblioteca de mídia`,
+          });
+          return uploadResult.mediaItem;
+        } else {
+          throw new Error(uploadResult.error || 'Upload failed');
+        }
+      } else {
+        throw new Error(result.error || 'Export failed');
+      }
+    } catch (error) {
+      console.error('Error exporting design:', error);
+      toast({
+        title: 'Erro ao importar',
+        description: 'Não foi possível importar o design do Canva',
+        variant: 'destructive',
+      });
+      return null;
+    } finally {
+      setIsExporting(prev => prev.filter(id => id !== designId));
+    }
+  }, [callCanvaApi, toast]);
  
   const exportSelectedDesigns = useCallback(async (format: 'png' | 'jpg' | 'pdf' = 'png') => {
     const designsToExport = designs.filter(d => selectedDesigns.has(d.id));
