@@ -1,336 +1,428 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import * as faceapi from "face-api.js";
-import { Loader2, Camera, Scan, Sparkles, Smile, Frown, User, ShoppingBag, ArrowRight } from "lucide-react";
+import { Loader2, Camera, Scan, Sparkles, Smile, Frown, User, ShoppingBag, ArrowRight, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { motion, AnimatePresence } from "framer-motion";
 
-// --- PRODUCT DATA ---
-// Data structure: Gender -> Mood -> Products (with Age ranges)
 const PRODUCTS = {
   female: {
     good: [
-      { id: 1, name: "Batom Matte", category: "Beleza", image: "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9", minAge: 20, maxAge: 30 },
-      { id: 2, name: "Perfume Floral", category: "Perfumaria", image: "https://images.unsplash.com/photo-1585386959984-a41552231693", minAge: 20, maxAge: 30 },
-      { id: 3, name: "Chocolate Premium", category: "Alimentos", image: "https://images.unsplash.com/photo-1606313564200-e75d5e30476c", minAge: 30, maxAge: 45 },
-      { id: 4, name: "Creme Hidratante Facial", category: "Beleza", image: "https://images.unsplash.com/photo-1585232351009-aa87416fca90", minAge: 45, maxAge: 100 }
+      { id: 1, name: "Batom Matte Premium", category: "Beleza", image: "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=200&h=200&fit=crop", minAge: 18, maxAge: 35 },
+      { id: 2, name: "Perfume Floral Exclusivo", category: "Perfumaria", image: "https://images.unsplash.com/photo-1585386959984-a41552231693?w=200&h=200&fit=crop", minAge: 25, maxAge: 45 },
+      { id: 3, name: "Chocolate Premium Belga", category: "Alimentos", image: "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=200&h=200&fit=crop", minAge: 18, maxAge: 60 },
+      { id: 4, name: "Creme Hidratante Facial", category: "Beleza", image: "https://images.unsplash.com/photo-1585232351009-aa87416fca90?w=200&h=200&fit=crop", minAge: 30, maxAge: 70 },
+      { id: 17, name: "Vinho Rosé Premium", category: "Bebidas", image: "https://images.unsplash.com/photo-1558618666-fcd25c85f82e?w=200&h=200&fit=crop", minAge: 25, maxAge: 55 },
+      { id: 18, name: "Kit Skincare Completo", category: "Beleza", image: "https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=200&h=200&fit=crop", minAge: 20, maxAge: 40 },
     ],
     bad: [
-      { id: 5, name: "Chocolate Amargo", category: "Alimentos", image: "https://images.unsplash.com/photo-1599785209707-a456fc1337bb", minAge: 20, maxAge: 30 },
-      { id: 6, name: "Chá Calmante", category: "Bebidas", image: "https://images.unsplash.com/photo-1505576391880-b3f9d713dc4f", minAge: 20, maxAge: 30 },
-      { id: 7, name: "Vela Aromática", category: "Bem-estar", image: "https://images.unsplash.com/photo-1607082349566-1870c4b29a3c", minAge: 30, maxAge: 45 },
-      { id: 8, name: "Suplemento Relaxante", category: "Saúde", image: "https://images.unsplash.com/photo-1611078489935-0cb964de46d6", minAge: 45, maxAge: 100 }
+      { id: 5, name: "Chocolate Amargo 70%", category: "Alimentos", image: "https://images.unsplash.com/photo-1599785209707-a456fc1337bb?w=200&h=200&fit=crop", minAge: 18, maxAge: 40 },
+      { id: 6, name: "Chá Calmante Camomila", category: "Bebidas", image: "https://images.unsplash.com/photo-1505576391880-b3f9d713dc4f?w=200&h=200&fit=crop", minAge: 18, maxAge: 70 },
+      { id: 7, name: "Vela Aromática Lavanda", category: "Bem-estar", image: "https://images.unsplash.com/photo-1607082349566-1870c4b29a3c?w=200&h=200&fit=crop", minAge: 25, maxAge: 55 },
+      { id: 8, name: "Suplemento Relaxante", category: "Saúde", image: "https://images.unsplash.com/photo-1611078489935-0cb964de46d6?w=200&h=200&fit=crop", minAge: 30, maxAge: 65 },
+      { id: 19, name: "Máscara Facial Nutritiva", category: "Beleza", image: "https://images.unsplash.com/photo-1596755389378-c31d21fd1273?w=200&h=200&fit=crop", minAge: 20, maxAge: 45 },
+      { id: 20, name: "Difusor de Aromas", category: "Bem-estar", image: "https://images.unsplash.com/photo-1602928321679-560bb453f190?w=200&h=200&fit=crop", minAge: 25, maxAge: 60 },
     ]
   },
   male: {
     good: [
-      { id: 9, name: "Energético", category: "Bebidas", image: "https://images.unsplash.com/photo-1622484212850-eb5969c9cfa3", minAge: 20, maxAge: 30 },
-      { id: 10, name: "Fone Bluetooth", category: "Eletrônicos", image: "https://images.unsplash.com/photo-1585386959984-a41552231693", minAge: 20, maxAge: 30 },
-      { id: 11, name: "Cerveja Artesanal", category: "Bebidas", image: "https://images.unsplash.com/photo-1516455207990-7a41ce80f7ee", minAge: 30, maxAge: 45 },
-      { id: 12, name: "Kit Churrasco", category: "Utilidades", image: "https://images.unsplash.com/photo-1598514982205-f6d2c6f33c22", minAge: 45, maxAge: 100 }
+      { id: 9, name: "Energético Premium", category: "Bebidas", image: "https://images.unsplash.com/photo-1622484212850-eb5969c9cfa3?w=200&h=200&fit=crop", minAge: 18, maxAge: 35 },
+      { id: 10, name: "Fone Bluetooth Pro", category: "Eletrônicos", image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=200&h=200&fit=crop", minAge: 18, maxAge: 40 },
+      { id: 11, name: "Cerveja Artesanal IPA", category: "Bebidas", image: "https://images.unsplash.com/photo-1516455207990-7a41ce80f7ee?w=200&h=200&fit=crop", minAge: 25, maxAge: 55 },
+      { id: 12, name: "Kit Churrasco Gourmet", category: "Utilidades", image: "https://images.unsplash.com/photo-1598514982205-f6d2c6f33c22?w=200&h=200&fit=crop", minAge: 30, maxAge: 65 },
+      { id: 21, name: "Whisky Single Malt", category: "Bebidas", image: "https://images.unsplash.com/photo-1527281400683-1aae777175f8?w=200&h=200&fit=crop", minAge: 30, maxAge: 60 },
+      { id: 22, name: "Relógio Esportivo", category: "Acessórios", image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=200&h=200&fit=crop", minAge: 20, maxAge: 45 },
     ],
     bad: [
-      { id: 13, name: "Café Forte", category: "Bebidas", image: "https://images.unsplash.com/photo-1509042239860-f550ce710b93", minAge: 20, maxAge: 30 },
-      { id: 14, name: "Barra de Proteína", category: "Alimentos", image: "https://images.unsplash.com/photo-1572441710534-6808cc2f5c10", minAge: 20, maxAge: 30 },
-      { id: 15, name: "Analgésico Comum", category: "Farmácia", image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae", minAge: 30, maxAge: 45 },
-      { id: 16, name: "Chá Digestivo", category: "Bebidas", image: "https://images.unsplash.com/photo-1544787219-7f47ccb76574", minAge: 45, maxAge: 100 }
+      { id: 13, name: "Café Especial Forte", category: "Bebidas", image: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=200&h=200&fit=crop", minAge: 20, maxAge: 55 },
+      { id: 14, name: "Barra de Proteína Whey", category: "Alimentos", image: "https://images.unsplash.com/photo-1572441710534-6808cc2f5c10?w=200&h=200&fit=crop", minAge: 18, maxAge: 40 },
+      { id: 15, name: "Analgésico Extra Forte", category: "Farmácia", image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=200&h=200&fit=crop", minAge: 25, maxAge: 65 },
+      { id: 16, name: "Chá Digestivo Natural", category: "Bebidas", image: "https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=200&h=200&fit=crop", minAge: 30, maxAge: 70 },
+      { id: 23, name: "Snack Salgado Premium", category: "Alimentos", image: "https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=200&h=200&fit=crop", minAge: 18, maxAge: 35 },
+      { id: 24, name: "Água com Gás Importada", category: "Bebidas", image: "https://images.unsplash.com/photo-1560023907-5f339617ea55?w=200&h=200&fit=crop", minAge: 20, maxAge: 50 },
     ]
   }
 };
 
 const translateExpression = (expr: string) => {
   const map: Record<string, string> = {
-    neutral: 'Neutro',
-    happy: 'Feliz',
-    sad: 'Triste',
-    angry: 'Irritado',
-    fearful: 'Com Medo',
-    disgusted: 'Desgostoso',
-    surprised: 'Surpreso'
+    neutral: 'Neutro', happy: 'Feliz', sad: 'Triste',
+    angry: 'Irritado', fearful: 'Com Medo', disgusted: 'Desgostoso', surprised: 'Surpreso'
   };
   return map[expr] || expr;
 };
 
+const getRecommendedProducts = (gender: 'male' | 'female', mood: 'good' | 'bad', age: number) => {
+  const allProducts = PRODUCTS[gender][mood];
+  
+  // Score products by age proximity
+  const scored = allProducts.map(p => {
+    const inRange = age >= p.minAge && age <= p.maxAge;
+    const midAge = (p.minAge + p.maxAge) / 2;
+    const distance = Math.abs(age - midAge);
+    return { ...p, score: inRange ? 1000 - distance : -distance, inRange };
+  });
+  
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, 4);
+};
+
 const MobileDemo = () => {
-  const [permission, setPermission] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
+  const [phase, setPhase] = useState<'welcome' | 'scanning' | 'results'>('welcome');
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
-  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [detectionProgress, setDetectionProgress] = useState(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const detectIntervalRef = useRef<number | null>(null);
+  const detectionsRef = useRef<any[]>([]);
 
   useEffect(() => {
+    const loadModels = async () => {
+      try {
+        const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+          faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
+          faceapi.nets.ageGenderNet.loadFromUri(MODEL_URL),
+        ]);
+        console.log("[MobileDemo] Models loaded successfully");
+      } catch (e) {
+        console.error("[MobileDemo] Error loading models:", e);
+      }
+      setModelsLoaded(true);
+    };
     loadModels();
+
+    return () => {
+      stopCamera();
+    };
   }, []);
 
-  useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
+  const stopCamera = useCallback(() => {
+    if (detectIntervalRef.current) {
+      clearInterval(detectIntervalRef.current);
+      detectIntervalRef.current = null;
     }
-  }, [stream, permission]);
-
-  const loadModels = async () => {
-    try {
-      // Load from a CDN if local files are missing
-      const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
-      await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-        faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
-        faceapi.nets.ageGenderNet.loadFromUri(MODEL_URL),
-      ]);
-      setModelsLoaded(true);
-    } catch (e) {
-      console.error("Error loading models", e);
-      // Fallback: proceed anyway, we'll simulate if models fail
-      setModelsLoaded(true);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
     }
-  };
+  }, []);
 
   const startCamera = async () => {
     setError(null);
-    
-    // Check if browser supports mediaDevices (often undefined in insecure contexts)
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setError("Câmera indisponível. O acesso à câmera requer HTTPS ou localhost.");
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError("Câmera indisponível. Acesso requer HTTPS.");
       return;
     }
 
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-      setStream(mediaStream);
-      setPermission(true);
-      startAnalysis();
-    } catch (err) {
-      console.error("Camera error:", err);
-      setError("Permissão de câmera negada. Por favor, permita o acesso para continuar.");
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }
+      });
+      streamRef.current = mediaStream;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play();
+          setPhase('scanning');
+          detectionsRef.current = [];
+          setDetectionProgress(0);
+          startContinuousDetection();
+        };
+      }
+    } catch (err: any) {
+      console.error("[MobileDemo] Camera error:", err);
+      if (err.name === 'NotAllowedError') {
+        setError("Permissão de câmera negada. Permita o acesso nas configurações do navegador.");
+      } else if (err.name === 'NotFoundError') {
+        setError("Nenhuma câmera encontrada neste dispositivo.");
+      } else {
+        setError(`Erro ao acessar câmera: ${err.message}`);
+      }
     }
   };
 
-  const startAnalysis = () => {
-    setAnalyzing(true);
-    // Wait a bit for camera to warm up and user to position
-    setTimeout(async () => {
-      try {
-        if (videoRef.current) {
-          // Attempt real detection
-          const detection = await faceapi.detectSingleFace(
-            videoRef.current, 
-            new faceapi.TinyFaceDetectorOptions()
-          ).withFaceExpressions().withAgeAndGender();
+  const startContinuousDetection = () => {
+    const REQUIRED_DETECTIONS = 5;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 20;
 
-          if (detection) {
-            processResult(detection);
-          } else {
-            // No face detected? Retry or simulate
-            simulateResult();
+    detectIntervalRef.current = window.setInterval(async () => {
+      attempts++;
+
+      if (!videoRef.current || videoRef.current.readyState < 2) {
+        console.log("[MobileDemo] Video not ready yet, attempt:", attempts);
+        return;
+      }
+
+      try {
+        const detection = await faceapi
+          .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.4 }))
+          .withFaceExpressions()
+          .withAgeAndGender();
+
+        if (detection) {
+          detectionsRef.current.push(detection);
+          const progress = Math.min(100, Math.round((detectionsRef.current.length / REQUIRED_DETECTIONS) * 100));
+          setDetectionProgress(progress);
+          console.log(`[MobileDemo] Detection ${detectionsRef.current.length}/${REQUIRED_DETECTIONS}`, {
+            gender: detection.gender,
+            age: Math.round(detection.age),
+            genderProbability: detection.genderProbability
+          });
+
+          if (detectionsRef.current.length >= REQUIRED_DETECTIONS) {
+            clearInterval(detectIntervalRef.current!);
+            detectIntervalRef.current = null;
+            finalizeResult();
           }
         } else {
-          simulateResult();
+          console.log("[MobileDemo] No face detected, attempt:", attempts);
         }
       } catch (e) {
-        // Model error? Simulate
-        simulateResult();
+        console.error("[MobileDemo] Detection error:", e);
       }
-    }, 2500); // 2.5s scanning effect
+
+      if (attempts >= MAX_ATTEMPTS && detectionsRef.current.length === 0) {
+        clearInterval(detectIntervalRef.current!);
+        detectIntervalRef.current = null;
+        setError("Não foi possível detectar um rosto. Posicione-se em frente à câmera com boa iluminação.");
+        setPhase('welcome');
+        stopCamera();
+      }
+    }, 600);
   };
 
-  const simulateResult = () => {
-    // Fallback simulation for demo purposes if detection fails or models missing
-    const genders = ['male', 'female'];
-    const moods = ['happy', 'sad']; // map to good/bad
-    const randomGender = genders[Math.floor(Math.random() * genders.length)];
-    const randomMood = moods[Math.floor(Math.random() * moods.length)];
-    const randomAge = Math.floor(Math.random() * (50 - 20 + 1) + 20); // 20-50
-
-    processResult({
-      gender: randomGender,
-      age: randomAge,
-      expressions: { [randomMood]: 0.9 }
-    });
-  };
-
-  const processResult = (data: any) => {
-    const gender = data.gender === 'male' ? 'male' : 'female';
+  const finalizeResult = () => {
+    const detections = detectionsRef.current;
     
-    // Determine mood: happy/surprised = good; sad/angry/disgusted/fearful = bad; neutral = good (default)
-    const expressions = data.expressions;
-    const goodMoodScore = (expressions.happy || 0) + (expressions.surprised || 0) + (expressions.neutral || 0);
-    const badMoodScore = (expressions.sad || 0) + (expressions.angry || 0) + (expressions.disgusted || 0) + (expressions.fearful || 0);
+    // Average results from multiple detections for accuracy
+    const avgAge = Math.round(detections.reduce((s, d) => s + d.age, 0) / detections.length);
     
-    const mood = goodMoodScore > badMoodScore ? 'good' : 'bad';
-    const age = Math.round(data.age);
+    const maleCount = detections.filter(d => d.gender === 'male').length;
+    const gender: 'male' | 'female' = maleCount > detections.length / 2 ? 'male' : 'female';
 
-    // Find dominant expression
-    const sortedExpressions = Object.entries(expressions).sort(([, a], [, b]) => (b as number) - (a as number));
-    const dominantExpression = sortedExpressions[0] ? sortedExpressions[0][0] : 'neutral';
-
-    setResult({
-      gender,
-      mood,
-      expression: dominantExpression,
-      age,
-      products: PRODUCTS[gender][mood]
+    // Aggregate expressions
+    const exprTotals: Record<string, number> = {};
+    detections.forEach(d => {
+      Object.entries(d.expressions).forEach(([key, val]) => {
+        exprTotals[key] = (exprTotals[key] || 0) + (val as number);
+      });
     });
-    setAnalyzing(false);
+    Object.keys(exprTotals).forEach(k => exprTotals[k] /= detections.length);
+
+    const goodScore = (exprTotals.happy || 0) + (exprTotals.surprised || 0) + (exprTotals.neutral || 0);
+    const badScore = (exprTotals.sad || 0) + (exprTotals.angry || 0) + (exprTotals.disgusted || 0) + (exprTotals.fearful || 0);
+    const mood: 'good' | 'bad' = goodScore >= badScore ? 'good' : 'bad';
+
+    const sorted = Object.entries(exprTotals).sort(([, a], [, b]) => b - a);
+    const dominantExpression = sorted[0]?.[0] || 'neutral';
+
+    const products = getRecommendedProducts(gender, mood, avgAge);
+
+    stopCamera();
+    setResult({ gender, mood, expression: dominantExpression, age: avgAge, products });
+    setPhase('results');
   };
 
-  if (result) {
-    return (
-      <div className="min-h-screen bg-black text-white p-4 overflow-y-auto">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-md mx-auto space-y-6"
-        >
-          <div className="text-center space-y-2 mb-8">
-            <div className="inline-block p-3 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 mb-4">
-              <Sparkles className="w-8 h-8 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold">Perfil Identificado!</h1>
-            <div className="flex justify-center gap-4 text-sm text-gray-400">
-              <span className="flex items-center gap-1"><User className="w-4 h-4" /> {result.gender === 'female' ? 'Mulher' : 'Homem'}</span>
-              <span className="flex items-center gap-1"><Scan className="w-4 h-4" /> {result.age} anos</span>
-              <span className="flex items-center gap-1">
-                {result.mood === 'good' ? <Smile className="w-4 h-4 text-green-400" /> : <Frown className="w-4 h-4 text-red-400" />}
-                {translateExpression(result.expression)}
-              </span>
-            </div>
-          </div>
-
-          <h2 className="text-lg font-semibold text-center mb-4">Sugestões para Você</h2>
-          
-          <div className="grid gap-4">
-            {result.products.map((product: any, i: number) => {
-              // Check if age matches
-              const isAgeMatch = result.age >= product.minAge && result.age <= product.maxAge;
-              
-              return (
-                <motion.div
-                  key={product.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.1 }}
-                >
-                  <Card className={`border-none overflow-hidden ${isAgeMatch ? 'ring-2 ring-purple-500 shadow-[0_0_20px_rgba(168,85,247,0.3)]' : 'opacity-80 grayscale-[0.3]'}`}>
-                    <div className="flex h-24 bg-slate-900">
-                      <div className="w-24 h-24 shrink-0 relative">
-                        <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
-                        {isAgeMatch && (
-                           <div className="absolute top-1 left-1 bg-purple-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-sm">
-                             BEST MATCH
-                           </div>
-                        )}
-                      </div>
-                      <div className="p-3 flex flex-col justify-center flex-1">
-                        <span className="text-xs text-purple-400 font-medium mb-1">{product.category}</span>
-                        <h3 className="text-white font-bold leading-tight mb-1">{product.name}</h3>
-                        <div className="flex items-center text-xs text-gray-500 mt-auto">
-                          <span>Faixa: {product.minAge}-{product.maxAge} anos</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center px-3 bg-white/5">
-                        <ArrowRight className="w-5 h-5 text-gray-400" />
-                      </div>
-                    </div>
-                  </Card>
-                </motion.div>
-              );
-            })}
-          </div>
-
-          <Button 
-            className="w-full mt-8 bg-white text-black hover:bg-gray-200"
-            onClick={() => {
-              setResult(null);
-              setAnalyzing(false);
-              setPermission(false);
-            }}
-          >
-            Nova Leitura
-          </Button>
-        </motion.div>
-      </div>
-    );
-  }
+  const reset = () => {
+    stopCamera();
+    setResult(null);
+    setError(null);
+    setDetectionProgress(0);
+    detectionsRef.current = [];
+    setPhase('welcome');
+  };
 
   return (
-    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 text-center">
+    <div className="min-h-screen bg-black text-white">
       <AnimatePresence mode="wait">
-        {!permission ? (
-          <motion.div 
-            key="permission"
+        {phase === 'welcome' && (
+          <motion.div
+            key="welcome"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="max-w-sm w-full space-y-8"
+            className="min-h-screen flex flex-col items-center justify-center p-6 text-center"
           >
-            <div className="relative w-32 h-32 mx-auto">
-              <div className="absolute inset-0 bg-purple-500/20 rounded-full animate-ping" />
-              <div className="relative bg-slate-900 w-32 h-32 rounded-full flex items-center justify-center border-2 border-purple-500/50">
-                <Camera className="w-12 h-12 text-purple-400" />
+            <div className="max-w-sm w-full space-y-8">
+              <div className="relative w-32 h-32 mx-auto">
+                <div className="absolute inset-0 bg-purple-500/20 rounded-full animate-ping" />
+                <div className="relative bg-slate-900 w-32 h-32 rounded-full flex items-center justify-center border-2 border-purple-500/50">
+                  <Camera className="w-12 h-12 text-purple-400" />
+                </div>
               </div>
-            </div>
-            
-            <div className="space-y-2">
-              <h1 className="text-3xl font-bold text-white">MUPA AI</h1>
+
+              <div className="space-y-3">
+                <h1 className="text-3xl font-bold">MUPA AI</h1>
+                <p className="text-gray-400">Permita o acesso à câmera para analisarmos seu perfil e sugerirmos produtos ideais.</p>
+                <p className="text-xs text-gray-600">Nenhuma imagem é gravada. Análise 100% anônima.</p>
+              </div>
+
               {error && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-sm text-red-400 font-medium">
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-sm text-red-400">
                   {error}
                 </div>
               )}
-              <p className="text-gray-400">Permita o acesso à câmera para analisarmos seu perfil e sugerirmos produtos ideais.</p>
-              <p className="text-xs text-gray-600 mt-4">Nenhuma imagem é gravada. Análise 100% anônima.</p>
-            </div>
 
-            <Button 
-              size="lg" 
-              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold h-14 rounded-full shadow-lg shadow-purple-900/20"
-              onClick={startCamera}
-              disabled={!modelsLoaded}
-            >
-              {modelsLoaded ? "Iniciar Experiência" : "Carregando IA..."}
-            </Button>
+              <Button
+                size="lg"
+                className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold h-14 rounded-full"
+                onClick={startCamera}
+                disabled={!modelsLoaded}
+              >
+                {modelsLoaded ? "Iniciar Experiência" : (
+                  <span className="flex items-center gap-2"><Loader2 className="w-5 h-5 animate-spin" /> Carregando IA...</span>
+                )}
+              </Button>
+            </div>
           </motion.div>
-        ) : (
+        )}
+
+        {phase === 'scanning' && (
           <motion.div
             key="scanning"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex flex-col items-center gap-8 w-full max-w-sm"
+            exit={{ opacity: 0 }}
+            className="min-h-screen flex flex-col items-center justify-center p-6"
           >
-            <div className="relative w-64 h-64 rounded-full overflow-hidden border-4 border-purple-500/30 shadow-[0_0_50px_rgba(168,85,247,0.2)]">
-               {/* Hidden video element for processing */}
-               <video 
-                  ref={videoRef} 
-                  autoPlay 
-                  playsInline 
-                  muted 
-                  className="absolute inset-0 w-full h-full object-cover opacity-0 pointer-events-none" 
-               />
-               
-               {/* Scanner Overlay */}
-               <div className="absolute inset-0 bg-gradient-to-b from-transparent via-purple-500/10 to-transparent z-10" />
-               <motion.div 
-                 animate={{ top: ["0%", "100%", "0%"] }}
-                 transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                 className="absolute left-0 w-full h-1 bg-purple-400 shadow-[0_0_15px_rgba(168,85,247,1)] z-20"
-               />
-               
-               <div className="absolute inset-0 flex items-center justify-center z-30">
-                 <Scan className="w-16 h-16 text-white/80 animate-pulse" />
-               </div>
-            </div>
+            <div className="max-w-sm w-full flex flex-col items-center gap-6">
+              {/* Live camera feed */}
+              <div className="relative w-64 h-64 rounded-full overflow-hidden border-4 border-purple-500/50 shadow-[0_0_60px_rgba(168,85,247,0.3)]">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover scale-x-[-1]"
+                />
+                {/* Scan line */}
+                <motion.div
+                  animate={{ top: ["0%", "100%", "0%"] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                  className="absolute left-0 w-full h-0.5 bg-purple-400 shadow-[0_0_15px_rgba(168,85,247,1)] z-10"
+                />
+                {/* Corner markers */}
+                <div className="absolute top-4 left-4 w-6 h-6 border-t-2 border-l-2 border-purple-400 rounded-tl-sm z-10" />
+                <div className="absolute top-4 right-4 w-6 h-6 border-t-2 border-r-2 border-purple-400 rounded-tr-sm z-10" />
+                <div className="absolute bottom-4 left-4 w-6 h-6 border-b-2 border-l-2 border-purple-400 rounded-bl-sm z-10" />
+                <div className="absolute bottom-4 right-4 w-6 h-6 border-b-2 border-r-2 border-purple-400 rounded-br-sm z-10" />
+              </div>
 
-            <div className="space-y-2">
-              <h2 className="text-2xl font-bold text-white animate-pulse">Analisando Perfil...</h2>
-              <p className="text-gray-400">Mantenha o rosto na câmera</p>
+              <div className="w-full space-y-2">
+                <div className="flex justify-between text-sm text-gray-400">
+                  <span>Analisando perfil...</span>
+                  <span>{detectionProgress}%</span>
+                </div>
+                <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full"
+                    animate={{ width: `${detectionProgress}%` }}
+                    transition={{ duration: 0.3 }}
+                  />
+                </div>
+                <p className="text-center text-xs text-gray-500 mt-2">Posicione seu rosto na câmera com boa iluminação</p>
+              </div>
+
+              <Button variant="ghost" className="text-gray-500 mt-4" onClick={reset}>
+                Cancelar
+              </Button>
             </div>
-            
-            <div className="flex gap-2">
-               <span className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: "0s" }} />
-               <span className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
-               <span className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: "0.4s" }} />
+          </motion.div>
+        )}
+
+        {phase === 'results' && result && (
+          <motion.div
+            key="results"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="min-h-screen p-4 pb-8"
+          >
+            <div className="max-w-md mx-auto space-y-6">
+              {/* Profile header */}
+              <div className="text-center space-y-3 pt-6">
+                <div className="inline-block p-3 rounded-full bg-gradient-to-r from-purple-500 to-blue-500">
+                  <Sparkles className="w-8 h-8 text-white" />
+                </div>
+                <h1 className="text-2xl font-bold">Perfil Identificado!</h1>
+                <div className="flex justify-center gap-4 text-sm text-gray-400">
+                  <span className="flex items-center gap-1">
+                    <User className="w-4 h-4" />
+                    {result.gender === 'female' ? 'Mulher' : 'Homem'}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Scan className="w-4 h-4" />
+                    {result.age} anos
+                  </span>
+                  <span className="flex items-center gap-1">
+                    {result.mood === 'good'
+                      ? <Smile className="w-4 h-4 text-green-400" />
+                      : <Frown className="w-4 h-4 text-red-400" />}
+                    {translateExpression(result.expression)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Products */}
+              <div className="space-y-3">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <ShoppingBag className="w-5 h-5 text-purple-400" />
+                  Recomendados para Você
+                </h2>
+
+                {result.products.map((product: any, i: number) => (
+                  <motion.div
+                    key={product.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.12 }}
+                  >
+                    <Card className={`border-none overflow-hidden ${product.inRange
+                      ? 'ring-2 ring-purple-500 shadow-[0_0_20px_rgba(168,85,247,0.25)]'
+                      : 'opacity-75'}`}
+                    >
+                      <div className="flex h-24 bg-slate-900">
+                        <div className="w-24 h-24 shrink-0 relative">
+                          <img
+                            src={product.image}
+                            alt={product.name}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                          {product.inRange && (
+                            <div className="absolute top-1 left-1 bg-purple-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-sm">
+                              MATCH
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-3 flex flex-col justify-center flex-1 min-w-0">
+                          <span className="text-xs text-purple-400 font-medium">{product.category}</span>
+                          <h3 className="text-white font-bold leading-tight truncate">{product.name}</h3>
+                          <span className="text-xs text-gray-500 mt-1">Faixa: {product.minAge}–{product.maxAge} anos</span>
+                        </div>
+                        <div className="flex items-center px-3 bg-white/5">
+                          <ArrowRight className="w-5 h-5 text-gray-400" />
+                        </div>
+                      </div>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+
+              <Button
+                className="w-full bg-white text-black hover:bg-gray-200 font-semibold h-12 rounded-full"
+                onClick={reset}
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Nova Leitura
+              </Button>
             </div>
           </motion.div>
         )}
