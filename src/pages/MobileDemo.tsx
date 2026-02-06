@@ -120,9 +120,11 @@ const MobileDemo = () => {
 
   const startCamera = async () => {
     setError(null);
+    setPhase('scanning');
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setError("Câmera indisponível. Acesso requer HTTPS.");
+      setPhase('welcome');
       return;
     }
 
@@ -132,18 +134,30 @@ const MobileDemo = () => {
       });
       streamRef.current = mediaStream;
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play();
-          setPhase('scanning');
-          detectionsRef.current = [];
-          setDetectionProgress(0);
-          startContinuousDetection();
+      // Wait for the video element to be in the DOM after phase change
+      const waitForVideo = () => new Promise<void>((resolve) => {
+        const check = () => {
+          if (videoRef.current) {
+            resolve();
+          } else {
+            requestAnimationFrame(check);
+          }
         };
-      }
+        check();
+      });
+
+      await waitForVideo();
+
+      videoRef.current!.srcObject = mediaStream;
+      videoRef.current!.onloadedmetadata = () => {
+        videoRef.current?.play();
+        detectionsRef.current = [];
+        setDetectionProgress(0);
+        startContinuousDetection();
+      };
     } catch (err: any) {
       console.error("[MobileDemo] Camera error:", err);
+      setPhase('welcome');
       if (err.name === 'NotAllowedError') {
         setError("Permissão de câmera negada. Permita o acesso nas configurações do navegador.");
       } else if (err.name === 'NotFoundError') {
