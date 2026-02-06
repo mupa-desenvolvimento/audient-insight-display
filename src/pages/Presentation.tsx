@@ -270,7 +270,7 @@ const slides: Slide[] = [
     title: "TVs que Veem",
     subtitle: "Métricas de Atenção",
     description: "Transforme suas telas em sensores de audiência. Saiba exatamente quem está olhando para sua vitrine ou gôndola.",
-    images: ["/captura_pessoas1.png", "/captura_pessoas2.png"],
+    images: ["/captura_pessoas1.jpg", "/captura_pessoas2.png"],
     stats: [
       { label: "Tráfego", value: "Pessoas no Local" },
       { label: "Conversão", value: "% que Olhou" },
