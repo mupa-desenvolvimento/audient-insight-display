@@ -88,13 +88,13 @@ const MobileDemo = () => {
   useEffect(() => {
     const loadModels = async () => {
       try {
-        const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+        const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
         await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+          faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
           faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
           faceapi.nets.ageGenderNet.loadFromUri(MODEL_URL),
         ]);
-        console.log("[MobileDemo] Models loaded successfully");
+        console.log("[MobileDemo] Models loaded successfully (SSD MobileNet)");
       } catch (e) {
         console.error("[MobileDemo] Error loading models:", e);
       }
@@ -183,7 +183,7 @@ const MobileDemo = () => {
 
       try {
         const detection = await faceapi
-          .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.4 }))
+          .detectSingleFace(videoRef.current, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 }))
           .withFaceExpressions()
           .withAgeAndGender();
 
