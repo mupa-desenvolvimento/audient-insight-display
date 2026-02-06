@@ -4,17 +4,17 @@ import { motion, useScroll, useTransform, useInView } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import logoHorizontal from "@/assets/logo_horizontal.svg";
-import { 
-  Monitor, 
-  BarChart3, 
-  Image, 
-  Users, 
-  Play, 
-  Calendar, 
-  Wifi, 
-  Shield, 
-  Zap, 
-  Eye, 
+import {
+  Monitor,
+  BarChart3,
+  Image,
+  Users,
+  Play,
+  Calendar,
+  Wifi,
+  Shield,
+  Zap,
+  Eye,
   Settings,
   Store,
   Layers,
@@ -22,7 +22,7 @@ import {
   CheckCircle2,
   ArrowRight,
   Brain,
-  Smartphone
+  Smartphone,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -33,9 +33,9 @@ const containerVariants = {
     opacity: 1,
     transition: {
       staggerChildren: 0.1,
-      delayChildren: 0.3
-    }
-  }
+      delayChildren: 0.3,
+    },
+  },
 } as const;
 
 const itemVariants = {
@@ -45,9 +45,9 @@ const itemVariants = {
     opacity: 1,
     transition: {
       type: "spring" as const,
-      stiffness: 100
-    }
-  }
+      stiffness: 100,
+    },
+  },
 };
 
 const Navbar = () => {
@@ -57,37 +57,41 @@ const Navbar = () => {
   const borderOpacity = useTransform(scrollY, [0, 100], [0, 0.1]);
 
   return (
-    <motion.header 
-      style={{ 
-        backgroundColor: useTransform(backgroundOpacity, o => `rgba(0, 0, 0, ${o})`),
-        backdropFilter: useTransform(backdropBlur, b => `blur(${b})`),
-        borderBottom: useTransform(borderOpacity, o => `1px solid rgba(255, 255, 255, ${o})`)
+    <motion.header
+      style={{
+        backgroundColor: useTransform(backgroundOpacity, (o) => `rgba(0, 0, 0, ${o})`),
+        backdropFilter: useTransform(backdropBlur, (b) => `blur(${b})`),
+        borderBottom: useTransform(borderOpacity, (o) => `1px solid rgba(255, 255, 255, ${o})`),
       }}
       className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
     >
       <div className="container mx-auto px-6 h-20 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2 group">
-          <motion.img 
+          <motion.img
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5 }}
-            src={logoHorizontal} 
-            alt="MupaMídias" 
-            className="h-10 transition-transform group-hover:scale-105" 
+            src={logoHorizontal}
+            alt="MupaMídias"
+            className="h-10 transition-transform group-hover:scale-105"
           />
         </Link>
         <div className="flex items-center space-x-6">
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-300">
-            <a href="#features" className="hover:text-white transition-colors">Recursos</a>
-            <a href="#ai" className="hover:text-white transition-colors">Inteligência Artificial</a>
-            <a href="#analytics" className="hover:text-white transition-colors">Analytics</a>
+            <a href="#features" className="hover:text-white transition-colors">
+              Recursos
+            </a>
+            <a href="#ai" className="hover:text-white transition-colors">
+              Inteligência Artificial
+            </a>
+            <a href="#analytics" className="hover:text-white transition-colors">
+              Analytics
+            </a>
           </nav>
           <div className="flex items-center gap-4">
             <ThemeToggle />
             <Link to="/auth">
-              <Button className="bg-white text-black hover:bg-gray-200 rounded-full px-6">
-                Entrar
-              </Button>
+              <Button className="bg-white text-black hover:bg-gray-200 rounded-full px-6">Entrar</Button>
             </Link>
           </div>
         </div>
@@ -106,47 +110,56 @@ const Hero = () => {
       </div>
 
       <div className="container mx-auto px-6 relative z-10 grid lg:grid-cols-2 gap-12 items-center">
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={containerVariants}
-          className="text-left"
-        >
-          <motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 mb-6">
+        <motion.div initial="hidden" animate="visible" variants={containerVariants} className="text-left">
+          <motion.div
+            variants={itemVariants}
+            className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 mb-6"
+          >
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
             </span>
             <span className="text-xs font-medium text-gray-300">Nova Versão 2.0 Disponível</span>
           </motion.div>
-          
-          <motion.h1 variants={itemVariants} className="text-5xl md:text-7xl font-bold mb-6 leading-tight tracking-tight text-white">
-            O Futuro do <br/>
+
+          <motion.h1
+            variants={itemVariants}
+            className="text-5xl md:text-7xl font-bold mb-6 leading-tight tracking-tight text-white"
+          >
+            O Futuro do <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400">
               Digital Signage
             </span>
           </motion.h1>
-          
+
           <motion.p variants={itemVariants} className="text-xl text-gray-400 mb-8 max-w-xl leading-relaxed">
-            Telas e terminais de consulta de preços que viram experiências inteligentes. Conteúdo dinâmico, audiência monitorada e gestão centralizada com a MUPA.
+            Telas e terminais de consulta de preços que viram experiências inteligentes. Conteúdo dinâmico, audiência
+            monitorada e gestão centralizada com a MUPA.
           </motion.p>
-          
+
           <motion.div variants={itemVariants} className="flex flex-col sm:flex-row gap-4">
             <Link to="/auth">
-              <Button size="lg" className="h-14 px-8 text-lg rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 border-0 shadow-lg shadow-purple-500/20">
+              <Button
+                size="lg"
+                className="h-14 px-8 text-lg rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 border-0 shadow-lg shadow-purple-500/20"
+              >
                 <Zap className="mr-2 h-5 w-5 fill-current" />
                 Começar Agora
               </Button>
             </Link>
             <Link to="/player">
-              <Button size="lg" variant="outline" className="h-14 px-8 text-lg rounded-full border-white/20 bg-white/5 hover:bg-white/10 text-white backdrop-blur-sm">
+              <Button
+                size="lg"
+                variant="outline"
+                className="h-14 px-8 text-lg rounded-full border-white/20 bg-white/5 hover:bg-white/10 text-white backdrop-blur-sm"
+              >
                 <Play className="mr-2 h-5 w-5" />
                 Ver Demo
               </Button>
             </Link>
           </motion.div>
 
-{null}
+          {null}
         </motion.div>
 
         {/* Hero Visual */}
@@ -167,7 +180,7 @@ const Hero = () => {
                 </div>
                 <div className="text-xs text-gray-500 font-mono">dashboard.mupa.ai</div>
               </div>
-              
+
               {/* Mock Dashboard UI */}
               <div className="grid grid-cols-3 gap-4 mb-4">
                 <div className="col-span-2 h-32 rounded-lg bg-gradient-to-br from-white/10 to-white/5 border border-white/5 p-4 flex flex-col justify-between">
@@ -196,21 +209,21 @@ const Hero = () => {
                 </div>
                 <div className="flex items-end justify-between gap-2 h-24">
                   {[40, 65, 45, 80, 55, 70, 40, 60, 75, 50, 65, 85].map((h, i) => (
-                    <motion.div 
+                    <motion.div
                       key={i}
                       initial={{ height: 0 }}
                       animate={{ height: `${h}%` }}
-                      transition={{ duration: 1, delay: 0.5 + (i * 0.05) }}
-                      className="w-full bg-blue-500/50 rounded-t-sm hover:bg-blue-400 transition-colors cursor-pointer" 
+                      transition={{ duration: 1, delay: 0.5 + i * 0.05 }}
+                      className="w-full bg-blue-500/50 rounded-t-sm hover:bg-blue-400 transition-colors cursor-pointer"
                     />
                   ))}
                 </div>
               </div>
             </div>
           </div>
-          
+
           {/* Floating Elements */}
-          <motion.div 
+          <motion.div
             animate={{ y: [0, -10, 0] }}
             transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
             className="absolute -top-10 -right-10 bg-black/80 backdrop-blur-md border border-white/10 p-4 rounded-xl shadow-xl z-20 flex items-center gap-3"
@@ -224,7 +237,7 @@ const Hero = () => {
             </div>
           </motion.div>
 
-          <motion.div 
+          <motion.div
             animate={{ y: [0, 10, 0] }}
             transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
             className="absolute -bottom-5 -left-5 bg-black/80 backdrop-blur-md border border-white/10 p-4 rounded-xl shadow-xl z-20 flex items-center gap-3"
@@ -243,7 +256,7 @@ const Hero = () => {
   );
 };
 
-const FeatureCard = ({ feature, index }: { feature: any, index: number }) => {
+const FeatureCard = ({ feature, index }: { feature: any; index: number }) => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true });
 
@@ -259,9 +272,7 @@ const FeatureCard = ({ feature, index }: { feature: any, index: number }) => {
         <feature.icon className="w-6 h-6" />
       </div>
       <h3 className="text-xl font-bold text-white mb-2">{feature.title}</h3>
-      <p className="text-gray-400 leading-relaxed">
-        {feature.description}
-      </p>
+      <p className="text-gray-400 leading-relaxed">{feature.description}</p>
     </motion.div>
   );
 };
@@ -271,33 +282,36 @@ const Features = () => {
     {
       icon: Monitor,
       title: "Gestão Centralizada",
-      description: "Controle milhares de telas de um único dashboard. Atualizações em tempo real e monitoramento de status instantâneo."
+      description:
+        "Controle milhares de telas de um único dashboard. Atualizações em tempo real e monitoramento de status instantâneo.",
     },
     {
       icon: Brain,
       title: "Inteligência Artificial",
-      description: "Algoritmos avançados que entendem quem está olhando. Adapte o conteúdo baseado na audiência presente."
+      description:
+        "Algoritmos avançados que entendem quem está olhando. Adapte o conteúdo baseado na audiência presente.",
     },
     {
       icon: Layers,
       title: "Playlists Dinâmicas",
-      description: "Crie regras complexas de exibição baseadas em horário, clima, ou dados externos. Flexibilidade total."
+      description:
+        "Crie regras complexas de exibição baseadas em horário, clima, ou dados externos. Flexibilidade total.",
     },
     {
       icon: Store,
       title: "Multi-Tenancy",
-      description: "Perfeito para redes de franquias. Hierarquia de permissões para matriz, regionais e lojas locais."
+      description: "Perfeito para redes de franquias. Hierarquia de permissões para matriz, regionais e lojas locais.",
     },
     {
       icon: Smartphone,
       title: "Integração Mobile",
-      description: "Gerencie sua rede pelo celular. App responsivo para controle rápido e verificação de status."
+      description: "Gerencie sua rede pelo celular. App responsivo para controle rápido e verificação de status.",
     },
     {
       icon: Shield,
       title: "Segurança Enterprise",
-      description: "Criptografia de ponta a ponta, logs de auditoria detalhados e conformidade com LGPD."
-    }
+      description: "Criptografia de ponta a ponta, logs de auditoria detalhados e conformidade com LGPD.",
+    },
   ];
 
   return (
@@ -305,12 +319,15 @@ const Features = () => {
       <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
       <div className="container mx-auto px-6">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Poderoso. Simples. <span className="text-purple-400">Inteligente.</span></h2>
+          <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">
+            Poderoso. Simples. <span className="text-purple-400">Inteligente.</span>
+          </h2>
           <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-            Uma suíte completa de ferramentas projetada para escalar sua operação de digital signage sem complicar sua vida.
+            Uma suíte completa de ferramentas projetada para escalar sua operação de digital signage sem complicar sua
+            vida.
           </p>
         </div>
-        
+
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {features.map((feature, index) => (
             <FeatureCard key={index} feature={feature} index={index} />
@@ -329,7 +346,7 @@ const AISection = () => {
     <section id="ai" className="py-24 bg-[#050505] relative overflow-hidden">
       {/* Background Glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-purple-600/10 rounded-full blur-[120px]" />
-      
+
       <div className="container mx-auto px-6 relative z-10">
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           <motion.div
@@ -342,18 +359,21 @@ const AISection = () => {
               MUPA AI Vision
             </div>
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-              Sua tela agora tem <br/>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">olhos inteligentes</span>
+              Sua tela agora tem <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
+                olhos inteligentes
+              </span>
             </h2>
             <p className="text-lg text-gray-400 mb-8 leading-relaxed">
-              Não apenas exiba conteúdo. Entenda como ele performa. Nossa tecnologia de visão computacional analisa anonimamente quem está olhando para sua tela em tempo real.
+              Não apenas exiba conteúdo. Entenda como ele performa. Nossa tecnologia de visão computacional analisa
+              anonimamente quem está olhando para sua tela em tempo real.
             </p>
-            
+
             <div className="space-y-6">
               {[
                 { title: "Detecção de Emoções", desc: "Saiba se seu público está feliz, surpreso ou neutro." },
                 { title: "Demografia em Tempo Real", desc: "Identifique idade e gênero para segmentar anúncios." },
-                { title: "Mapa de Calor de Atenção", desc: "Descubra quais áreas da tela chamam mais atenção." }
+                { title: "Mapa de Calor de Atenção", desc: "Descubra quais áreas da tela chamam mais atenção." },
               ].map((item, i) => (
                 <div key={i} className="flex gap-4">
                   <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center shrink-0 border border-white/10">
@@ -370,32 +390,28 @@ const AISection = () => {
 
           <div className="relative">
             <motion.div
-               initial={{ opacity: 0, scale: 0.9 }}
-               animate={isInView ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.9 }}
-               transition={{ duration: 0.8, delay: 0.2 }}
-               className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={isInView ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl"
             >
               {/* Simulated Camera Feed UI */}
               <div className="aspect-video bg-gray-900 relative overflow-hidden">
-                <img 
-                  src="/terminal-woman.jpg" 
-                  alt="Crowd Analysis" 
-                  className="w-full h-full object-cover opacity-60"
-                />
-                
+                <img src="/terminal-woman.jpg" alt="Crowd Analysis" className="w-full h-full object-cover opacity-60" />
+
                 {/* AI Overlays */}
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 1, duration: 1 }}
                   className="absolute top-1/4 left-1/4 w-24 h-24 border-2 border-green-500 rounded-lg"
                 >
                   <div className="absolute -top-6 left-0 bg-green-500 text-black text-xs font-bold px-2 py-1 rounded">
-                    Homem, 25-34
+                    Mulher, 25-34
                   </div>
                 </motion.div>
 
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 1.5, duration: 1 }}
@@ -407,7 +423,7 @@ const AISection = () => {
                 </motion.div>
 
                 {/* Scan Line Animation */}
-                <motion.div 
+                <motion.div
                   animate={{ top: ["0%", "100%", "0%"] }}
                   transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
                   className="absolute left-0 w-full h-px bg-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.8)]"
@@ -449,22 +465,23 @@ const CTA = () => {
           className="max-w-3xl mx-auto"
         >
           <h2 className="text-4xl md:text-6xl font-bold text-white mb-8">
-            Pronto para revolucionar <br/> suas telas?
+            Pronto para revolucionar <br /> suas telas?
           </h2>
           <p className="text-xl text-gray-400 mb-10">
             Junte-se a mais de 500 empresas que já transformaram a experiência de seus clientes com a MUPA.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-             <Link to="/auth">
-              <Button size="lg" className="h-16 px-10 text-xl rounded-full bg-white text-black hover:bg-gray-200 transition-all transform hover:scale-105">
+            <Link to="/auth">
+              <Button
+                size="lg"
+                className="h-16 px-10 text-xl rounded-full bg-white text-black hover:bg-gray-200 transition-all transform hover:scale-105"
+              >
                 Criar Conta Grátis
                 <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
             </Link>
           </div>
-          <p className="mt-6 text-sm text-gray-500">
-            Teste grátis por 14 dias. Sem compromisso.
-          </p>
+          <p className="mt-6 text-sm text-gray-500">Teste grátis por 14 dias. Sem compromisso.</p>
         </motion.div>
       </div>
     </section>
@@ -481,17 +498,27 @@ const Index = () => {
         <AISection />
         <CTA />
       </main>
-      
+
       <footer className="py-12 border-t border-white/10 bg-black">
         <div className="container mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-2">
-            <img src={logoHorizontal} alt="MupaMídias" className="h-8 opacity-70 grayscale hover:grayscale-0 transition-all" />
+            <img
+              src={logoHorizontal}
+              alt="MupaMídias"
+              className="h-8 opacity-70 grayscale hover:grayscale-0 transition-all"
+            />
             <span className="text-gray-500 text-sm">© 2024 MupaMídias Inc.</span>
           </div>
           <div className="flex gap-8 text-sm text-gray-500">
-            <a href="#" className="hover:text-white transition-colors">Privacidade</a>
-            <a href="#" className="hover:text-white transition-colors">Termos</a>
-            <a href="#" className="hover:text-white transition-colors">Suporte</a>
+            <a href="#" className="hover:text-white transition-colors">
+              Privacidade
+            </a>
+            <a href="#" className="hover:text-white transition-colors">
+              Termos
+            </a>
+            <a href="#" className="hover:text-white transition-colors">
+              Suporte
+            </a>
           </div>
         </div>
       </footer>
