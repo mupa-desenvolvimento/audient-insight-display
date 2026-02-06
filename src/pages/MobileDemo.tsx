@@ -4,45 +4,7 @@ import { Loader2, Camera, Scan, Sparkles, Smile, Frown, User, ShoppingBag, Arrow
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { motion, AnimatePresence } from "framer-motion";
-
-const PRODUCTS = {
-  female: {
-    good: [
-      { id: 1, name: "Batom Matte Premium", category: "Beleza", image: "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=200&h=200&fit=crop", minAge: 18, maxAge: 35 },
-      { id: 2, name: "Perfume Floral Exclusivo", category: "Perfumaria", image: "https://images.unsplash.com/photo-1585386959984-a41552231693?w=200&h=200&fit=crop", minAge: 25, maxAge: 45 },
-      { id: 3, name: "Chocolate Premium Belga", category: "Alimentos", image: "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=200&h=200&fit=crop", minAge: 18, maxAge: 60 },
-      { id: 4, name: "Creme Hidratante Facial", category: "Beleza", image: "https://images.unsplash.com/photo-1585232351009-aa87416fca90?w=200&h=200&fit=crop", minAge: 30, maxAge: 70 },
-      { id: 17, name: "Vinho Rosé Premium", category: "Bebidas", image: "https://images.unsplash.com/photo-1558618666-fcd25c85f82e?w=200&h=200&fit=crop", minAge: 25, maxAge: 55 },
-      { id: 18, name: "Kit Skincare Completo", category: "Beleza", image: "https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=200&h=200&fit=crop", minAge: 20, maxAge: 40 },
-    ],
-    bad: [
-      { id: 5, name: "Chocolate Amargo 70%", category: "Alimentos", image: "https://images.unsplash.com/photo-1599785209707-a456fc1337bb?w=200&h=200&fit=crop", minAge: 18, maxAge: 40 },
-      { id: 6, name: "Chá Calmante Camomila", category: "Bebidas", image: "https://images.unsplash.com/photo-1505576391880-b3f9d713dc4f?w=200&h=200&fit=crop", minAge: 18, maxAge: 70 },
-      { id: 7, name: "Vela Aromática Lavanda", category: "Bem-estar", image: "https://images.unsplash.com/photo-1607082349566-1870c4b29a3c?w=200&h=200&fit=crop", minAge: 25, maxAge: 55 },
-      { id: 8, name: "Suplemento Relaxante", category: "Saúde", image: "https://images.unsplash.com/photo-1611078489935-0cb964de46d6?w=200&h=200&fit=crop", minAge: 30, maxAge: 65 },
-      { id: 19, name: "Máscara Facial Nutritiva", category: "Beleza", image: "https://images.unsplash.com/photo-1596755389378-c31d21fd1273?w=200&h=200&fit=crop", minAge: 20, maxAge: 45 },
-      { id: 20, name: "Difusor de Aromas", category: "Bem-estar", image: "https://images.unsplash.com/photo-1602928321679-560bb453f190?w=200&h=200&fit=crop", minAge: 25, maxAge: 60 },
-    ]
-  },
-  male: {
-    good: [
-      { id: 9, name: "Energético Premium", category: "Bebidas", image: "https://images.unsplash.com/photo-1622484212850-eb5969c9cfa3?w=200&h=200&fit=crop", minAge: 18, maxAge: 35 },
-      { id: 10, name: "Fone Bluetooth Pro", category: "Eletrônicos", image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=200&h=200&fit=crop", minAge: 18, maxAge: 40 },
-      { id: 11, name: "Cerveja Artesanal IPA", category: "Bebidas", image: "https://images.unsplash.com/photo-1516455207990-7a41ce80f7ee?w=200&h=200&fit=crop", minAge: 25, maxAge: 55 },
-      { id: 12, name: "Kit Churrasco Gourmet", category: "Utilidades", image: "https://images.unsplash.com/photo-1598514982205-f6d2c6f33c22?w=200&h=200&fit=crop", minAge: 30, maxAge: 65 },
-      { id: 21, name: "Whisky Single Malt", category: "Bebidas", image: "https://images.unsplash.com/photo-1527281400683-1aae777175f8?w=200&h=200&fit=crop", minAge: 30, maxAge: 60 },
-      { id: 22, name: "Relógio Esportivo", category: "Acessórios", image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=200&h=200&fit=crop", minAge: 20, maxAge: 45 },
-    ],
-    bad: [
-      { id: 13, name: "Café Especial Forte", category: "Bebidas", image: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=200&h=200&fit=crop", minAge: 20, maxAge: 55 },
-      { id: 14, name: "Barra de Proteína Whey", category: "Alimentos", image: "https://images.unsplash.com/photo-1572441710534-6808cc2f5c10?w=200&h=200&fit=crop", minAge: 18, maxAge: 40 },
-      { id: 15, name: "Analgésico Extra Forte", category: "Farmácia", image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=200&h=200&fit=crop", minAge: 25, maxAge: 65 },
-      { id: 16, name: "Chá Digestivo Natural", category: "Bebidas", image: "https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=200&h=200&fit=crop", minAge: 30, maxAge: 70 },
-      { id: 23, name: "Snack Salgado Premium", category: "Alimentos", image: "https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=200&h=200&fit=crop", minAge: 18, maxAge: 35 },
-      { id: 24, name: "Água com Gás Importada", category: "Bebidas", image: "https://images.unsplash.com/photo-1560023907-5f339617ea55?w=200&h=200&fit=crop", minAge: 20, maxAge: 50 },
-    ]
-  }
-};
+import { supabase } from "@/integrations/supabase/client";
 
 const translateExpression = (expr: string) => {
   const map: Record<string, string> = {
@@ -52,19 +14,64 @@ const translateExpression = (expr: string) => {
   return map[expr] || expr;
 };
 
-const getRecommendedProducts = (gender: 'male' | 'female', mood: 'good' | 'bad', age: number) => {
-  const allProducts = PRODUCTS[gender][mood];
-  
-  // Score products by age proximity
-  const scored = allProducts.map(p => {
-    const inRange = age >= p.minAge && age <= p.maxAge;
-    const midAge = (p.minAge + p.maxAge) / 2;
-    const distance = Math.abs(age - midAge);
-    return { ...p, score: inRange ? 1000 - distance : -distance, inRange };
-  });
-  
-  scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, 4);
+const mapMoodToTargetMood = (mood: 'good' | 'bad', expression: string): string[] => {
+  if (mood === 'good') return ['happy', 'all'];
+  return ['neutral', 'sad', 'all'];
+};
+
+const fetchRecommendedProducts = async (gender: 'male' | 'female', mood: 'good' | 'bad', expression: string, age: number) => {
+  const targetMoods = mapMoodToTargetMood(mood, expression);
+  const genderFilters = [gender, 'all'];
+
+  const { data, error } = await supabase
+    .from('product_recommendations')
+    .select('*')
+    .eq('is_active', true)
+    .in('target_gender', genderFilters)
+    .in('target_mood', targetMoods)
+    .lte('target_age_min', age)
+    .gte('target_age_max', age)
+    .order('score', { ascending: false })
+    .limit(20);
+
+  if (error || !data || data.length === 0) {
+    console.warn('[MobileDemo] No DB recommendations, using fallback query');
+    // Fallback: broader query without mood filter
+    const { data: fallback } = await supabase
+      .from('product_recommendations')
+      .select('*')
+      .eq('is_active', true)
+      .in('target_gender', genderFilters)
+      .lte('target_age_min', age)
+      .gte('target_age_max', age)
+      .order('score', { ascending: false })
+      .limit(20);
+    
+    const products = (fallback || []).map(p => ({
+      id: p.id,
+      name: p.name,
+      category: p.category || 'Geral',
+      image: p.image_url || `https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=200&h=200&fit=crop`,
+      minAge: p.target_age_min ?? 0,
+      maxAge: p.target_age_max ?? 100,
+      inRange: true,
+      score: p.score ?? 50,
+    }));
+    return products.slice(0, 4);
+  }
+
+  const products = data.map(p => ({
+    id: p.id,
+    name: p.name,
+    category: p.category || 'Geral',
+    image: p.image_url || `https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=200&h=200&fit=crop`,
+    minAge: p.target_age_min ?? 0,
+    maxAge: p.target_age_max ?? 100,
+    inRange: age >= (p.target_age_min ?? 0) && age <= (p.target_age_max ?? 100),
+    score: p.score ?? 50,
+  }));
+
+  return products.slice(0, 4);
 };
 
 const MobileDemo = () => {
@@ -198,16 +205,14 @@ const MobileDemo = () => {
     }, 600);
   };
 
-  const finalizeResult = () => {
+  const finalizeResult = async () => {
     const detections = detectionsRef.current;
     
-    // Average results from multiple detections for accuracy
     const avgAge = Math.round(detections.reduce((s, d) => s + d.age, 0) / detections.length);
     
     const maleCount = detections.filter(d => d.gender === 'male').length;
     const gender: 'male' | 'female' = maleCount > detections.length / 2 ? 'male' : 'female';
 
-    // Aggregate expressions
     const exprTotals: Record<string, number> = {};
     detections.forEach(d => {
       Object.entries(d.expressions).forEach(([key, val]) => {
@@ -223,9 +228,10 @@ const MobileDemo = () => {
     const sorted = Object.entries(exprTotals).sort(([, a], [, b]) => b - a);
     const dominantExpression = sorted[0]?.[0] || 'neutral';
 
-    const products = getRecommendedProducts(gender, mood, avgAge);
-
     stopCamera();
+
+    const products = await fetchRecommendedProducts(gender, mood, dominantExpression, avgAge);
+
     setResult({ gender, mood, expression: dominantExpression, age: avgAge, products });
     setPhase('results');
   };
