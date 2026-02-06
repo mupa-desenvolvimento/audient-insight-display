@@ -178,9 +178,9 @@ const MobileDemo = () => {
   };
 
   const startContinuousDetection = () => {
-    const REQUIRED_DETECTIONS = 5;
+    const REQUIRED_DETECTIONS = 12;
     let attempts = 0;
-    const MAX_ATTEMPTS = 20;
+    const MAX_ATTEMPTS = 40;
 
     detectIntervalRef.current = window.setInterval(async () => {
       attempts++;
