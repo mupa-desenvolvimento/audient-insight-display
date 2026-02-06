@@ -19,9 +19,40 @@ const mapMoodToTargetMood = (mood: 'good' | 'bad', expression: string): string[]
   return ['neutral', 'sad', 'all'];
 };
 
+const getProductImageUrl = (ean: string, imageUrl: string | null): string => {
+  if (imageUrl) return imageUrl;
+  // Use Mupa API image endpoint based on EAN
+  return `https://api.mfrural.com.br/api/v1/produto-imagem/${ean}`;
+};
+
+const deduplicateByName = (products: any[]): any[] => {
+  const seen = new Set<string>();
+  return products.filter(p => {
+    const key = p.name.toLowerCase().trim();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
 const fetchRecommendedProducts = async (gender: 'male' | 'female', mood: 'good' | 'bad', expression: string, age: number) => {
   const targetMoods = mapMoodToTargetMood(mood, expression);
   const genderFilters = [gender, 'all'];
+
+  const mapProducts = (data: any[], checkRange = true) => {
+    const mapped = data.map(p => ({
+      id: p.id,
+      name: p.name,
+      ean: p.ean,
+      category: p.category || 'Geral',
+      image: getProductImageUrl(p.ean, p.image_url),
+      minAge: p.target_age_min ?? 0,
+      maxAge: p.target_age_max ?? 100,
+      inRange: checkRange ? age >= (p.target_age_min ?? 0) && age <= (p.target_age_max ?? 100) : true,
+      score: p.score ?? 50,
+    }));
+    return deduplicateByName(mapped).slice(0, 4);
+  };
 
   const { data, error } = await supabase
     .from('product_recommendations')
@@ -32,11 +63,10 @@ const fetchRecommendedProducts = async (gender: 'male' | 'female', mood: 'good' 
     .lte('target_age_min', age)
     .gte('target_age_max', age)
     .order('score', { ascending: false })
-    .limit(20);
+    .limit(50);
 
   if (error || !data || data.length === 0) {
     console.warn('[MobileDemo] No DB recommendations, using fallback query');
-    // Fallback: broader query without mood filter
     const { data: fallback } = await supabase
       .from('product_recommendations')
       .select('*')
@@ -45,33 +75,12 @@ const fetchRecommendedProducts = async (gender: 'male' | 'female', mood: 'good' 
       .lte('target_age_min', age)
       .gte('target_age_max', age)
       .order('score', { ascending: false })
-      .limit(20);
+      .limit(50);
     
-    const products = (fallback || []).map(p => ({
-      id: p.id,
-      name: p.name,
-      category: p.category || 'Geral',
-      image: p.image_url || `https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=200&h=200&fit=crop`,
-      minAge: p.target_age_min ?? 0,
-      maxAge: p.target_age_max ?? 100,
-      inRange: true,
-      score: p.score ?? 50,
-    }));
-    return products.slice(0, 4);
+    return mapProducts(fallback || [], false);
   }
 
-  const products = data.map(p => ({
-    id: p.id,
-    name: p.name,
-    category: p.category || 'Geral',
-    image: p.image_url || `https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=200&h=200&fit=crop`,
-    minAge: p.target_age_min ?? 0,
-    maxAge: p.target_age_max ?? 100,
-    inRange: age >= (p.target_age_min ?? 0) && age <= (p.target_age_max ?? 100),
-    score: p.score ?? 50,
-  }));
-
-  return products.slice(0, 4);
+  return mapProducts(data);
 };
 
 const MobileDemo = () => {
