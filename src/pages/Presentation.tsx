@@ -668,8 +668,8 @@ export default function Presentation() {
                 >
                   <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-75 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-tilt"></div>
                   <div className="relative bg-white p-6 rounded-xl">
-                    <QRCode 
-                      value="http://172.20.10.2:8080/mobile-demo"
+                     <QRCode 
+                       value="https://mupa-midias.lovable.app/mobile-demo"
                       size={256}
                       level="H"
                     />
