@@ -1,13 +1,11 @@
  import { useEffect, useState, useRef } from 'react';
- import { useSearchParams, useNavigate } from 'react-router-dom';
- import { supabase } from '@/integrations/supabase/client';
- import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
- import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
- import { Button } from '@/components/ui/button';
- 
- const CANVA_REDIRECT_DOMAIN = 'https://midias.mupa.app';
- 
- export default function CanvaCallback() {
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+
+export default function CanvaCallback() {
    const navigate = useNavigate();
    const [searchParams] = useSearchParams();
    const [status, setStatus] = useState<'processing' | 'waiting_session' | 'success' | 'error'>('processing');
@@ -21,12 +19,13 @@
      const error = searchParams.get('error');
  
      // Check for OAuth errors immediately
-     if (error) {
-       console.error('[Canva Callback] OAuth error:', error);
-       setStatus('error');
-       setErrorMessage('Autorização cancelada ou negada pelo Canva');
-       return;
-     }
+    if (error) {
+      console.error('[Canva Callback] OAuth error:', error);
+      setStatus('error');
+      const errorDesc = searchParams.get('error_description');
+      setErrorMessage(errorDesc ? `Erro: ${error} - ${errorDesc}` : `Erro: ${error} - Autorização cancelada ou negada pelo Canva`);
+      return;
+    }
  
      if (!code || !state) {
        console.error('[Canva Callback] Missing code or state');
@@ -78,12 +77,13 @@
        setStatus('processing');
  
        try {
-         // Exchange the code for tokens
-         const redirectUri = `${CANVA_REDIRECT_DOMAIN}/admin/canva/callback`;
-         
-         console.log('[Canva Callback] Exchanging code for tokens...');
-         
-         const response = await fetch(
+        // Exchange the code for tokens
+        // Use window.location.origin to match the redirect URI used in get_auth_url
+        const redirectUri = `${window.location.origin}/admin/canva/callback`;
+        
+        console.log('[Canva Callback] Exchanging code for tokens with redirect_uri:', redirectUri);
+        
+        const response = await fetch(
            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/canva-auth?action=exchange_code`,
            {
              method: 'POST',

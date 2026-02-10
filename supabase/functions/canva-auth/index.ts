@@ -68,16 +68,17 @@
        const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
        
        await supabase.from('canva_auth_states').upsert({
-         user_id,
-         state,
-         code_verifier: codeVerifier,
-         expires_at: expiresAt,
-       });
-       
-const scopes = 'design:meta:read design:content:read folder:read asset:read';
-       
-       const authUrl = `${CANVA_AUTH_URL}?` +
-         `client_id=${encodeURIComponent(clientId)}&` +
+        user_id,
+        state,
+        code_verifier: codeVerifier,
+        expires_at: expiresAt,
+      });
+      
+      // Scopes updated to include offline_access (for refresh tokens) and profile:read
+      const scopes = 'design:meta:read design:content:read folder:read asset:read profile:read offline_access';
+      
+      const authUrl = `${CANVA_AUTH_URL}?` +
+        `client_id=${encodeURIComponent(clientId)}&` +
          `response_type=code&` +
          `redirect_uri=${encodeURIComponent(redirect_uri)}&` +
          `scope=${encodeURIComponent(scopes)}&` +

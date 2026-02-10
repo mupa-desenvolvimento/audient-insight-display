@@ -23,8 +23,8 @@ interface FolderBreadcrumb {
   name: string;
 }
  
-  // Production domain for Canva OAuth redirect (must match Canva app configuration)
-  const CANVA_REDIRECT_DOMAIN = 'https://midias.mupa.app';
+  // Use current origin for redirect (works for both localhost and production)
+  const getRedirectUri = () => `${window.location.origin}/admin/canva/callback`;
   
   export function useCanvaIntegration() {
    const { toast } = useToast();
@@ -98,8 +98,10 @@ interface FolderBreadcrumb {
  
   const connect = useCallback(async () => {
     try {
-      // Always use production domain for OAuth redirect
-      const redirectUri = `${CANVA_REDIRECT_DOMAIN}/admin/canva/callback`;
+      // Use dynamic redirect URI
+      const redirectUri = getRedirectUri();
+      console.log('[Canva Integration] Initiating connection with redirect_uri:', redirectUri);
+      
       const result = await callCanvaApi('get_auth_url', { redirect_uri: redirectUri });
       
       if (result.auth_url) {
@@ -120,7 +122,7 @@ interface FolderBreadcrumb {
   const handleCallback = useCallback(async (code: string, state: string) => {
     try {
       // Must match the redirect_uri used during authorization
-      const redirectUri = `${CANVA_REDIRECT_DOMAIN}/admin/canva/callback`;
+      const redirectUri = getRedirectUri();
       const result = await callCanvaApi('exchange_code', { code, state, redirect_uri: redirectUri });
       
       if (result.success) {
