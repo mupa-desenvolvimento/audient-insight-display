@@ -507,7 +507,7 @@ const Index = () => {
               alt="MupaMídias"
               className="h-8 opacity-70 grayscale hover:grayscale-0 transition-all"
             />
-            <span className="text-gray-500 text-sm">© 2024 MupaMídias Inc.</span>
+            <span className="text-gray-500 text-sm">© Mupa Desenvolvimento de Solucoes Tecnologicas Ltda.</span>
           </div>
           <div className="flex gap-8 text-sm text-gray-500">
             <a href="#" className="hover:text-white transition-colors">
