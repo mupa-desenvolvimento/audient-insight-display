@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useStores } from '@/hooks/useStores';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Upload, Store, MapPin, Edit, Trash2, Loader2, Download } from 'lucide-react';
+import { Plus, Search, Upload, Store, MapPin, Edit, Trash2, Loader2, Download, Map, RefreshCw } from 'lucide-react';
 import { StoreWithHierarchy, City, State } from '@/types/database';
 import { toast } from 'sonner';
 import { StoreImportDialog } from '@/components/stores/StoreImportDialog';
@@ -23,6 +24,8 @@ interface StoreFormData {
   bairro: string;
   cep: string;
   regional_responsavel: string;
+  lat: string;
+  lng: string;
 }
 
 interface CityWithState extends City {
@@ -35,7 +38,49 @@ interface StoreFormProps {
   cities: CityWithState[];
 }
 
-const StoreForm = ({ formData, setFormData, cities }: StoreFormProps) => (
+const StoreForm = ({ formData, setFormData, cities }: StoreFormProps) => {
+  const [isGeocoding, setIsGeocoding] = useState(false);
+
+  const handleGeocode = async () => {
+    const city = cities.find(c => c.id === formData.city_id);
+    const addressParts = [
+      formData.address,
+      formData.bairro,
+      city?.name,
+      city?.state?.name || city?.state?.code,
+      'Brasil'
+    ].filter(Boolean);
+    
+    if (addressParts.length < 2) {
+      toast.error('Preencha pelo menos o endereço e a cidade');
+      return;
+    }
+    
+    const fullAddress = addressParts.join(', ');
+    setIsGeocoding(true);
+    
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}&limit=1`);
+      const data = await response.json();
+      
+      if (data && data.length > 0) {
+        setFormData(prev => ({
+          ...prev,
+          lat: data[0].lat,
+          lng: data[0].lon
+        }));
+        toast.success('Coordenadas encontradas!');
+      } else {
+        toast.error('Endereço não encontrado');
+      }
+    } catch (error) {
+      toast.error('Erro ao buscar coordenadas');
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
+  return (
   <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
     <div className="grid grid-cols-2 gap-4">
       <div className="space-y-2">
@@ -77,11 +122,22 @@ const StoreForm = ({ formData, setFormData, cities }: StoreFormProps) => (
 
     <div className="space-y-2">
       <Label>Endereço</Label>
-      <Input
-        placeholder="Endereço completo"
-        value={formData.address}
-        onChange={(e) => setFormData((prev) => ({ ...prev, address: e.target.value }))}
-      />
+      <div className="flex gap-2">
+        <Input
+          placeholder="Endereço completo"
+          value={formData.address}
+          onChange={(e) => setFormData((prev) => ({ ...prev, address: e.target.value }))}
+        />
+        <Button 
+          type="button" 
+          variant="outline" 
+          onClick={handleGeocode}
+          disabled={isGeocoding}
+          title="Buscar coordenadas pelo endereço"
+        >
+          {isGeocoding ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+        </Button>
+      </div>
     </div>
 
     <div className="grid grid-cols-2 gap-4">
@@ -121,10 +177,31 @@ const StoreForm = ({ formData, setFormData, cities }: StoreFormProps) => (
         </SelectContent>
       </Select>
     </div>
+
+    <div className="grid grid-cols-2 gap-4">
+      <div className="space-y-2">
+        <Label>Latitude</Label>
+        <Input
+          placeholder="-23.550520"
+          value={formData.lat}
+          onChange={(e) => setFormData((prev) => ({ ...prev, lat: e.target.value }))}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>Longitude</Label>
+        <Input
+          placeholder="-46.633308"
+          value={formData.lng}
+          onChange={(e) => setFormData((prev) => ({ ...prev, lng: e.target.value }))}
+        />
+      </div>
+    </div>
   </div>
-);
+  );
+};
 
 export default function Stores() {
+  const navigate = useNavigate();
   const { stores, cities, isLoading, updateStore, deleteStore, refetch } = useStores();
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -142,6 +219,8 @@ export default function Stores() {
     bairro: '',
     cep: '',
     regional_responsavel: '',
+    lat: '',
+    lng: '',
   });
 
   const filteredStores = stores.filter(store =>
@@ -154,7 +233,7 @@ export default function Stores() {
   );
 
   const resetForm = () => {
-    setFormData({ code: '', name: '', city_id: '', address: '', cnpj: '', bairro: '', cep: '', regional_responsavel: '' });
+    setFormData({ code: '', name: '', city_id: '', address: '', cnpj: '', bairro: '', cep: '', regional_responsavel: '', lat: '', lng: '' });
   };
 
   const handleCreate = async () => {
@@ -177,7 +256,10 @@ export default function Stores() {
           cep: formData.cep || null,
           regional_responsavel: formData.regional_responsavel || null,
           is_active: true,
-          metadata: {},
+          metadata: {
+            lat: formData.lat,
+            lng: formData.lng
+          },
         });
 
       if (error) throw error;
@@ -199,6 +281,7 @@ export default function Stores() {
 
   const handleEdit = (store: StoreWithHierarchy) => {
     setSelectedStore(store);
+    const meta = store.metadata as any || {};
     setFormData({
       code: store.code,
       name: store.name,
@@ -208,6 +291,8 @@ export default function Stores() {
       bairro: (store as any).bairro || '',
       cep: (store as any).cep || '',
       regional_responsavel: (store as any).regional_responsavel || '',
+      lat: meta.lat || '',
+      lng: meta.lng || '',
     });
     setIsEditOpen(true);
   };
@@ -219,6 +304,8 @@ export default function Stores() {
     }
 
     setIsSubmitting(true);
+    const currentMeta = (selectedStore?.metadata as any) || {};
+
     try {
       const { error } = await supabase
         .from('stores')
@@ -231,6 +318,11 @@ export default function Stores() {
           bairro: formData.bairro || null,
           cep: formData.cep || null,
           regional_responsavel: formData.regional_responsavel || null,
+          metadata: {
+            ...currentMeta,
+            lat: formData.lat,
+            lng: formData.lng
+          }
         })
         .eq('id', selectedStore.id);
 
@@ -289,6 +381,88 @@ export default function Stores() {
     toast.success('Lojas exportadas com sucesso');
   };
 
+  const syncCoordinates = async () => {
+    const storesToUpdate = stores.filter(store => {
+      const meta = store.metadata as any || {};
+      return !meta.lat || !meta.lng;
+    });
+
+    if (storesToUpdate.length === 0) {
+      toast.info('Todas as lojas já possuem coordenadas.');
+      return;
+    }
+
+    if (!confirm(`Deseja buscar coordenadas para ${storesToUpdate.length} lojas? Isso pode levar algum tempo (aprox. ${(storesToUpdate.length * 1.2 / 60).toFixed(1)} min).`)) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    let updatedCount = 0;
+    let errorCount = 0;
+    const toastId = toast.loading('Iniciando sincronização...');
+
+    try {
+      for (let i = 0; i < storesToUpdate.length; i++) {
+        const store = storesToUpdate[i];
+        toast.loading(`Processando ${i + 1}/${storesToUpdate.length}: ${store.name}`, { id: toastId });
+
+        const addressParts = [
+          store.address,
+          (store as any).bairro,
+          store.city?.name,
+          store.city?.state?.name || store.city?.state?.code,
+          'Brasil'
+        ].filter(Boolean);
+
+        if (addressParts.length < 2) {
+          console.warn(`Endereço insuficiente para loja ${store.name}`);
+          errorCount++;
+          continue;
+        }
+
+        const fullAddress = addressParts.join(', ');
+
+        try {
+          // Delay to respect Nominatim rate limit (1 req/sec)
+          await new Promise(resolve => setTimeout(resolve, 1200));
+
+          const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}&limit=1`);
+          const data = await response.json();
+
+          if (data && data.length > 0) {
+            const currentMeta = (store.metadata as any) || {};
+            const { error } = await supabase
+              .from('stores')
+              .update({
+                metadata: {
+                  ...currentMeta,
+                  lat: data[0].lat,
+                  lng: data[0].lon
+                }
+              })
+              .eq('id', store.id);
+
+            if (error) throw error;
+            updatedCount++;
+          } else {
+            console.warn(`Coordenadas não encontradas para ${store.name}`);
+            errorCount++;
+          }
+        } catch (error) {
+          console.error(`Erro ao processar loja ${store.name}:`, error);
+          errorCount++;
+        }
+      }
+
+      toast.success(`Sincronização concluída! ${updatedCount} atualizadas, ${errorCount} falhas.`, { id: toastId });
+      refetch();
+    } catch (error) {
+      toast.error('Erro geral na sincronização', { id: toastId });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -305,9 +479,17 @@ export default function Stores() {
           <p className="text-muted-foreground">Gerencie todas as lojas do sistema ({stores.length} lojas)</p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => navigate('/admin/stores/map')}>
+            <Map className="mr-2 h-4 w-4" />
+            Ver no Mapa
+          </Button>
           <Button variant="outline" onClick={exportCSV}>
             <Download className="mr-2 h-4 w-4" />
             Exportar
+          </Button>
+          <Button variant="outline" onClick={syncCoordinates} disabled={isSubmitting} title="Buscar coordenadas para lojas sem lat/lng">
+            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+            Sincronizar Coordenadas
           </Button>
           <Button variant="outline" onClick={() => setIsImportOpen(true)}>
             <Upload className="mr-2 h-4 w-4" />

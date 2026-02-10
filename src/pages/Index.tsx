@@ -147,7 +147,7 @@ const Hero = () => {
                 Começar Agora
               </Button>
             </Link>
-            <Link to="/player">
+            <Link to="/demo">
               <Button
                 size="lg"
                 variant="outline"

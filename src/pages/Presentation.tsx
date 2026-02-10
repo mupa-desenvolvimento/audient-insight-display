@@ -27,12 +27,15 @@ import {
   Trophy,
   HeartHandshake,
   QrCode,
-  ShoppingBag
+  ShoppingBag,
+  Edit
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import QRCode from "react-qr-code";
 import logoHorizontal from "@/assets/logo_horizontal.svg";
+import { Slide } from "@/types/presentation";
+import { SlideEditor } from "@/components/presentation/SlideEditor";
 
 // --- THEME SYSTEM ---
 type Theme = {
@@ -135,32 +138,8 @@ const themes: Record<string, Theme> = {
   }
 };
 
-type Slide = {
-  id: number;
-  layout: string;
-  title: string;
-  subtitle: string;
-  description: string;
-  icon?: React.ElementType;
-  image?: string | null;
-  images?: string[];
-  video?: string;
-  points?: string[];
-  features?: { icon: React.ElementType; text: string; desc?: string }[];
-  items?: { title: string; desc: string; icon: React.ElementType }[];
-  stats?: { label: string; value: string }[];
-  benefits?: string[];
-  color?: string;
-  cta?: string;
-  comparison?: {
-    left: { label: string; image: string; color?: string };
-    right: { label: string; image: string; color?: string };
-  };
-  reasons?: { title: string; desc: string }[];
-};
-
 // Configuração dos slides
-const slides: Slide[] = [
+const INITIAL_SLIDES: Slide[] = [
   // Slide 1: Capa
   {
     id: 1,
@@ -286,6 +265,11 @@ const slides: Slide[] = [
     subtitle: "IA na palma da mão",
     description: "Escaneie o QR Code para testar a análise de perfil e recomendação de produtos em tempo real no seu celular.",
     image: null,
+    items: [
+      { icon: ScanBarcode, title: "1. Aponte", desc: "Abra a câmera do seu celular e aponte para o QR Code." },
+      { icon: Brain, title: "2. Analise", desc: "Nossa IA identificará seu perfil de forma anônima e segura." },
+      { icon: ShoppingBag, title: "3. Descubra", desc: "Receba recomendações personalizadas instantaneamente." }
+    ],
     icon: QrCode
   },
   // Slide 10: Dashboard em Tempo Real
@@ -295,6 +279,17 @@ const slides: Slide[] = [
     title: "Dashboard em Tempo Real",
     subtitle: "Visão 360º da Operação",
     description: "Acompanhe métricas vitais de todos os seus dispositivos em um único painel intuitivo.",
+    stats: [
+      { label: "Online", value: "1,240" },
+      { label: "Offline", value: "8" }
+    ],
+    items: [
+      { title: "Loja Shopping SP", desc: "98" },
+      { title: "Flagship Av. Paulista", desc: "85" },
+      { title: "Quiosque Aeroporto", desc: "72" },
+      { title: "Loja Centro RJ", desc: "65" },
+      { title: "Supermercado Barra", desc: "54" }
+    ],
     icon: BarChart3
   },
   // Slide 11: Case Varejo (Terminais de Preço)
@@ -389,7 +384,9 @@ const slides: Slide[] = [
 ];
 
 export default function Presentation() {
+  const [slides, setSlides] = useState<Slide[]>(INITIAL_SLIDES);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [searchParams] = useSearchParams();
   
   const themeParam = searchParams.get("theme");
@@ -407,6 +404,37 @@ export default function Presentation() {
   
   const slide = slides[currentSlide];
   const theme = themes[currentThemeId];
+
+  const handleUpdateSlide = (updatedSlide: Slide) => {
+    const newSlides = [...slides];
+    newSlides[currentSlide] = updatedSlide;
+    setSlides(newSlides);
+  };
+
+  const handleAddSlide = () => {
+    const newSlide: Slide = {
+      id: Math.max(...slides.map(s => s.id)) + 1,
+      layout: "landing-hero",
+      title: "Novo Slide",
+      subtitle: "Subtítulo do Slide",
+      description: "Descrição do novo slide.",
+      points: ["Ponto 1", "Ponto 2"],
+    };
+    const newSlides = [...slides];
+    newSlides.splice(currentSlide + 1, 0, newSlide);
+    setSlides(newSlides);
+    setCurrentSlide(currentSlide + 1);
+    setIsEditorOpen(true); // Keep editor open for the new slide
+  };
+
+  const handleDeleteSlide = () => {
+    if (slides.length <= 1) return; // Prevent deleting the last slide
+    const newSlides = slides.filter((_, index) => index !== currentSlide);
+    setSlides(newSlides);
+    if (currentSlide >= newSlides.length) {
+      setCurrentSlide(newSlides.length - 1);
+    }
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -469,6 +497,15 @@ export default function Presentation() {
           {currentSlide + 1} / {slides.length}
         </span>
         <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={() => setIsEditorOpen(true)}
+            className={`rounded-full w-10 h-10 ${theme.buttonSecondary}`}
+            title="Editar Slide"
+          >
+            <Edit className="w-4 h-4" />
+          </Button>
           <Button 
             variant="outline" 
             size="icon" 
@@ -555,6 +592,11 @@ export default function Presentation() {
                   transition={{ duration: 1, delay: 0.2, type: "spring" }}
                   className="relative hidden lg:block perspective-1000"
                 >
+                  {slide.image ? (
+                    <div className={`relative z-10 rounded-2xl overflow-hidden shadow-2xl shadow-purple-500/20 border ${theme.cardBorder} bg-black/50 backdrop-blur-xl transform rotate-y-12 transition-transform duration-500 hover:rotate-y-0 h-[600px]`}>
+                      <img src={slide.image} alt={slide.title} className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
                   <div className={`relative z-10 rounded-2xl overflow-hidden shadow-2xl shadow-purple-500/20 border ${theme.cardBorder} bg-black/50 backdrop-blur-xl transform rotate-y-12 transition-transform duration-500 hover:rotate-y-0`}>
                     <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/10 to-purple-500/10 pointer-events-none" />
                     <div className="p-6">
@@ -607,6 +649,7 @@ export default function Presentation() {
                       </div>
                     </div>
                   </div>
+                  )}
                   
                   {/* Floating Elements */}
                   <motion.div 
@@ -687,11 +730,7 @@ export default function Presentation() {
                 </motion.div>
 
                 <div className="grid grid-cols-3 gap-8 text-left mt-8 max-w-3xl">
-                  {[
-                    { icon: ScanBarcode, title: "1. Aponte", desc: "Abra a câmera do seu celular e aponte para o QR Code." },
-                    { icon: Brain, title: "2. Analise", desc: "Nossa IA identificará seu perfil de forma anônima e segura." },
-                    { icon: ShoppingBag, title: "3. Descubra", desc: "Receba recomendações personalizadas instantaneamente." }
-                  ].map((step, i) => (
+                  {slide.items?.map((step: any, i: number) => (
                     <motion.div 
                       key={i}
                       initial={{ opacity: 0, y: 20 }}
@@ -700,7 +739,7 @@ export default function Presentation() {
                       className={`p-4 rounded-xl ${theme.cardBg} border ${theme.cardBorder}`}
                     >
                       <div className={`w-10 h-10 rounded-full ${theme.iconBg} flex items-center justify-center mb-3`}>
-                        <step.icon className={`w-5 h-5 ${theme.iconColor}`} />
+                        {step.icon ? <step.icon className={`w-5 h-5 ${theme.iconColor}`} /> : <ScanBarcode className={`w-5 h-5 ${theme.iconColor}`} />}
                       </div>
                       <h4 className={`font-bold ${theme.textPrimary} mb-1`}>{step.title}</h4>
                       <p className={`text-sm ${theme.textSecondary}`}>{step.desc}</p>
@@ -769,8 +808,8 @@ export default function Presentation() {
                        className={`p-6 rounded-3xl ${theme.cardBg} border ${theme.cardBorder} flex flex-col justify-between ${theme.cardHover} transition-all group ${i === 0 || i === 3 ? 'md:col-span-2' : ''}`}
                      >
                         <div className={`w-12 h-12 rounded-xl ${theme.iconBg} flex items-center justify-center mb-4 ${theme.iconColor} group-hover:scale-110 transition-transform`}>
-                           <feat.icon className="w-6 h-6" />
-                        </div>
+                          {feat.icon ? <feat.icon className="w-6 h-6" /> : <Zap className="w-6 h-6" />}
+                       </div>
                         <div>
                            <h3 className={`text-2xl font-bold mb-2 ${theme.textPrimary}`}>{feat.text}</h3>
                            <p className={`${theme.textSecondary} text-sm leading-relaxed`}>{feat.desc}</p>
@@ -1110,8 +1149,9 @@ export default function Presentation() {
                       <div className="text-white font-bold text-xl">MUPA Analytics</div>
                     </div>
                     <div className="flex gap-4 text-sm text-slate-400">
-                      <span>Online: 1,240</span>
-                      <span>Offline: 8</span>
+                      {slide.stats?.map((stat, i) => (
+                         <span key={i}>{stat.label}: {stat.value}</span>
+                      ))}
                     </div>
                   </div>
 
@@ -1146,26 +1186,20 @@ export default function Presentation() {
                     <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-4 overflow-hidden flex flex-col">
                       <h4 className="text-sm font-medium text-slate-300 mb-4">Lojas com Maior Tráfego</h4>
                       <div className="space-y-3 overflow-y-auto custom-scrollbar flex-1">
-                        {[
-                          { name: "Loja Shopping SP", val: 98 },
-                          { name: "Flagship Av. Paulista", val: 85 },
-                          { name: "Quiosque Aeroporto", val: 72 },
-                          { name: "Loja Centro RJ", val: 65 },
-                          { name: "Supermercado Barra", val: 54 },
-                        ].map((store, i) => (
+                        {slide.items?.map((store: any, i: number) => (
                           <div key={i} className="flex items-center gap-3">
                             <div className="w-6 h-6 rounded bg-slate-800 flex items-center justify-center text-xs text-slate-400 font-bold">
                               {i + 1}
                             </div>
                             <div className="flex-1">
                               <div className="flex justify-between text-xs mb-1">
-                                <span className="text-slate-300">{store.name}</span>
-                                <span className="text-slate-500">{store.val}%</span>
+                                <span className="text-slate-300">{store.title}</span>
+                                <span className="text-slate-500">{store.desc}%</span>
                               </div>
                               <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
                                 <motion.div 
                                   initial={{ width: 0 }}
-                                  animate={{ width: `${store.val}%` }}
+                                  animate={{ width: `${Math.min(100, parseInt(store.desc) || 50)}%` }}
                                   transition={{ duration: 1, delay: 0.5 + i * 0.1 }}
                                   className="h-full bg-blue-500 rounded-full"
                                 />
@@ -1246,6 +1280,15 @@ export default function Presentation() {
           </div>
         </motion.div>
       </AnimatePresence>
+
+      <SlideEditor 
+        slide={slide} 
+        isOpen={isEditorOpen} 
+        onClose={() => setIsEditorOpen(false)} 
+        onUpdate={handleUpdateSlide}
+        onAdd={handleAddSlide}
+        onDelete={handleDeleteSlide}
+      />
     </div>
   );
 }

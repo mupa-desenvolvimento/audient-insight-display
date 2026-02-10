@@ -11,6 +11,9 @@ interface FaceCaptureProps {
   isStreaming: boolean;
   onCapture: (captures: FaceCaptureData[]) => void;
   requiredCaptures?: number;
+  onQualityChange?: (quality: FaceQuality | null) => void;
+  onCountdownChange?: (countdown: number | null) => void;
+  onModelLoad?: (loaded: boolean) => void;
 }
 
 export interface FaceCaptureData {
@@ -22,7 +25,7 @@ export interface FaceCaptureData {
   genderConfidence: number;
 }
 
-interface FaceQuality {
+export interface FaceQuality {
   score: number;
   isCentered: boolean;
   isFacingCamera: boolean;
@@ -34,7 +37,10 @@ export const FaceCapture = ({
   videoRef, 
   isStreaming, 
   onCapture, 
-  requiredCaptures = 3 
+  requiredCaptures = 3,
+  onQualityChange,
+  onCountdownChange,
+  onModelLoad
 }: FaceCaptureProps) => {
   const [captures, setCaptures] = useState<FaceCaptureData[]>([]);
   const [isDetecting, setIsDetecting] = useState(false);
@@ -42,7 +48,32 @@ export const FaceCapture = ({
   const [faceInfo, setFaceInfo] = useState<{ age: number; gender: string; confidence: number } | null>(null);
   const [isAutoCapturing, setIsAutoCapturing] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [modelLoaded, setModelLoaded] = useState(false);
+  const [modelError, setModelError] = useState(false);
   const captureCanvasRef = useRef<HTMLCanvasElement>(null);
+  const lastCaptureTimeRef = useRef<number>(0);
+
+  // Load models on mount
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        // Use CDN for consistency with useFaceDetection
+        const modelPath = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(modelPath),
+          faceapi.nets.faceLandmark68Net.loadFromUri(modelPath),
+          faceapi.nets.faceRecognitionNet.loadFromUri(modelPath),
+          faceapi.nets.ageGenderNet.loadFromUri(modelPath)
+        ]);
+        setModelLoaded(true);
+        onModelLoad?.(true);
+      } catch (error) {
+        console.error('Failed to load face-api models:', error);
+        setModelError(true);
+      }
+    };
+    loadModels();
+  }, [onModelLoad]);
 
   const analyzeFaceQuality = useCallback((
     detection: faceapi.WithFaceDescriptor<faceapi.WithFaceLandmarks<{ detection: faceapi.FaceDetection }, faceapi.FaceLandmarks68>>,
@@ -110,9 +141,19 @@ export const FaceCapture = ({
     };
   }, []);
 
+  // Notificar pai sobre mudanças de qualidade
+  useEffect(() => {
+    onQualityChange?.(currentQuality);
+  }, [currentQuality, onQualityChange]);
+
+  // Notificar pai sobre mudanças de countdown
+  useEffect(() => {
+    onCountdownChange?.(countdown);
+  }, [countdown, onCountdownChange]);
+
   // Detectar face continuamente
   useEffect(() => {
-    if (!isStreaming || !videoRef.current) {
+    if (!isStreaming || !videoRef.current || !modelLoaded) {
       setCurrentQuality(null);
       setFaceInfo(null);
       return;
@@ -181,10 +222,23 @@ export const FaceCapture = ({
       return;
     }
 
-    if (currentQuality.score >= 70 && countdown === null) {
-      setCountdown(3);
-    } else if (currentQuality.score < 60) {
+    const now = Date.now();
+    // Throttle captures (minimum 800ms between captures)
+    if (now - lastCaptureTimeRef.current < 800) return;
+
+    // Se qualidade perfeita (100%), capturar imediatamente
+    if (currentQuality.score >= 100) {
+      capturePhoto();
       setCountdown(null);
+      return;
+    }
+
+    // Se qualidade excelente, iniciar countdown curto para estabilização
+    // O usuário quer "Posicione e mantenha parado" -> "Perfeito" -> Captura
+    if (currentQuality.score >= 80 && countdown === null) {
+      setCountdown(2); // 2 segundos de estabilização
+    } else if (currentQuality.score < 60) {
+      setCountdown(null); // Reset se perder qualidade
     }
   }, [currentQuality, isAutoCapturing, captures.length, requiredCaptures, countdown]);
 
@@ -259,7 +313,7 @@ export const FaceCapture = ({
         const newCaptures = [...captures, newCapture];
         setCaptures(newCaptures);
 
-        if (newCaptures.length >= requiredCaptures) {
+        if (newCaptures.length >= requiredCaptures || quality.score >= 100) {
           setIsAutoCapturing(false);
           onCapture(newCaptures);
         }
@@ -300,85 +354,6 @@ export const FaceCapture = ({
     <div className="space-y-4">
       <canvas ref={captureCanvasRef} className="hidden" />
       
-      {/* Guia de posicionamento */}
-      <div className="relative">
-        <div className={cn(
-          "p-4 rounded-lg border-2 transition-colors",
-          currentQuality && currentQuality.score >= 70 
-            ? "border-green-500 bg-green-50 dark:bg-green-950" 
-            : currentQuality 
-              ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-950"
-              : "border-muted bg-muted/50"
-        )}>
-          {/* Indicadores de qualidade */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <User className="w-5 h-5" />
-              <span className="font-medium">Qualidade da Captura</span>
-            </div>
-            {currentQuality && (
-              <Badge variant="outline" className={getQualityColor(currentQuality.score)}>
-                {currentQuality.score >= 80 ? 'Excelente' : 
-                 currentQuality.score >= 60 ? 'Boa' : 'Melhore a posição'}
-              </Badge>
-            )}
-          </div>
-
-          {currentQuality ? (
-            <>
-              <Progress 
-                value={currentQuality.score} 
-                className={cn("h-2 mb-3", getQualityBgColor(currentQuality.score))}
-              />
-              
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className={cn("flex items-center gap-2", currentQuality.isCentered ? "text-green-600" : "text-muted-foreground")}>
-                  {currentQuality.isCentered ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-                  Face centralizada
-                </div>
-                <div className={cn("flex items-center gap-2", currentQuality.isFacingCamera ? "text-green-600" : "text-muted-foreground")}>
-                  {currentQuality.isFacingCamera ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-                  Olhando para frente
-                </div>
-                <div className={cn("flex items-center gap-2", currentQuality.hasGoodLighting ? "text-green-600" : "text-muted-foreground")}>
-                  {currentQuality.hasGoodLighting ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-                  Boa iluminação
-                </div>
-                <div className={cn("flex items-center gap-2", currentQuality.isCorrectSize ? "text-green-600" : "text-muted-foreground")}>
-                  {currentQuality.isCorrectSize ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-                  Tamanho adequado
-                </div>
-              </div>
-
-              {faceInfo && (
-                <div className="mt-3 pt-3 border-t flex items-center gap-4 text-sm">
-                  <Badge variant="secondary">{faceInfo.gender}</Badge>
-                  <Badge variant="secondary">~{faceInfo.age} anos</Badge>
-                  <span className="text-muted-foreground">
-                    Confiança: {(faceInfo.confidence * 100).toFixed(0)}%
-                  </span>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="text-center py-4 text-muted-foreground">
-              <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              <p>Posicione seu rosto na câmera</p>
-            </div>
-          )}
-        </div>
-
-        {/* Countdown overlay */}
-        {countdown !== null && countdown > 0 && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-lg">
-            <div className="text-center">
-              <div className="text-6xl font-bold text-primary animate-pulse">{countdown}</div>
-              <p className="text-muted-foreground mt-2">Capturando...</p>
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* Fotos capturadas */}
       <div>
         <div className="flex items-center justify-between mb-2">

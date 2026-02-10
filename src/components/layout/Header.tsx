@@ -43,7 +43,7 @@ const Header = () => {
   };
 
   return (
-    <header className="border-b border-border bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="border-b border-white/10 bg-black/40 backdrop-blur-md">
       <div className="flex h-16 items-center px-6 gap-4">
         <SidebarTrigger className="lg:hidden" />
 

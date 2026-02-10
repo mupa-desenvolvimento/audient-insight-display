@@ -66,7 +66,7 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen flex flex-col">
       {/* Header */}
       <header className="p-4 flex items-center justify-between">
         <Link to="/" className="flex items-center space-x-2 text-muted-foreground hover:text-foreground transition-colors">
@@ -78,7 +78,7 @@ export default function Auth() {
 
       {/* Login Form */}
       <div className="flex-1 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md animate-fade-in">
+        <Card className="w-full max-w-md animate-fade-in glass-effect border-white/10 bg-black/40">
           <CardHeader className="text-center space-y-4">
             <div className="flex justify-center">
               <img src={logoHorizontal} alt="MupaMídias" className="h-12" />

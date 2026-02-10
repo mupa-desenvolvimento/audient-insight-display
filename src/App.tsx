@@ -12,7 +12,6 @@ import Devices from "./pages/Devices";
 import Media from "./pages/Media";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
-import Player from "./pages/Player";
 import Index from "./pages/Index";
 import DevicePlayer from "./pages/DevicePlayer";
 import DeviceSetup from "./pages/DeviceSetup";
@@ -27,6 +26,7 @@ import MobileDemo from "./pages/MobileDemo";
 import Auth from "./pages/Auth";
 import CanvaCallback from "./pages/admin/CanvaCallback";
 import Stores from "./pages/admin/Stores";
+import StoresMap from "./pages/admin/StoresMap";
 import Regions from "./pages/admin/Regions";
 import Channels from "./pages/admin/Channels";
 import Playlists from "./pages/admin/Playlists";
@@ -74,7 +74,6 @@ function AppContent() {
           <Route path="/" element={<Index />} />
           <Route path="/install" element={<Install />} />
           <Route path="/auth" element={<Auth />} />
-          <Route path="/player" element={<Player />} />
           <Route path="/device/:deviceId" element={<DevicePlayer />} />
           <Route path="/setup/:deviceId" element={<DeviceSetup />} />
           <Route path="/detect/:deviceCode" element={<DeviceDetector />} />
@@ -89,12 +88,23 @@ function AppContent() {
           <Route path="/mobile-demo" element={<MobileDemo />} />
           {/* Canva OAuth callback - must be outside ProtectedRoute to handle redirect properly */}
           <Route path="/admin/canva/callback" element={<CanvaCallback />} />
+          
+          {/* Fullscreen Map Route - No Layout/Sidebar */}
+          <Route
+            path="/admin/stores/map"
+            element={
+              <ProtectedRoute>
+                <StoresMap />
+              </ProtectedRoute>
+            }
+          />
+
           <Route
             path="/admin/*"
             element={
               <ProtectedRoute>
                 <SidebarProvider>
-                  <div className="min-h-screen flex w-full bg-background">
+                  <div className="min-h-screen flex w-full bg-transparent">
                     <AppLayout>
                       <Routes>
                         <Route path="dashboard" element={<Dashboard />} />

@@ -71,7 +71,7 @@ const AppSidebar = () => {
   };
 
   return (
-    <Sidebar className="border-r border-border">
+    <Sidebar className="border-r border-white/10 bg-black/40 backdrop-blur-md" collapsible="icon">
       <SidebarHeader className="p-4">
         <div className="flex items-center justify-center">
           <img src={logoHorizontal} alt="MupaMídias" className="h-10" />
