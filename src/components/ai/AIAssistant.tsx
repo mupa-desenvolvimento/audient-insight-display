@@ -148,13 +148,12 @@ export const AIAssistant = () => {
               whileTap={{ scale: 0.9 }}
               className="absolute bottom-0 right-0"
             >
-              <Button
+              <button
                 onClick={() => setIsOpen(true)}
-                size="icon"
-                className="h-14 w-14 rounded-full shadow-xl bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
+                className="h-14 w-14 rounded-full shadow-xl overflow-hidden border-2 border-purple-500/50 hover:border-purple-400 transition-colors"
               >
-                <Sparkles className="h-7 w-7" />
-              </Button>
+                <img src={inkyAvatar} alt="Inky" className="w-full h-full object-cover" />
+              </button>
             </motion.div>
           )}
 
