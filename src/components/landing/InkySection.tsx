@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import inkyMascot from "@/assets/inky-mascot.png";
 
 interface Message {
   id: string;
@@ -120,7 +121,7 @@ export const InkySection = () => {
             transition={{ duration: 0.7 }}
           >
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/20 mb-6">
-              <span className="text-2xl">🐙</span>
+              <img src={inkyMascot} alt="Inky" className="w-6 h-6" />
               <span className="text-xs font-semibold text-cyan-300 tracking-wide uppercase">
                 Conheça o Inky
               </span>
@@ -145,9 +146,9 @@ export const InkySection = () => {
               <motion.div
                 animate={{ rotate: [0, -5, 5, 0] }}
                 transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-                className="text-8xl select-none"
+                className="select-none"
               >
-                🐙
+                <img src={inkyMascot} alt="Inky mascot" className="w-24 h-24" />
               </motion.div>
               <div className="space-y-2 pb-3">
                 {["Inteligente", "Rápido", "Simpático"].map((tag) => (
@@ -171,8 +172,8 @@ export const InkySection = () => {
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md shadow-2xl shadow-cyan-500/5 overflow-hidden flex flex-col" style={{ height: 480 }}>
               {/* Header */}
               <div className="px-5 py-4 border-b border-white/10 flex items-center gap-3 bg-white/[0.02]">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500/30 to-blue-600/30 border border-cyan-500/30 flex items-center justify-center text-xl">
-                  🐙
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500/30 to-blue-600/30 border border-cyan-500/30 flex items-center justify-center">
+                  <img src={inkyMascot} alt="Inky" className="w-6 h-6" />
                 </div>
                 <div>
                   <div className="text-sm font-bold text-white">Inky</div>
@@ -198,7 +199,7 @@ export const InkySection = () => {
                     >
                       {msg.role === "assistant" && (
                         <div className="w-7 h-7 rounded-full bg-cyan-500/20 border border-cyan-500/20 flex items-center justify-center text-sm mr-2 mt-1 shrink-0">
-                          🐙
+                          <img src={inkyMascot} alt="Inky" className="w-5 h-5" />
                         </div>
                       )}
                       <div
@@ -215,7 +216,7 @@ export const InkySection = () => {
                   {isLoading && (
                     <div className="flex justify-start">
                       <div className="w-7 h-7 rounded-full bg-cyan-500/20 border border-cyan-500/20 flex items-center justify-center text-sm mr-2 mt-1 shrink-0">
-                        🐙
+                        <img src={inkyMascot} alt="Inky" className="w-5 h-5" />
                       </div>
                       <div className="bg-white/[0.06] rounded-2xl rounded-tl-none px-4 py-3 border border-white/10 flex items-center gap-2">
                         <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
