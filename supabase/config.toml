@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.inky-landing]
 verify_jwt = false
+
+[functions.inky-insights]
+verify_jwt = false
