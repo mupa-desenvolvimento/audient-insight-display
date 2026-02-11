@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { PlansSection } from "@/components/landing/PlansSection";
+import { InkySection } from "@/components/landing/InkySection";
 import { LeadFormModal, LeadFormType } from "@/components/landing/LeadFormModal";
 import logoHorizontal from "@/assets/logo_horizontal.svg";
 import {
@@ -89,6 +90,9 @@ const Navbar = () => {
             <a href="#ai" className="hover:text-white transition-colors">
               Inteligência Artificial
             </a>
+            <a href="#inky" className="hover:text-white transition-colors">
+              Inky 🐙
+            </a>
             <a href="#analytics" className="hover:text-white transition-colors">
               Analytics
             </a>
@@ -116,6 +120,9 @@ const Navbar = () => {
                   </a>
                   <a href="#ai" className="text-xl font-medium hover:text-purple-400 transition-colors">
                     Inteligência Artificial
+                  </a>
+                  <a href="#inky" className="text-xl font-medium hover:text-cyan-400 transition-colors">
+                    Inky 🐙
                   </a>
                   <a href="#analytics" className="text-xl font-medium hover:text-purple-400 transition-colors">
                     Analytics
@@ -493,6 +500,7 @@ const Index = () => {
         <Hero />
         <Features />
         <AISection />
+        <InkySection />
         <PlansSection />
       </main>
 
