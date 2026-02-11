@@ -3,12 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Sparkles, Send, X, Minimize2, Maximize2, Bot, User, Loader2 } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Sparkles, Send, X, Minimize2, Maximize2, User, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
+import inkyAvatar from "@/assets/inky-avatar.png";
 
 interface Message {
   id: string;
@@ -175,11 +176,11 @@ export const AIAssistant = () => {
               <Card className="w-full h-full shadow-2xl border-purple-500/20 bg-background/95 backdrop-blur-md flex flex-col overflow-hidden">
                 <CardHeader className="p-4 border-b bg-muted/30 flex flex-row items-center justify-between space-y-0 shrink-0">
                   <div className="flex items-center gap-2">
-                    <div className="p-1.5 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                      <Bot className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                    <div className="w-8 h-8 rounded-full overflow-hidden border border-purple-500/30">
+                      <img src={inkyAvatar} alt="Inky" className="w-full h-full object-cover" />
                     </div>
                     <div>
-                      <CardTitle className="text-sm font-bold">MUPA AI</CardTitle>
+                      <CardTitle className="text-sm font-bold">Inky AI</CardTitle>
                       <p className="text-xs text-muted-foreground">
                         Assistente Inteligente
                       </p>
@@ -224,7 +225,8 @@ export const AIAssistant = () => {
                               }`}
                             >
                               {msg.role === "assistant" && (
-                                <Avatar className="h-8 w-8 mt-1 border border-purple-500/20">
+                                <Avatar className="h-8 w-8 mt-1 rounded-full overflow-hidden border border-purple-500/20">
+                                  <AvatarImage src={inkyAvatar} alt="Inky" className="object-cover" />
                                   <AvatarFallback className="bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-400">
                                     AI
                                   </AvatarFallback>
@@ -256,7 +258,8 @@ export const AIAssistant = () => {
                           ))}
                           {isLoading && (
                             <div className="flex gap-3 justify-start">
-                              <Avatar className="h-8 w-8 mt-1 border border-purple-500/20">
+                              <Avatar className="h-8 w-8 mt-1 rounded-full overflow-hidden border border-purple-500/20">
+                                <AvatarImage src={inkyAvatar} alt="Inky" className="object-cover" />
                                 <AvatarFallback className="bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-400">
                                   AI
                                 </AvatarFallback>
