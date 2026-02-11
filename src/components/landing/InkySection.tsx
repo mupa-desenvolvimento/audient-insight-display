@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import inkyMascot from "@/assets/inky-mascot.png";
+import inkyMascot from "@/assets/inky-mascot.svg";
 
 interface Message {
   id: string;
