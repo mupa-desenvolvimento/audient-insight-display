@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.import-product-catalog]
 verify_jwt = false
+
+[functions.ai-assistant]
+verify_jwt = false
