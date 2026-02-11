@@ -122,7 +122,7 @@ export const InkySection = () => {
             transition={{ duration: 0.7 }}
           >
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/20 mb-6">
-              <img src={inkyMascot} alt="Inky" className="w-6 h-6" />
+              <img src={inkyAvatar} alt="Inky" className="w-6 h-6 rounded-full object-cover" />
               <span className="text-xs font-semibold text-cyan-300 tracking-wide uppercase">
                 Conheça o Inky
               </span>
