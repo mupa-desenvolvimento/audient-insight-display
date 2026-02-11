@@ -135,14 +135,17 @@ export const AIAssistant = () => {
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end pointer-events-none">
       <div className="pointer-events-auto">
-        <AnimatePresence mode="wait">
+        <AnimatePresence>
           {!isOpen && (
             <motion.div
+              key="fab-button"
               initial={{ scale: 0, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0, opacity: 0 }}
+              transition={{ duration: 0.15 }}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
+              className="absolute bottom-0 right-0"
             >
               <Button
                 onClick={() => setIsOpen(true)}
@@ -156,6 +159,7 @@ export const AIAssistant = () => {
 
           {isOpen && (
             <motion.div
+              key="chat-panel"
               initial={{ opacity: 0, y: 20, scale: 0.95 }}
               animate={{
                 opacity: 1,
