@@ -8,17 +8,13 @@ import {
   BarChart3, 
   Brain, 
   ArrowRight,
-  Calendar,
-  Wifi,
-  Users,
-  Layers,
-  ShoppingBag,
-  TrendingUp,
-  Target,
-  LucideIcon
+  LucideIcon,
+  Scale
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { LeadFormModal, LeadFormType } from "./LeadFormModal";
+import { PlansComparisonModal } from "./PlansComparisonModal";
 
 // Types for Plan Data
 interface PlanFeature {
@@ -43,7 +39,7 @@ const plans: Plan[] = [
     theme: "green",
     tagline: "Controle total. Simples. Escalável.",
     description: "Gerencie todas as telas da sua rede com máxima performance, organização hierárquica e estabilidade offline.",
-    buttonText: "Solicitar proposta Flow",
+    buttonText: "Quero organizar minhas telas",
     details: [
       {
         title: "Distribuição e Gestão",
@@ -84,7 +80,7 @@ const plans: Plan[] = [
     theme: "blue",
     tagline: "Dados reais. Decisões inteligentes.",
     description: "Descubra quem olha para suas telas, quais produtos despertam interesse e quais campanhas realmente performam.",
-    buttonText: "Solicitar proposta Insight",
+    buttonText: "Quero entender meu público",
     details: [
       {
         title: "Inclui tudo do Flow +",
@@ -133,7 +129,7 @@ const plans: Plan[] = [
     theme: "purple",
     tagline: "Personalização em tempo real. Monetização de audiência.",
     description: "Transforme cada tela em um ativo estratégico de vendas com personalização dinâmica e inteligência artificial.",
-    buttonText: "Solicitar proposta Impact",
+    buttonText: "Quero transformar minhas telas em ativo estratégico",
     details: [
       {
         title: "Inclui tudo do Insight +",
@@ -192,7 +188,7 @@ const plans: Plan[] = [
   }
 ];
 
-const PlanCard = ({ plan }: { plan: Plan }) => {
+const PlanCard = ({ plan, onAction }: { plan: Plan; onAction: () => void }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const themeColors = {
@@ -201,10 +197,10 @@ const PlanCard = ({ plan }: { plan: Plan }) => {
     purple: "from-purple-500 to-pink-700 border-purple-500/30 hover:border-purple-500/60 text-purple-400 bg-purple-500/10"
   };
 
-  const buttonGradients = {
-    green: "bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500",
-    blue: "bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500",
-    purple: "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500"
+  const buttonStyles: Record<string, string> = {
+    flow: "bg-zinc-800 hover:bg-zinc-700 text-white border border-white/10 shadow-sm",
+    insight: "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-900/20 border-0",
+    impact: "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-xl shadow-purple-500/30 border-0 font-bold tracking-wide"
   };
 
   const iconMap: Record<string, LucideIcon> = {
@@ -224,7 +220,8 @@ const PlanCard = ({ plan }: { plan: Plan }) => {
         isExpanded ? "ring-2 ring-offset-0 ring-offset-transparent ring-opacity-50 z-20" : "hover:border-opacity-50 z-10",
         plan.theme === "green" && isExpanded && "ring-green-500",
         plan.theme === "blue" && isExpanded && "ring-blue-500",
-        plan.theme === "purple" && isExpanded && "ring-purple-500"
+        plan.theme === "purple" && isExpanded && "ring-purple-500",
+        plan.id === "impact" && !isExpanded && "border-purple-500/40 shadow-purple-900/10 shadow-2xl"
       )}
     >
       {/* Top Gradient Line */}
@@ -261,7 +258,10 @@ const PlanCard = ({ plan }: { plan: Plan }) => {
           </Button>
 
           {!isExpanded && (
-            <Button className={cn("w-full text-white font-medium border-0 shadow-lg", buttonGradients[plan.theme])}>
+            <Button 
+              className={cn("w-full text-white font-medium", buttonStyles[plan.id])}
+              onClick={onAction}
+            >
               {plan.buttonText}
             </Button>
           )}
@@ -298,7 +298,10 @@ const PlanCard = ({ plan }: { plan: Plan }) => {
                   </div>
                 ))}
 
-                <Button className={cn("w-full h-12 text-lg font-medium text-white border-0 shadow-xl mt-4", buttonGradients[plan.theme])}>
+                <Button 
+                  className={cn("w-full h-12 text-lg font-medium text-white mt-4", buttonStyles[plan.id])}
+                  onClick={onAction}
+                >
                   {plan.buttonText}
                   <ArrowRight className="w-5 h-5 ml-2" />
                 </Button>
@@ -312,8 +315,33 @@ const PlanCard = ({ plan }: { plan: Plan }) => {
 };
 
 export const PlansSection = () => {
+  const [leadFormType, setLeadFormType] = useState<LeadFormType | null>(null);
+  const [isComparisonOpen, setIsComparisonOpen] = useState(false);
+
+  const handlePlanAction = (planId: string) => {
+    // Map plan IDs to form types
+    if (planId === "flow") setLeadFormType("flow");
+    if (planId === "insight") setLeadFormType("insight");
+    if (planId === "impact") setLeadFormType("impact");
+  };
+
   return (
     <section className="py-24 bg-black relative overflow-hidden" id="plans">
+      <LeadFormModal 
+        isOpen={!!leadFormType} 
+        onClose={() => setLeadFormType(null)} 
+        type={leadFormType || "general"} 
+      />
+      
+      <PlansComparisonModal 
+        isOpen={isComparisonOpen} 
+        onClose={() => setIsComparisonOpen(false)}
+        onSelectPlan={(plan) => {
+          setIsComparisonOpen(false);
+          setLeadFormType(plan);
+        }}
+      />
+
       {/* Background Elements */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(120,0,255,0.05),transparent_70%)]" />
       
@@ -348,9 +376,30 @@ export const PlansSection = () => {
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
             >
-              <PlanCard plan={plan} />
+              <PlanCard plan={plan} onAction={() => handlePlanAction(plan.id)} />
             </motion.div>
           ))}
+        </div>
+
+        {/* Intermediate CTA - Comparison */}
+        <div className="text-center mb-32">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="inline-flex flex-col items-center gap-4"
+          >
+            <h3 className="text-2xl text-gray-300 font-medium">Ainda não sabe qual plano escolher?</h3>
+            <Button 
+              variant="outline" 
+              size="lg"
+              onClick={() => setIsComparisonOpen(true)}
+              className="h-14 px-8 text-lg rounded-full border-white/20 hover:bg-white/10 text-white gap-2"
+            >
+              <Scale className="w-5 h-5" />
+              Comparar planos
+            </Button>
+          </motion.div>
         </div>
 
         {/* Bottom CTA Block */}
@@ -372,20 +421,22 @@ export const PlansSection = () => {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button 
-                size="lg" 
-                className="h-14 px-8 text-lg rounded-full bg-white text-black hover:bg-gray-200 transition-colors"
-              >
-                Falar com especialista
-              </Button>
-              <Button 
-                size="lg" 
-                variant="outline" 
-                className="h-14 px-8 text-lg rounded-full border-white/20 hover:bg-white/10 text-white"
-              >
-                Agendar demonstração
-              </Button>
-            </div>
+                      <Button 
+                        size="lg" 
+                        onClick={() => setLeadFormType("general")}
+                        className="h-14 px-8 text-lg rounded-full bg-white text-black hover:bg-gray-200 transition-colors"
+                      >
+                        Falar com especialista Mupa
+                      </Button>
+                      <Button 
+                        size="lg" 
+                        variant="outline" 
+                        onClick={() => setLeadFormType("demo")}
+                        className="h-14 px-8 text-lg rounded-full border-white/20 hover:bg-white/10 text-white"
+                      >
+                        Agendar reunião executiva
+                      </Button>
+                    </div>
           </div>
         </motion.div>
       </div>

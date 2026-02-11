@@ -1,9 +1,10 @@
-import { useRef } from "react";
+import { useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { motion, useScroll, useTransform, useInView } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { PlansSection } from "@/components/landing/PlansSection";
+import { LeadFormModal, LeadFormType } from "@/components/landing/LeadFormModal";
 import logoHorizontal from "@/assets/logo_horizontal.svg";
 import {
   Monitor,
@@ -103,8 +104,15 @@ const Navbar = () => {
 };
 
 const Hero = () => {
+  const [leadFormType, setLeadFormType] = useState<LeadFormType | null>(null);
+
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
+      <LeadFormModal 
+        isOpen={!!leadFormType} 
+        onClose={() => setLeadFormType(null)} 
+        type={leadFormType || "general"} 
+      />
       {/* Background Elements */}
       <div className="absolute inset-0 bg-black">
         <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_0%,rgba(120,0,255,0.2),transparent_50%)]" />
@@ -140,25 +148,23 @@ const Hero = () => {
           </motion.p>
 
           <motion.div variants={itemVariants} className="flex flex-col sm:flex-row gap-4">
-            <Link to="/auth">
-              <Button
-                size="lg"
-                className="h-14 px-8 text-lg rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 border-0 shadow-lg shadow-purple-500/20"
-              >
-                <Zap className="mr-2 h-5 w-5 fill-current" />
-                Começar Agora
-              </Button>
-            </Link>
-            <Link to="/demo">
-              <Button
-                size="lg"
-                variant="outline"
-                className="h-14 px-8 text-lg rounded-full border-white/20 bg-white/5 hover:bg-white/10 text-white backdrop-blur-sm"
-              >
-                <Play className="mr-2 h-5 w-5" />
-                Ver Demo
-              </Button>
-            </Link>
+            <Button
+              size="lg"
+              onClick={() => setLeadFormType("general")}
+              className="h-14 px-8 text-lg rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 border-0 shadow-lg shadow-purple-500/20"
+            >
+              <Zap className="mr-2 h-5 w-5 fill-current" />
+              Solicitar diagnóstico da minha operação
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => setLeadFormType("demo")}
+              className="h-14 px-8 text-lg rounded-full border-white/20 bg-white/5 hover:bg-white/10 text-white backdrop-blur-sm"
+            >
+              <Play className="mr-2 h-5 w-5" />
+              Agendar demonstração estratégica
+            </Button>
           </motion.div>
 
           {null}
@@ -455,40 +461,7 @@ const AISection = () => {
   );
 };
 
-const CTA = () => {
-  return (
-    <section className="py-32 relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-b from-black to-purple-950/20" />
-      <div className="container mx-auto px-6 relative z-10 text-center">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          className="max-w-3xl mx-auto"
-        >
-          <h2 className="text-4xl md:text-6xl font-bold text-white mb-8">
-            Pronto para revolucionar <br /> suas telas?
-          </h2>
-          <p className="text-xl text-gray-400 mb-10">
-            Junte-se a mais de 500 empresas que já transformaram a experiência de seus clientes com a MUPA.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/auth">
-              <Button
-                size="lg"
-                className="h-16 px-10 text-xl rounded-full bg-white text-black hover:bg-gray-200 transition-all transform hover:scale-105"
-              >
-                Criar Conta Grátis
-                <ArrowRight className="ml-2 w-5 h-5" />
-              </Button>
-            </Link>
-          </div>
-          <p className="mt-6 text-sm text-gray-500">Teste grátis por 14 dias. Sem compromisso.</p>
-        </motion.div>
-      </div>
-    </section>
-  );
-};
+
 
 const Index = () => {
   return (
@@ -499,7 +472,6 @@ const Index = () => {
         <Features />
         <AISection />
         <PlansSection />
-        <CTA />
       </main>
 
       <footer className="py-12 border-t border-white/10 bg-black">
