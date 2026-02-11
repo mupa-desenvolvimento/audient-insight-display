@@ -8,11 +8,13 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useState } from "react";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { useState, useMemo } from "react";
+import { CheckCircle2, Loader2, ArrowRight, ArrowLeft, Building2, User, HelpCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
 
-export type LeadFormType = "general" | "flow" | "insight" | "impact" | "demo";
+export type LeadFormType = "general" | "lite" | "flow" | "insight" | "impact" | "demo";
 
 interface LeadFormModalProps {
   isOpen: boolean;
@@ -30,7 +32,7 @@ const baseSchema = {
 const formConfigs = {
   general: {
     title: "Solicitar Diagnóstico",
-    subtitle: "Analise a maturidade da sua operação de Digital Signage.",
+    subtitle: "Vamos analisar a maturidade da sua operação de Digital Signage.",
     fields: ["jobTitle", "stores", "hasTerminals", "hasCameras", "phone"],
     schema: z.object({
       ...baseSchema,
@@ -43,7 +45,7 @@ const formConfigs = {
   },
   demo: {
     title: "Agendar Demonstração",
-    subtitle: "Veja como a Mupa pode transformar sua operação.",
+    subtitle: "Veja na prática como a Mupa pode transformar sua operação.",
     fields: ["jobTitle", "stores", "hasTerminals", "hasCameras", "phone"],
     schema: z.object({
       ...baseSchema,
@@ -54,9 +56,20 @@ const formConfigs = {
       phone: z.string().min(10, "Telefone inválido"),
     })
   },
+  lite: {
+    title: "Proposta Mupa Lite",
+    subtitle: "Solução offline ideal para estabilidade e baixo custo.",
+    fields: ["stores", "phone", "city"],
+    schema: z.object({
+      ...baseSchema,
+      stores: z.string().min(1, "Número de lojas é obrigatório"),
+      phone: z.string().min(10, "Telefone inválido"),
+      city: z.string().min(2, "Cidade é obrigatória"),
+    })
+  },
   flow: {
-    title: "Mupa Flow - Organização e Controle",
-    subtitle: "Ideal para redes que querem controle e performance com simplicidade.",
+    title: "Mupa Flow",
+    subtitle: "Organização e controle para sua rede.",
     fields: ["screens", "city"],
     schema: z.object({
       ...baseSchema,
@@ -65,8 +78,8 @@ const formConfigs = {
     })
   },
   insight: {
-    title: "Mupa Insight - Inteligência de Dados",
-    subtitle: "Descubra quem olha para suas telas e quais produtos realmente despertam interesse.",
+    title: "Mupa Insight",
+    subtitle: "Inteligência de dados para sua audiência.",
     fields: ["stores", "hasTerminals", "wantAudienceAnalysis", "phone"],
     schema: z.object({
       ...baseSchema,
@@ -77,8 +90,8 @@ const formConfigs = {
     })
   },
   impact: {
-    title: "Mupa Impact - Estratégia e Monetização",
-    subtitle: "Indicado para redes que querem personalização, IA e monetização de audiência.",
+    title: "Mupa Impact",
+    subtitle: "Estratégia e monetização para grandes redes.",
     fields: ["stores", "hasLoyalty", "hasTradeMarketing", "wantMonetize", "phone"],
     schema: z.object({
       ...baseSchema,
@@ -94,6 +107,8 @@ const formConfigs = {
 export function LeadFormModal({ isOpen, onClose, type }: LeadFormModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const navigate = useNavigate();
 
   const config = formConfigs[type];
   const form = useForm({
@@ -108,6 +123,53 @@ export function LeadFormModal({ isOpen, onClose, type }: LeadFormModalProps) {
     }
   });
 
+  // Calculate steps based on fields
+  const steps = useMemo(() => {
+    const s = [
+      {
+        id: "contact",
+        title: "Vamos começar",
+        icon: User,
+        fields: ["name", "email", "phone", "jobTitle"].filter(f => 
+          ["name", "email"].includes(f) || config.fields.includes(f)
+        )
+      },
+      {
+        id: "company",
+        title: "Sobre a Empresa",
+        icon: Building2,
+        fields: ["company", "city", "stores", "screens"].filter(f => 
+          ["company"].includes(f) || config.fields.includes(f)
+        )
+      },
+      {
+        id: "details",
+        title: "Últimos Detalhes",
+        icon: HelpCircle,
+        fields: config.fields.filter(f => 
+          !["name", "email", "phone", "jobTitle", "company", "city", "stores", "screens"].includes(f)
+        )
+      }
+    ];
+    return s.filter(step => step.fields.length > 0);
+  }, [config.fields]);
+
+  const currentStepData = steps[currentStep];
+  const isLastStep = currentStep === steps.length - 1;
+
+  const handleNext = async () => {
+    const fields = currentStepData.fields;
+    const isValid = await form.trigger(fields as any);
+    
+    if (isValid) {
+      setCurrentStep(prev => Math.min(prev + 1, steps.length - 1));
+    }
+  };
+
+  const handleBack = () => {
+    setCurrentStep(prev => Math.max(prev - 1, 0));
+  };
+
   const onSubmit = async (data: any) => {
     setIsSubmitting(true);
     // Simulate API call
@@ -115,403 +177,344 @@ export function LeadFormModal({ isOpen, onClose, type }: LeadFormModalProps) {
     console.log("Form submitted:", { type, data });
     setIsSubmitting(false);
     setIsSuccess(true);
-    // Reset form after 2 seconds and close
+    
+    // Redirect logic
     setTimeout(() => {
       setIsSuccess(false);
       onClose();
       form.reset();
-    }, 3000);
+      setCurrentStep(0);
+      
+      // Navigate to demo if applicable
+      if (type === 'demo' || type === 'general') {
+        navigate('/demo');
+      }
+    }, 1500);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] bg-zinc-950 border-zinc-800 text-white max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px] bg-zinc-950 border-zinc-800 text-white max-h-[90vh] overflow-y-auto p-0 gap-0">
         <AnimatePresence mode="wait">
           {isSuccess ? (
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="flex flex-col items-center justify-center py-10 text-center space-y-4"
+              className="flex flex-col items-center justify-center py-16 text-center space-y-6 p-6"
             >
-              <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center">
-                <CheckCircle2 className="w-8 h-8 text-green-500" />
+              <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center">
+                <CheckCircle2 className="w-10 h-10 text-green-500" />
               </div>
-              <h3 className="text-2xl font-bold">Solicitação Recebida!</h3>
-              <p className="text-gray-400">
-                Recebemos sua solicitação. Nossa equipe estratégica entrará em contato em breve.
-              </p>
+              <div className="space-y-2">
+                <h3 className="text-3xl font-bold">Tudo Pronto!</h3>
+                <p className="text-gray-400 text-lg">
+                  {type === 'demo' 
+                    ? "Redirecionando para a demonstração..." 
+                    : "Recebemos suas informações com sucesso."}
+                </p>
+              </div>
             </motion.div>
           ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <DialogHeader className="mb-6">
-                <DialogTitle className="text-2xl font-bold">{config.title}</DialogTitle>
+            <div className="flex flex-col h-full min-h-[500px]">
+              {/* Header */}
+              <div className="p-6 border-b border-zinc-800 bg-zinc-900/30">
+                <div className="flex items-center justify-between mb-4">
+                  <DialogTitle className="text-2xl font-bold">{config.title}</DialogTitle>
+                  <span className="text-sm font-medium text-zinc-500 bg-zinc-900 px-3 py-1 rounded-full border border-zinc-800">
+                    Passo {currentStep + 1} de {steps.length}
+                  </span>
+                </div>
                 <DialogDescription className="text-gray-400 text-base">
                   {config.subtitle}
                 </DialogDescription>
-              </DialogHeader>
-
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nome Completo</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Seu nome" className="bg-zinc-900 border-zinc-800" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                
+                {/* Progress Bar */}
+                <div className="w-full h-1.5 bg-zinc-900 mt-6 rounded-full overflow-hidden">
+                  <motion.div 
+                    className="h-full bg-gradient-to-r from-blue-500 to-purple-500"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
+                    transition={{ duration: 0.4, ease: "easeInOut" }}
                   />
+                </div>
+              </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="company"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Empresa</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Nome da empresa" className="bg-zinc-900 border-zinc-800" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                     {config.fields.includes("jobTitle") && (
-                      <FormField
-                        control={form.control}
-                        name="jobTitle"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Cargo</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Seu cargo" className="bg-zinc-900 border-zinc-800" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )}
-                     {config.fields.includes("city") && (
-                      <FormField
-                        control={form.control}
-                        name="city"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Cidade</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Sua cidade" className="bg-zinc-900 border-zinc-800" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )}
-                  </div>
+              {/* Form Body */}
+              <div className="flex-1 p-6 overflow-y-auto">
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                    <motion.div
+                      key={currentStep}
+                      initial={{ x: 20, opacity: 0 }}
+                      animate={{ x: 0, opacity: 1 }}
+                      exit={{ x: -20, opacity: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="space-y-6"
+                    >
+                      <div className="flex items-center gap-3 text-xl font-semibold text-white mb-6">
+                        {currentStepData.icon && <currentStepData.icon className="w-6 h-6 text-purple-400" />}
+                        {currentStepData.title}
+                      </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email Corporativo</FormLabel>
-                          <FormControl>
-                            <Input placeholder="seu@email.com" type="email" className="bg-zinc-900 border-zinc-800" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    {config.fields.includes("phone") && (
-                      <FormField
-                        control={form.control}
-                        name="phone"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Telefone / WhatsApp</FormLabel>
-                            <FormControl>
-                              <Input placeholder="(00) 00000-0000" className="bg-zinc-900 border-zinc-800" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )}
-                  </div>
+                      {currentStepData.fields.map((fieldName) => (
+                        <div key={fieldName}>
+                          {/* Name Field */}
+                          {fieldName === "name" && (
+                            <FormField
+                              control={form.control}
+                              name="name"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-base">Qual seu nome completo?</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="Ex: João Silva" className="bg-zinc-900 border-zinc-800 h-12 text-lg" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
 
-                  {config.fields.includes("stores") && (
-                    <FormField
-                      control={form.control}
-                      name="stores"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Número de Lojas</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger className="bg-zinc-900 border-zinc-800">
-                                <SelectValue placeholder="Selecione..." />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="1-5">1 a 5</SelectItem>
-                              <SelectItem value="6-20">6 a 20</SelectItem>
-                              <SelectItem value="21-50">21 a 50</SelectItem>
-                              <SelectItem value="51+">Mais de 50</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
+                          {/* Email Field */}
+                          {fieldName === "email" && (
+                            <FormField
+                              control={form.control}
+                              name="email"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-base">Seu melhor email corporativo</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="nome@empresa.com" type="email" className="bg-zinc-900 border-zinc-800 h-12 text-lg" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
 
-                  {config.fields.includes("screens") && (
-                    <FormField
-                      control={form.control}
-                      name="screens"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Número de Telas</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger className="bg-zinc-900 border-zinc-800">
-                                <SelectValue placeholder="Selecione..." />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="1-10">1 a 10</SelectItem>
-                              <SelectItem value="11-50">11 a 50</SelectItem>
-                              <SelectItem value="51-200">51 a 200</SelectItem>
-                              <SelectItem value="200+">Mais de 200</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
+                          {/* Phone Field */}
+                          {fieldName === "phone" && (
+                            <FormField
+                              control={form.control}
+                              name="phone"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-base">WhatsApp ou Telefone</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="(00) 00000-0000" className="bg-zinc-900 border-zinc-800 h-12 text-lg" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
 
-                  {/* Yes/No Questions */}
-                  {config.fields.includes("hasTerminals") && (
-                    <FormField
-                      control={form.control}
-                      name="hasTerminals"
-                      render={({ field }) => (
-                        <FormItem className="space-y-3">
-                          <FormLabel>Possui terminais de consulta?</FormLabel>
-                          <FormControl>
-                            <RadioGroup
-                              onValueChange={field.onChange}
-                              defaultValue={field.value}
-                              className="flex space-x-4"
-                            >
-                              <FormItem className="flex items-center space-x-2 space-y-0">
-                                <FormControl>
-                                  <RadioGroupItem value="yes" />
-                                </FormControl>
-                                <FormLabel className="font-normal">Sim</FormLabel>
-                              </FormItem>
-                              <FormItem className="flex items-center space-x-2 space-y-0">
-                                <FormControl>
-                                  <RadioGroupItem value="no" />
-                                </FormControl>
-                                <FormLabel className="font-normal">Não</FormLabel>
-                              </FormItem>
-                            </RadioGroup>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
+                          {/* Job Title Field */}
+                          {fieldName === "jobTitle" && (
+                            <FormField
+                              control={form.control}
+                              name="jobTitle"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-base">Qual seu cargo atual?</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="Ex: Gerente de Marketing" className="bg-zinc-900 border-zinc-800 h-12 text-lg" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
 
-                  {config.fields.includes("hasCameras") && (
-                    <FormField
-                      control={form.control}
-                      name="hasCameras"
-                      render={({ field }) => (
-                        <FormItem className="space-y-3">
-                          <FormLabel>Utiliza câmeras nas telas?</FormLabel>
-                          <FormControl>
-                            <RadioGroup
-                              onValueChange={field.onChange}
-                              defaultValue={field.value}
-                              className="flex space-x-4"
-                            >
-                              <FormItem className="flex items-center space-x-2 space-y-0">
-                                <FormControl>
-                                  <RadioGroupItem value="yes" />
-                                </FormControl>
-                                <FormLabel className="font-normal">Sim</FormLabel>
-                              </FormItem>
-                              <FormItem className="flex items-center space-x-2 space-y-0">
-                                <FormControl>
-                                  <RadioGroupItem value="no" />
-                                </FormControl>
-                                <FormLabel className="font-normal">Não</FormLabel>
-                              </FormItem>
-                            </RadioGroup>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
+                          {/* Company Field */}
+                          {fieldName === "company" && (
+                            <FormField
+                              control={form.control}
+                              name="company"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-base">Nome da Empresa</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="Ex: Minha Loja Ltda" className="bg-zinc-900 border-zinc-800 h-12 text-lg" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
 
-                  {config.fields.includes("wantAudienceAnalysis") && (
-                    <FormField
-                      control={form.control}
-                      name="wantAudienceAnalysis"
-                      render={({ field }) => (
-                        <FormItem className="space-y-3">
-                          <FormLabel>Deseja análise de audiência?</FormLabel>
-                          <FormControl>
-                            <RadioGroup
-                              onValueChange={field.onChange}
-                              defaultValue={field.value}
-                              className="flex space-x-4"
-                            >
-                              <FormItem className="flex items-center space-x-2 space-y-0">
-                                <FormControl>
-                                  <RadioGroupItem value="yes" />
-                                </FormControl>
-                                <FormLabel className="font-normal">Sim</FormLabel>
-                              </FormItem>
-                              <FormItem className="flex items-center space-x-2 space-y-0">
-                                <FormControl>
-                                  <RadioGroupItem value="no" />
-                                </FormControl>
-                                <FormLabel className="font-normal">Não</FormLabel>
-                              </FormItem>
-                            </RadioGroup>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
+                          {/* City Field */}
+                          {fieldName === "city" && (
+                            <FormField
+                              control={form.control}
+                              name="city"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-base">Em qual cidade está a matriz?</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="Cidade - UF" className="bg-zinc-900 border-zinc-800 h-12 text-lg" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
 
-                  {config.fields.includes("hasLoyalty") && (
-                    <FormField
-                      control={form.control}
-                      name="hasLoyalty"
-                      render={({ field }) => (
-                        <FormItem className="space-y-3">
-                          <FormLabel>Possui programa de fidelidade?</FormLabel>
-                          <FormControl>
-                            <RadioGroup
-                              onValueChange={field.onChange}
-                              defaultValue={field.value}
-                              className="flex space-x-4"
-                            >
-                              <FormItem className="flex items-center space-x-2 space-y-0">
-                                <FormControl>
-                                  <RadioGroupItem value="yes" />
-                                </FormControl>
-                                <FormLabel className="font-normal">Sim</FormLabel>
-                              </FormItem>
-                              <FormItem className="flex items-center space-x-2 space-y-0">
-                                <FormControl>
-                                  <RadioGroupItem value="no" />
-                                </FormControl>
-                                <FormLabel className="font-normal">Não</FormLabel>
-                              </FormItem>
-                            </RadioGroup>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
+                          {/* Stores Field */}
+                          {fieldName === "stores" && (
+                            <FormField
+                              control={form.control}
+                              name="stores"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-base">Quantas lojas a rede possui?</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger className="bg-zinc-900 border-zinc-800 h-12 text-lg">
+                                        <SelectValue placeholder="Selecione uma opção" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="1-5">1 a 5 lojas</SelectItem>
+                                      <SelectItem value="6-20">6 a 20 lojas</SelectItem>
+                                      <SelectItem value="21-50">21 a 50 lojas</SelectItem>
+                                      <SelectItem value="51+">Mais de 50 lojas</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
 
-                  {config.fields.includes("hasTradeMarketing") && (
-                    <FormField
-                      control={form.control}
-                      name="hasTradeMarketing"
-                      render={({ field }) => (
-                        <FormItem className="space-y-3">
-                          <FormLabel>Trabalha com Trade Marketing estruturado?</FormLabel>
-                          <FormControl>
-                            <RadioGroup
-                              onValueChange={field.onChange}
-                              defaultValue={field.value}
-                              className="flex space-x-4"
-                            >
-                              <FormItem className="flex items-center space-x-2 space-y-0">
-                                <FormControl>
-                                  <RadioGroupItem value="yes" />
-                                </FormControl>
-                                <FormLabel className="font-normal">Sim</FormLabel>
-                              </FormItem>
-                              <FormItem className="flex items-center space-x-2 space-y-0">
-                                <FormControl>
-                                  <RadioGroupItem value="no" />
-                                </FormControl>
-                                <FormLabel className="font-normal">Não</FormLabel>
-                              </FormItem>
-                            </RadioGroup>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
+                          {/* Screens Field */}
+                          {fieldName === "screens" && (
+                            <FormField
+                              control={form.control}
+                              name="screens"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-base">Quantas telas você gerencia hoje?</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger className="bg-zinc-900 border-zinc-800 h-12 text-lg">
+                                        <SelectValue placeholder="Selecione uma opção" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="1-10">1 a 10 telas</SelectItem>
+                                      <SelectItem value="11-50">11 a 50 telas</SelectItem>
+                                      <SelectItem value="51-200">51 a 200 telas</SelectItem>
+                                      <SelectItem value="200+">Mais de 200 telas</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
 
-                  {config.fields.includes("wantMonetize") && (
-                    <FormField
-                      control={form.control}
-                      name="wantMonetize"
-                      render={({ field }) => (
-                        <FormItem className="space-y-3">
-                          <FormLabel>Deseja monetizar espaço de tela?</FormLabel>
-                          <FormControl>
-                            <RadioGroup
-                              onValueChange={field.onChange}
-                              defaultValue={field.value}
-                              className="flex space-x-4"
-                            >
-                              <FormItem className="flex items-center space-x-2 space-y-0">
-                                <FormControl>
-                                  <RadioGroupItem value="yes" />
-                                </FormControl>
-                                <FormLabel className="font-normal">Sim</FormLabel>
-                              </FormItem>
-                              <FormItem className="flex items-center space-x-2 space-y-0">
-                                <FormControl>
-                                  <RadioGroupItem value="no" />
-                                </FormControl>
-                                <FormLabel className="font-normal">Não</FormLabel>
-                              </FormItem>
-                            </RadioGroup>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
+                          {/* Boolean Fields (Yes/No) - Modern Card Style */}
+                          {["hasTerminals", "hasCameras", "wantAudienceAnalysis", "hasLoyalty", "hasTradeMarketing", "wantMonetize"].includes(fieldName) && (
+                            <FormField
+                              control={form.control}
+                              name={fieldName as any}
+                              render={({ field }) => (
+                                <FormItem className="space-y-4 pt-2">
+                                  <FormLabel className="text-lg font-medium">
+                                    {fieldName === "hasTerminals" && "Você já possui terminais de consulta?"}
+                                    {fieldName === "hasCameras" && "Utiliza câmeras ou sensores nas telas?"}
+                                    {fieldName === "wantAudienceAnalysis" && "Tem interesse em análise de audiência?"}
+                                    {fieldName === "hasLoyalty" && "A empresa possui programa de fidelidade?"}
+                                    {fieldName === "hasTradeMarketing" && "Vocês trabalham com verba de Trade Marketing?"}
+                                    {fieldName === "wantMonetize" && "Deseja gerar receita com anúncios nas telas?"}
+                                  </FormLabel>
+                                  <FormControl>
+                                    <RadioGroup
+                                      onValueChange={field.onChange}
+                                      defaultValue={field.value}
+                                      className="grid grid-cols-2 gap-4"
+                                    >
+                                      <FormItem>
+                                        <FormControl>
+                                          <RadioGroupItem value="yes" id={`${fieldName}-yes`} className="peer sr-only" />
+                                        </FormControl>
+                                        <Label
+                                          htmlFor={`${fieldName}-yes`}
+                                          className="flex flex-col items-center justify-center p-4 rounded-xl border-2 border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800 hover:border-zinc-700 peer-data-[state=checked]:border-purple-500 peer-data-[state=checked]:bg-purple-500/10 cursor-pointer transition-all duration-200"
+                                        >
+                                          <span className="text-lg font-bold">Sim</span>
+                                        </Label>
+                                      </FormItem>
+                                      <FormItem>
+                                        <FormControl>
+                                          <RadioGroupItem value="no" id={`${fieldName}-no`} className="peer sr-only" />
+                                        </FormControl>
+                                        <Label
+                                          htmlFor={`${fieldName}-no`}
+                                          className="flex flex-col items-center justify-center p-4 rounded-xl border-2 border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800 hover:border-zinc-700 peer-data-[state=checked]:border-zinc-500 peer-data-[state=checked]:bg-zinc-800 cursor-pointer transition-all duration-200"
+                                        >
+                                          <span className="text-lg font-bold">Não</span>
+                                        </Label>
+                                      </FormItem>
+                                    </RadioGroup>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </motion.div>
+                  </form>
+                </Form>
+              </div>
 
-                  <Button type="submit" className="w-full h-12 text-lg mt-4 bg-purple-600 hover:bg-purple-700 text-white" disabled={isSubmitting}>
+              {/* Footer Actions */}
+              <div className="p-6 border-t border-zinc-800 bg-zinc-900/30 flex justify-between">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleBack}
+                  disabled={currentStep === 0 || isSubmitting}
+                  className="text-zinc-400 hover:text-white"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Voltar
+                </Button>
+
+                {isLastStep ? (
+                  <Button 
+                    onClick={form.handleSubmit(onSubmit)}
+                    disabled={isSubmitting}
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white min-w-[140px] h-11 text-base shadow-lg shadow-purple-900/20"
+                  >
                     {isSubmitting ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                         Enviando...
                       </>
                     ) : (
-                      "Enviar Solicitação"
+                      <>
+                        Finalizar
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </>
                     )}
                   </Button>
-                </form>
-              </Form>
-            </motion.div>
+                ) : (
+                  <Button 
+                    type="button" 
+                    onClick={handleNext}
+                    className="bg-white text-black hover:bg-gray-200 min-w-[140px] h-11 text-base"
+                  >
+                    Próximo
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                )}
+              </div>
+            </div>
           )}
         </AnimatePresence>
       </DialogContent>

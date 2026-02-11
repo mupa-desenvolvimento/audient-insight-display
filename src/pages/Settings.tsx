@@ -7,11 +7,14 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { useUserCompany } from "@/hooks/useUserCompany";
+import { usePresentationConfig } from "@/hooks/usePresentationConfig";
+import { SlideSortableList } from "@/components/presentation/SlideSortableList";
 import { Copy, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 
 const Settings = () => {
   const { company } = useUserCompany();
+  const { config, toggleOption, updateConfig } = usePresentationConfig();
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -26,11 +29,12 @@ const Settings = () => {
       </div>
 
       <Tabs defaultValue="general" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="general">Geral</TabsTrigger>
           <TabsTrigger value="ai">IA & Câmera</TabsTrigger>
           <TabsTrigger value="notifications">Notificações</TabsTrigger>
           <TabsTrigger value="users">Usuários</TabsTrigger>
+          <TabsTrigger value="presentation">Apresentação</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="space-y-6">
@@ -211,7 +215,100 @@ const Settings = () => {
                 </Button>
                 <p className="text-sm text-muted-foreground">
                   Esta funcionalidade será implementada na próxima versão.
-                </p>
+                </p></div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="presentation" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Configurações da Landing Page</CardTitle>
+              <CardDescription>Personalize a exibição dos planos e seções na página inicial</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Plano Lite</Label>
+                  <p className="text-sm text-muted-foreground">Exibir o card do plano Lite</p>
+                </div>
+                <Switch 
+                  checked={config.showLite} 
+                  onCheckedChange={() => toggleOption('showLite')} 
+                />
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Plano Flow</Label>
+                  <p className="text-sm text-muted-foreground">Exibir o card do plano Flow</p>
+                </div>
+                <Switch 
+                  checked={config.showFlow} 
+                  onCheckedChange={() => toggleOption('showFlow')} 
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Plano Insight</Label>
+                  <p className="text-sm text-muted-foreground">Exibir o card do plano Insight</p>
+                </div>
+                <Switch 
+                  checked={config.showInsight} 
+                  onCheckedChange={() => toggleOption('showInsight')} 
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Plano Impact</Label>
+                  <p className="text-sm text-muted-foreground">Exibir o card do plano Impact</p>
+                </div>
+                <Switch 
+                  checked={config.showImpact} 
+                  onCheckedChange={() => toggleOption('showImpact')} 
+                />
+              </div>
+
+              <Separator />
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Comparativo de Planos</Label>
+                  <p className="text-sm text-muted-foreground">Exibir botão para tabela comparativa</p>
+                </div>
+                <Switch 
+                  checked={config.showComparison} 
+                  onCheckedChange={() => toggleOption('showComparison')} 
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Detalhes dos Planos</Label>
+                  <p className="text-sm text-muted-foreground">Exibir detalhes e recursos nos cards</p>
+                </div>
+                <Switch 
+                  checked={config.showDetails} 
+                  onCheckedChange={() => toggleOption('showDetails')} 
+                />
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <div className="space-y-0.5">
+                  <Label>Ordem dos Slides</Label>
+                  <p className="text-sm text-muted-foreground">Arraste para reordenar os slides da apresentação</p>
+                </div>
+                
+                <div className="bg-muted/30 p-4 rounded-lg border">
+                  <SlideSortableList 
+                    items={config.slideOrder || []} 
+                    onReorder={(newOrder) => updateConfig({ slideOrder: newOrder })} 
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>

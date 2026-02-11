@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { motion, useScroll, useTransform, useInView } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { PlansSection } from "@/components/landing/PlansSection";
 import { LeadFormModal, LeadFormType } from "@/components/landing/LeadFormModal";
@@ -26,6 +27,7 @@ import {
   Brain,
   Smartphone,
   LucideIcon,
+  Menu,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -90,12 +92,43 @@ const Navbar = () => {
             <a href="#analytics" className="hover:text-white transition-colors">
               Analytics
             </a>
+            <a href="#plans" className="hover:text-white transition-colors">
+              Planos
+            </a>
           </nav>
           <div className="flex items-center gap-4">
             <ThemeToggle />
-            <Link to="/auth">
+            <Link to="/auth" className="hidden md:block">
               <Button className="bg-white text-black hover:bg-gray-200 rounded-full px-6">Entrar</Button>
             </Link>
+
+            {/* Mobile Menu */}
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="md:hidden text-white hover:bg-white/10">
+                  <Menu className="h-6 w-6" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent className="bg-black border-zinc-800 text-white pt-20">
+                <nav className="flex flex-col gap-6">
+                  <a href="#features" className="text-xl font-medium hover:text-purple-400 transition-colors">
+                    Recursos
+                  </a>
+                  <a href="#ai" className="text-xl font-medium hover:text-purple-400 transition-colors">
+                    Inteligência Artificial
+                  </a>
+                  <a href="#analytics" className="text-xl font-medium hover:text-purple-400 transition-colors">
+                    Analytics
+                  </a>
+                  <a href="#plans" className="text-xl font-medium hover:text-purple-400 transition-colors">
+                    Planos
+                  </a>
+                  <Link to="/auth" className="w-full pt-4">
+                    <Button className="w-full h-12 text-lg bg-white text-black hover:bg-gray-200 rounded-full">Entrar</Button>
+                  </Link>
+                </nav>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
       </div>
@@ -134,7 +167,7 @@ const Hero = () => {
 
           <motion.h1
             variants={itemVariants}
-            className="text-5xl md:text-7xl font-bold mb-6 leading-tight tracking-tight text-white"
+            className="text-3xl sm:text-5xl md:text-7xl font-bold mb-6 leading-tight tracking-tight text-white"
           >
             O Futuro do <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400">
@@ -151,19 +184,19 @@ const Hero = () => {
             <Button
               size="lg"
               onClick={() => setLeadFormType("general")}
-              className="h-14 px-8 text-lg rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 border-0 shadow-lg shadow-purple-500/20"
+              className="w-full sm:w-auto min-h-[3.5rem] h-auto py-4 px-6 sm:px-8 text-base sm:text-lg rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 border-0 shadow-lg shadow-purple-500/20 whitespace-normal leading-tight"
             >
-              <Zap className="mr-2 h-5 w-5 fill-current" />
-              Solicitar diagnóstico da minha operação
+              <Zap className="mr-2 h-5 w-5 fill-current shrink-0" />
+              <span>Solicitar diagnóstico da minha operação</span>
             </Button>
             <Button
               size="lg"
               variant="outline"
               onClick={() => setLeadFormType("demo")}
-              className="h-14 px-8 text-lg rounded-full border-white/20 bg-white/5 hover:bg-white/10 text-white backdrop-blur-sm"
+              className="w-full sm:w-auto min-h-[3.5rem] h-auto py-4 px-6 sm:px-8 text-base sm:text-lg rounded-full border-white/20 bg-white/5 hover:bg-white/10 text-white backdrop-blur-sm whitespace-normal leading-tight"
             >
-              <Play className="mr-2 h-5 w-5" />
-              Agendar demonstração estratégica
+              <Play className="mr-2 h-5 w-5 shrink-0" />
+              <span>Ver demonstração</span>
             </Button>
           </motion.div>
 
@@ -274,7 +307,7 @@ const FeatureCard = ({ feature, index }: { feature: { icon: LucideIcon; title: s
       initial={{ opacity: 0, y: 50 }}
       animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 50 }}
       transition={{ duration: 0.5, delay: index * 0.1 }}
-      className="group p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-purple-500/50 transition-all duration-300 hover:bg-white/10"
+      className="group p-4 sm:p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-purple-500/50 transition-all duration-300 hover:bg-white/10"
     >
       <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-white/10 to-transparent flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 text-white">
         <feature.icon className="w-6 h-6" />
@@ -323,7 +356,7 @@ const Features = () => {
   ];
 
   return (
-    <section id="features" className="py-24 bg-black relative">
+    <section id="features" className="py-12 md:py-24 bg-black relative">
       <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
       <div className="container mx-auto px-6">
         <div className="text-center mb-16">
@@ -351,7 +384,7 @@ const AISection = () => {
   const isInView = useInView(ref, { once: true });
 
   return (
-    <section id="ai" className="py-24 bg-[#050505] relative overflow-hidden">
+    <section id="ai" className="py-12 md:py-24 bg-[#050505] relative overflow-hidden">
       {/* Background Glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-purple-600/10 rounded-full blur-[120px]" />
 
@@ -419,17 +452,6 @@ const AISection = () => {
                   </div>
                 </motion.div>
 
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 1.5, duration: 1 }}
-                  className="absolute bottom-1/3 right-1/3 w-20 h-20 border-2 border-purple-500 rounded-lg"
-                >
-                  <div className="absolute -top-6 left-0 bg-purple-500 text-white text-xs font-bold px-2 py-1 rounded">
-                    Mulher, 18-24
-                  </div>
-                </motion.div>
-
                 {/* Scan Line Animation */}
                 <motion.div
                   animate={{ top: ["0%", "100%", "0%"] }}
@@ -439,7 +461,7 @@ const AISection = () => {
               </div>
 
               {/* Data Panel */}
-              <div className="bg-black/80 backdrop-blur-md p-4 border-t border-white/10 grid grid-cols-3 gap-4">
+              <div className="bg-black/80 backdrop-blur-md p-4 border-t border-white/10 grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-white">42</div>
                   <div className="text-xs text-gray-500 uppercase tracking-wider">Pessoas</div>
@@ -474,7 +496,7 @@ const Index = () => {
         <PlansSection />
       </main>
 
-      <footer className="py-12 border-t border-white/10 bg-black">
+      <footer className="py-8 md:py-12 border-t border-white/10 bg-black">
         <div className="container mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-2">
             <img

@@ -6,27 +6,28 @@ import { Button } from "@/components/ui/button";
 interface PlansComparisonModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectPlan: (plan: 'flow' | 'insight' | 'impact') => void;
+  onSelectPlan: (plan: 'lite' | 'flow' | 'insight' | 'impact') => void;
 }
 
 export function PlansComparisonModal({ isOpen, onClose, onSelectPlan }: PlansComparisonModalProps) {
   const features = [
-    { name: "Gestão Centralizada de Telas", flow: true, insight: true, impact: true },
-    { name: "Playlists e Agendamentos", flow: true, insight: true, impact: true },
-    { name: "Monitoramento Online/Offline", flow: true, insight: true, impact: true },
-    { name: "Player Offline-First", flow: true, insight: true, impact: true },
-    { name: "Analytics de Consulta de Produtos", flow: false, insight: true, impact: true },
-    { name: "Audience Analytics (Câmera)", flow: false, insight: true, impact: true },
-    { name: "Mapa de Calor de Atenção", flow: false, insight: true, impact: true },
-    { name: "Segmentação Dinâmica (IA)", flow: false, insight: false, impact: true },
-    { name: "Recomendação Automática de Produtos", flow: false, insight: false, impact: true },
-    { name: "Monetização de Telas", flow: false, insight: false, impact: true },
-    { name: "Dashboard Trade Marketing", flow: false, insight: false, impact: true },
+    { name: "Suporte Técnico Remoto Imediato", lite: true, flow: true, insight: true, impact: true },
+    { name: "Operação 100% Offline", lite: true, flow: true, insight: true, impact: true },
+    { name: "Consulta de Preço/Produto", lite: true, flow: false, insight: true, impact: true },
+    { name: "Gestão Centralizada (Cloud)", lite: false, flow: true, insight: true, impact: true },
+    { name: "Playlists e Agendamentos", lite: false, flow: true, insight: true, impact: true },
+    { name: "Monitoramento Online/Offline", lite: false, flow: true, insight: true, impact: true },
+    { name: "Analytics de Consulta", lite: false, flow: false, insight: true, impact: true },
+    { name: "Audience Analytics (Câmera)", lite: false, flow: false, insight: true, impact: true },
+    { name: "Mapa de Calor de Atenção", lite: false, flow: false, insight: true, impact: true },
+    { name: "Segmentação Dinâmica (IA)", lite: false, flow: false, insight: false, impact: true },
+    { name: "Recomendação Automática", lite: false, flow: false, insight: false, impact: true },
+    { name: "Monetização de Telas", lite: false, flow: false, insight: false, impact: true },
   ];
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl bg-zinc-950 border-zinc-800 text-white max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl bg-zinc-950 border-zinc-800 text-white max-h-[90vh] overflow-y-auto">
         <DialogHeader className="mb-6">
           <DialogTitle className="text-2xl font-bold text-center">Comparativo de Planos</DialogTitle>
           <DialogDescription className="text-center text-gray-400">
@@ -35,19 +36,23 @@ export function PlansComparisonModal({ isOpen, onClose, onSelectPlan }: PlansCom
         </DialogHeader>
 
         <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-zinc-800 hover:bg-transparent">
-                <TableHead className="w-[300px] text-gray-300">Recurso</TableHead>
-                <TableHead className="text-center text-green-400 font-bold text-lg">MUPA FLOW</TableHead>
-                <TableHead className="text-center text-blue-400 font-bold text-lg">MUPA INSIGHT</TableHead>
-                <TableHead className="text-center text-purple-400 font-bold text-lg">MUPA IMPACT</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {features.map((feature, idx) => (
-                <TableRow key={idx} className="border-zinc-800 hover:bg-zinc-900/50">
-                  <TableCell className="font-medium text-gray-300">{feature.name}</TableCell>
+            <Table className="min-w-[800px]">
+              <TableHeader>
+                <TableRow className="border-zinc-800 hover:bg-transparent">
+                  <TableHead className="w-[200px] text-gray-300">Recurso</TableHead>
+                  <TableHead className="text-center text-zinc-400 font-bold text-sm sm:text-lg">MUPA LITE</TableHead>
+                  <TableHead className="text-center text-green-400 font-bold text-sm sm:text-lg">MUPA FLOW</TableHead>
+                  <TableHead className="text-center text-blue-400 font-bold text-sm sm:text-lg">MUPA INSIGHT</TableHead>
+                  <TableHead className="text-center text-purple-400 font-bold text-sm sm:text-lg">MUPA IMPACT</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {features.map((feature, idx) => (
+                  <TableRow key={idx} className="border-zinc-800 hover:bg-zinc-900/50">
+                    <TableCell className="font-medium text-gray-300 text-sm sm:text-base">{feature.name}</TableCell>
+                    <TableCell className="text-center">
+                      {feature.lite ? <Check className="mx-auto w-5 h-5 text-zinc-400" /> : <Minus className="mx-auto w-5 h-5 text-zinc-700" />}
+                    </TableCell>
                   <TableCell className="text-center">
                     {feature.flow ? <Check className="mx-auto w-5 h-5 text-green-500" /> : <Minus className="mx-auto w-5 h-5 text-zinc-700" />}
                   </TableCell>
@@ -61,6 +66,9 @@ export function PlansComparisonModal({ isOpen, onClose, onSelectPlan }: PlansCom
               ))}
               <TableRow className="border-zinc-800 hover:bg-transparent">
                 <TableCell></TableCell>
+                <TableCell className="p-4">
+                  <Button onClick={() => onSelectPlan('lite')} className="w-full bg-zinc-700 hover:bg-zinc-600 text-white">Selecionar</Button>
+                </TableCell>
                 <TableCell className="p-4">
                   <Button onClick={() => onSelectPlan('flow')} className="w-full bg-green-600 hover:bg-green-700 text-white">Selecionar</Button>
                 </TableCell>

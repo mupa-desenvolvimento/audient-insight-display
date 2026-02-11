@@ -36,6 +36,8 @@ import QRCode from "react-qr-code";
 import logoHorizontal from "@/assets/logo_horizontal.svg";
 import { Slide } from "@/types/presentation";
 import { SlideEditor } from "@/components/presentation/SlideEditor";
+import { usePresentationConfig } from "@/hooks/usePresentationConfig";
+import { INITIAL_SLIDES } from "@/data/presentation-slides";
 
 // --- THEME SYSTEM ---
 type Theme = {
@@ -84,7 +86,7 @@ const themes: Record<string, Theme> = {
     iconColor: "text-purple-400",
     progressBar: "bg-gradient-to-r from-blue-500 to-purple-500",
     font: "selection:bg-purple-500/30 font-sans",
-    logoClass: "invert"
+    logoClass: "brightness-0 invert"
   },
   neon: {
     id: "neon",
@@ -109,7 +111,7 @@ const themes: Record<string, Theme> = {
     iconColor: "text-emerald-400",
     progressBar: "bg-gradient-to-r from-emerald-500 to-cyan-500",
     font: "selection:bg-emerald-500/30 font-sans tracking-tight",
-    logoClass: "invert"
+    logoClass: "brightness-0 invert"
   },
   light: {
     id: "light",
@@ -134,258 +136,53 @@ const themes: Record<string, Theme> = {
     iconColor: "text-blue-600",
     progressBar: "bg-blue-600",
     font: "selection:bg-blue-100 font-sans",
-    logoClass: "invert-0"
+    logoClass: ""
   }
 };
 
-// Configuração dos slides
-const INITIAL_SLIDES: Slide[] = [
-  // Slide 1: Capa
-  {
-    id: 1,
-    layout: "landing-hero",
-    title: "MUPA + Hardware",
-    subtitle: "A Solução Completa",
-    description: "Transforme televisores e terminais em experiências inteligentes de comunicação.",
-    image: null,
-    icon: Monitor
-  },
-  // Slide 2: Gestão Centralizada
-  {
-    id: 2,
-    layout: "feature-list",
-    title: "Gestão Centralizada",
-    subtitle: "Controle Total",
-    description: "Gerencie 1 ou 10.000 telas de um único dashboard na nuvem.",
-    points: [
-      "Atualização remota em segundos",
-      "Agendamento por dia/hora",
-      "Monitoramento de status (Online/Offline)",
-      "Prova de execução (Screenshot remoto)"
-    ],
-    icon: Network
-  },
-  // Slide 3: O Desafio (Hardware Sozinho)
-  {
-    id: 3,
-    layout: "problem",
-    title: "O Desafio do Hardware",
-    subtitle: "Uma tela preta não vende",
-    description: "Vender apenas o equipamento entrega uma solução incompleta. O cliente precisa de gestão, conteúdo e inteligência para ver valor no investimento.",
-    points: [
-      "Telas desligadas ou com pen-drive",
-      "Dificuldade de atualização de conteúdo",
-      "Sem métricas de retorno (ROI)",
-      "Manutenção presencial custosa"
-    ],
-    video: "/terminal_video_concorrente.mp4",
-    icon: Tv
-  },
-  // Slide 4: A Solução MUPA (NEW LAYOUT: BENTO GRID)
-  {
-    id: 4,
-    layout: "bento-grid",
-    title: "A Solução MUPA",
-    subtitle: "O Cérebro da Operação",
-    description: "O sistema operacional que dá vida ao hardware. Compatível com Android, Windows, Linux e WebOS.",
-    features: [
-      { icon: WifiOff, text: "100% Offline", desc: "Nunca para de rodar, mesmo sem internet" },
-      { icon: Layers, text: "Playlists Dinâmicas", desc: "Agendamento inteligente por dia e hora" },
-      { icon: Lock, text: "Segurança Enterprise", desc: "Criptografia e proteção de dados" },
-      { icon: Zap, text: "Integração Rápida", desc: "Setup em menos de 5 minutos" }
-    ],
-    icon: Brain
-  },
-  // Slide 5: Ecossistema de Hardware
-  {
-    id: 5,
-    layout: "grid",
-    title: "Ecossistema Completo",
-    subtitle: "Um sistema, múltiplos dispositivos",
-    description: "O MUPA se adapta a qualquer formato de tela que você vende.",
-    items: [
-      { title: "Smart TVs", desc: "Menu board, Mídia Indoor, Corporativo", icon: Tv },
-      { title: "Terminais Zebra", desc: "Verificadores de Preço, Totens", icon: ScanBarcode },
-      { title: "Tablets/Android", desc: "Gôndolas, Caixas, Quiosques", icon: Smartphone },
-      { title: "Painéis LED", desc: "Fachadas, Grandes Formatos", icon: Monitor }
-    ],
-    icon: Layers
-  },
-  // Slide 6: Diferencial IA (NEW LAYOUT: IMMERSIVE SPLIT)
-  {
-    id: 6,
-    layout: "immersive-split",
-    title: "Inteligência Artificial",
-    subtitle: "Sua tela agora tem olhos",
-    description: "Análise de audiência em tempo real, sem gravar imagens (GDPR/LGPD).",
-    image: "/terminal-woman.jpg",
-    stats: [
-      { label: "Gênero e Idade", value: "Perfil" },
-      { label: "Emoções", value: "Reação" },
-      { label: "Atenção", value: "Foco" }
-    ],
-    icon: Eye
-  },
-  // Slide 7: Análise de Comportamento
-  {
-    id: 7,
-    layout: "case",
-    title: "Análise de Comportamento",
-    subtitle: "Insights em Toda a Jornada",
-    description: "Entenda como seu cliente reage em cada interação, do corredor ao checkout.",
-    benefits: [
-      "Consulta de Produto: O app capta a emoção exata ao ver o preço.",
-      "Mídia Indoor (TVs): Câmeras medem quantas pessoas olharam e o tempo.",
-      "Métricas de Atenção: Saiba quais conteúdos retêm mais o olhar.",
-      "Vantagem Competitiva: Transforme dados de comportamento em vendas."
-    ],
-    color: "bg-indigo-600",
-    icon: ScanBarcode
-  },
-  // Slide 8: TVs com Visão Computacional
-  {
-    id: 8,
-    layout: "visual-right",
-    title: "TVs que Veem",
-    subtitle: "Métricas de Atenção",
-    description: "Transforme suas telas em sensores de audiência. Saiba exatamente quem está olhando para sua vitrine ou gôndola.",
-    images: ["/captura_pessoas1.jpg", "/captura_pessoas2.png"],
-    stats: [
-      { label: "Tráfego", value: "Pessoas no Local" },
-      { label: "Conversão", value: "% que Olhou" },
-      { label: "Engajamento", value: "Tempo Médio" }
-    ],
-    icon: Monitor
-  },
-  // Slide 9: Demo Interativa (QR Code)
-  {
-    id: 9,
-    layout: "qr-demo",
-    title: "Experiência Mobile",
-    subtitle: "IA na palma da mão",
-    description: "Escaneie o QR Code para testar a análise de perfil e recomendação de produtos em tempo real no seu celular.",
-    image: null,
-    items: [
-      { icon: ScanBarcode, title: "1. Aponte", desc: "Abra a câmera do seu celular e aponte para o QR Code." },
-      { icon: Brain, title: "2. Analise", desc: "Nossa IA identificará seu perfil de forma anônima e segura." },
-      { icon: ShoppingBag, title: "3. Descubra", desc: "Receba recomendações personalizadas instantaneamente." }
-    ],
-    icon: QrCode
-  },
-  // Slide 10: Dashboard em Tempo Real
-  {
-    id: 10,
-    layout: "dashboard-demo",
-    title: "Dashboard em Tempo Real",
-    subtitle: "Visão 360º da Operação",
-    description: "Acompanhe métricas vitais de todos os seus dispositivos em um único painel intuitivo.",
-    stats: [
-      { label: "Online", value: "1,240" },
-      { label: "Offline", value: "8" }
-    ],
-    items: [
-      { title: "Loja Shopping SP", desc: "98" },
-      { title: "Flagship Av. Paulista", desc: "85" },
-      { title: "Quiosque Aeroporto", desc: "72" },
-      { title: "Loja Centro RJ", desc: "65" },
-      { title: "Supermercado Barra", desc: "54" }
-    ],
-    icon: BarChart3
-  },
-  // Slide 11: Case Varejo (Terminais de Preço)
-  {
-    id: 11,
-    layout: "case",
-    title: "Varejo & Supermercados",
-    subtitle: "Muito além do preço",
-    description: "Transforme o verificador de preço em um ponto de mídia digital.",
-    benefits: [
-      "Exiba ofertas quando ocioso",
-      "Sugira produtos complementares ao bipar",
-      "Venda espaço publicitário para marcas",
-      "Pesquisa de satisfação na tela"
-    ],
-    color: "bg-blue-600",
-    icon: Store
-  },
-  // Slide 12: Case Corporativo (TVs)
-  {
-    id: 12,
-    layout: "case",
-    title: "Corporativo & Mídia",
-    subtitle: "Comunicação Interna Eficaz",
-    description: "Substitua murais de papel por TV Corporativa dinâmica.",
-    benefits: [
-      "Aniversariantes do mês automáticos",
-      "Metas e indicadores em tempo real",
-      "Notícias e clima",
-      "Treinamentos e vídeos institucionais"
-    ],
-    color: "bg-purple-600",
-    icon: Users
-  },
-  // Slide 13: MUPA em Ação (Vídeo)
-  {
-    id: 13,
-    layout: "video-showcase",
-    title: "MUPA em Ação",
-    subtitle: "Fluidez e Performance",
-    description: "Veja como o sistema se comporta em tempo real. Transições suaves e resposta imediata.",
-    video: "/terminal_video_mupa.mp4",
-    icon: Play
-  },
-  // Slide 14: Comparativo Visual
-  {
-    id: 14,
-    layout: "comparison",
-    title: "Comparativo de Qualidade",
-    subtitle: "Não é apenas uma tela",
-    description: "A percepção de valor do seu hardware muda completamente com o software certo.",
-    comparison: {
-      left: { label: "Concorrência / Genérico", image: "/terminal_foto_concorrente_compara1.jpeg", color: "text-red-400" },
-      right: { label: "Experiência MUPA", image: "/terminal_foto_mupa_compara1.jpeg", color: "text-green-400" }
-    },
-    icon: Trophy
-  },
-  // Slide 15: Argumentos de Venda
-  {
-    id: 15,
-    layout: "sales",
-    title: "Por que vender MUPA?",
-    subtitle: "Agregue valor ao seu hardware",
-    description: "Ao oferecer a solução completa, você foge da guerra de preços do hardware.",
-    reasons: [
-      { title: "Receita Recorrente", desc: "Possibilidade de ganho no SaaS" },
-      { title: "Fidelização", desc: "O cliente depende da sua solução" },
-      { title: "Diferenciação", desc: "Não venda tela, venda inteligência" },
-      { title: "Suporte Simplificado", desc: "Tudo remoto, menos visitas técnicas" }
-    ],
-    icon: DollarSign
-  },
-  // Slide 16: Encerramento (NEW LAYOUT: MINIMAL CENTERED)
-  {
-    id: 16,
-    layout: "minimal-centered",
-    title: "Vamos Começar?",
-    subtitle: "Parceria MUPA + Seu Hardware",
-    description: "O futuro do Digital Signage é inteligente. Leve essa inovação para seus clientes.",
-    cta: "Cadastrar Vendedor",
-    icon: CheckCircle2
-  },
-  // Slide 17: Obrigado
-  {
-    id: 17,
-    layout: "hero",
-    title: "Obrigado!",
-    subtitle: "Boas Vendas",
-    description: "Estamos à disposição para transformar seu negócio.",
-    icon: HeartHandshake
-  }
-];
+
+// Configuração dos slides removida daqui e movida para src/data/presentation-slides.ts
 
 export default function Presentation() {
-  const [slides, setSlides] = useState<Slide[]>(INITIAL_SLIDES);
+  const { config } = usePresentationConfig();
+
+  const filterSlides = (cfg: typeof config) => {
+    let slides = INITIAL_SLIDES.filter(slide => {
+      if (slide.title === "MUPA LITE" && !cfg.showLite) return false;
+      if (slide.title === "MUPA FLOW" && !cfg.showFlow) return false;
+      if (slide.title === "MUPA INSIGHT" && !cfg.showInsight) return false;
+      if (slide.title === "MUPA IMPACT" && !cfg.showImpact) return false;
+      if (slide.layout === "comparison" && !cfg.showComparison) return false;
+      return true;
+    });
+
+    if (cfg.slideOrder && cfg.slideOrder.length > 0) {
+      slides.sort((a, b) => {
+        const indexA = cfg.slideOrder.indexOf(a.id);
+        const indexB = cfg.slideOrder.indexOf(b.id);
+        
+        // If slide is not in order array, put it at the end
+        if (indexA === -1) return 1;
+        if (indexB === -1) return -1;
+        
+        return indexA - indexB;
+      });
+    }
+
+    return slides;
+  };
+
+  const [slides, setSlides] = useState<Slide[]>(() => filterSlides(config));
   const [currentSlide, setCurrentSlide] = useState(0);
+
+  useEffect(() => {
+    const filtered = filterSlides(config);
+    setSlides(filtered);
+    if (currentSlide >= filtered.length) {
+      setCurrentSlide(Math.max(0, filtered.length - 1));
+    }
+  }, [config]);
+
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [searchParams] = useSearchParams();
   
@@ -817,6 +614,76 @@ export default function Presentation() {
                      </motion.div>
                    ))}
                 </div>
+              </div>
+            )}
+
+            {/* PLAN DETAILS LAYOUT (NEW) */}
+            {slide.layout === "plan-details" && (
+              <div className="h-full flex flex-col justify-center max-w-[1600px] mx-auto w-full px-6">
+                <div className="text-center mb-6 shrink-0">
+                   <motion.div 
+                     variants={itemVariants}
+                     className={`inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4 ${
+                       slide.planTheme === 'zinc' ? 'bg-zinc-500/10 text-zinc-400' :
+                       slide.planTheme === 'green' ? 'bg-green-500/10 text-green-400' :
+                       slide.planTheme === 'blue' ? 'bg-blue-500/10 text-blue-400' :
+                       'bg-purple-500/10 text-purple-400'
+                     }`}
+                   >
+                      {slide.icon && <slide.icon className="w-7 h-7" />}
+                   </motion.div>
+                   <motion.h2 variants={itemVariants} className={`text-4xl md:text-5xl font-black mb-2 ${theme.textPrimary}`}>{slide.title}</motion.h2>
+                   <motion.div 
+                     variants={itemVariants}
+                     className={`text-lg font-bold tracking-wider uppercase mb-4 ${
+                       slide.planTheme === 'zinc' ? 'text-zinc-400' :
+                       slide.planTheme === 'green' ? 'text-green-400' :
+                       slide.planTheme === 'blue' ? 'text-blue-400' :
+                       'text-purple-400'
+                     }`}
+                   >
+                     {slide.subtitle}
+                   </motion.div>
+                   <motion.p variants={itemVariants} className={`text-lg ${theme.textSecondary} max-w-3xl mx-auto leading-relaxed`}>{slide.description}</motion.p>
+                </div>
+
+                {config.showDetails && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 flex-1 min-h-0 overflow-y-auto custom-scrollbar p-1">
+                   {slide.planDetails?.map((section, i) => (
+                     <motion.div
+                       key={i}
+                       variants={itemVariants}
+                       className={`p-4 rounded-xl border ${
+                         slide.planTheme === 'zinc' ? 'bg-zinc-900/40 border-zinc-500/20' :
+                         slide.planTheme === 'green' ? 'bg-green-900/20 border-green-500/20' :
+                         slide.planTheme === 'blue' ? 'bg-blue-900/20 border-blue-500/20' :
+                         'bg-purple-900/20 border-purple-500/20'
+                       } backdrop-blur-sm hover:bg-opacity-80 transition-all`}
+                     >
+                        <h4 className={`text-base font-bold mb-2 flex items-center gap-2 ${theme.textPrimary}`}>
+                          {section.title.includes("Inclui tudo") ? (
+                            <span className={`${theme.textSecondary} italic`}>{section.title}</span>
+                          ) : (
+                            section.title
+                          )}
+                        </h4>
+                        <ul className="space-y-2">
+                          {section.items.map((item, idx) => (
+                            <li key={idx} className="flex items-start gap-2 text-sm text-gray-300">
+                              <CheckCircle2 className={`w-4 h-4 mt-0.5 shrink-0 ${
+                                 slide.planTheme === 'zinc' ? 'text-zinc-500' :
+                                 slide.planTheme === 'green' ? 'text-green-500' :
+                                 slide.planTheme === 'blue' ? 'text-blue-500' :
+                                 'text-purple-500'
+                               }`} />
+                              <span className="leading-tight text-sm">{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                     </motion.div>
+                   ))}
+                </div>
+                )}
               </div>
             )}
 

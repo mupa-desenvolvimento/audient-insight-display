@@ -9,12 +9,18 @@ import {
   Brain, 
   ArrowRight,
   LucideIcon,
-  Scale
+  Scale,
+  Monitor,
+  LayoutTemplate,
+  Presentation
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
+import { usePresentationConfig } from "@/hooks/usePresentationConfig";
 import { LeadFormModal, LeadFormType } from "./LeadFormModal";
 import { PlansComparisonModal } from "./PlansComparisonModal";
+import { PlansCarousel } from "./PlansCarousel";
 
 // Types for Plan Data
 interface PlanFeature {
@@ -25,7 +31,7 @@ interface PlanFeature {
 interface Plan {
   id: string;
   name: string;
-  theme: "green" | "blue" | "purple";
+  theme: "green" | "blue" | "purple" | "zinc";
   tagline: string;
   description: string;
   buttonText: string;
@@ -33,6 +39,51 @@ interface Plan {
 }
 
 const plans: Plan[] = [
+  {
+    id: "lite",
+    name: "MUPA LITE",
+    theme: "zinc",
+    tagline: "Simples. Estável. 100% Offline.",
+    description: "Terminal de consulta rápido, funcional e independente de internet. Ideal para operações que precisam de estabilidade e baixo custo.",
+    buttonText: "Quero uma solução offline",
+    details: [
+      {
+        title: "Operação Offline Total",
+        items: [
+          "Funciona sem conexão com internet",
+          "Sem sincronização com nuvem",
+          "Sem dependência de servidor externo",
+          "Base de dados local embarcada"
+        ]
+      },
+      {
+        title: "Consulta de Produto Simplificada",
+        items: [
+          "Leitura de código de barras",
+          "Exibição de nome e preço",
+          "Banco de dados local com resposta instantânea",
+          "Nota: Sem imagens ou sugestões inteligentes"
+        ]
+      },
+      {
+        title: "Conteúdo Estático Limitado",
+        items: [
+          "Até 3 imagens estáticas fixas",
+          "Rotação simples entre imagens",
+          "Definidas na instalação (sem campanhas dinâmicas)"
+        ]
+      },
+      {
+        title: "Performance Máxima",
+        items: [
+          "Carregamento imediato",
+          "Alta estabilidade para alto fluxo",
+          "Baixo consumo de recursos",
+          "Atualização manual via arquivo"
+        ]
+      }
+    ]
+  },
   {
     id: "flow",
     name: "MUPA FLOW",
@@ -188,22 +239,25 @@ const plans: Plan[] = [
   }
 ];
 
-const PlanCard = ({ plan, onAction }: { plan: Plan; onAction: () => void }) => {
+const PlanCard = ({ plan, onAction, showDetails = true }: { plan: Plan; onAction: () => void; showDetails?: boolean }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const themeColors = {
+    zinc: "from-zinc-500 to-zinc-700 border-zinc-500/30 hover:border-zinc-500/60 text-zinc-400 bg-zinc-500/10",
     green: "from-green-500 to-emerald-700 border-green-500/30 hover:border-green-500/60 text-green-400 bg-green-500/10",
     blue: "from-blue-500 to-cyan-700 border-blue-500/30 hover:border-blue-500/60 text-blue-400 bg-blue-500/10",
     purple: "from-purple-500 to-pink-700 border-purple-500/30 hover:border-purple-500/60 text-purple-400 bg-purple-500/10"
   };
 
   const buttonStyles: Record<string, string> = {
+    lite: "bg-zinc-100 hover:bg-white text-black border border-white/20 shadow-sm font-bold",
     flow: "bg-zinc-800 hover:bg-zinc-700 text-white border border-white/10 shadow-sm",
     insight: "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-900/20 border-0",
     impact: "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-xl shadow-purple-500/30 border-0 font-bold tracking-wide"
   };
 
   const iconMap: Record<string, LucideIcon> = {
+    zinc: Monitor,
     green: Zap,
     blue: BarChart3,
     purple: Brain
@@ -215,9 +269,10 @@ const PlanCard = ({ plan, onAction }: { plan: Plan; onAction: () => void }) => {
     <motion.div 
       layout
       className={cn(
-        "relative rounded-2xl border bg-black/40 backdrop-blur-sm overflow-hidden transition-all duration-300",
+        "relative rounded-2xl border bg-black/40 backdrop-blur-sm overflow-hidden transition-all duration-300 h-full",
         `border-${plan.theme}-500/20`,
         isExpanded ? "ring-2 ring-offset-0 ring-offset-transparent ring-opacity-50 z-20" : "hover:border-opacity-50 z-10",
+        plan.theme === "zinc" && isExpanded && "ring-zinc-500",
         plan.theme === "green" && isExpanded && "ring-green-500",
         plan.theme === "blue" && isExpanded && "ring-blue-500",
         plan.theme === "purple" && isExpanded && "ring-purple-500",
@@ -227,39 +282,47 @@ const PlanCard = ({ plan, onAction }: { plan: Plan; onAction: () => void }) => {
       {/* Top Gradient Line */}
       <div className={cn("h-1 w-full bg-gradient-to-r", themeColors[plan.theme].split(" ")[0] + " " + themeColors[plan.theme].split(" ")[1])} />
 
-      <div className="p-6 md:p-8 flex flex-col h-full">
+      <div className="p-4 sm:p-6 md:p-8 flex flex-col h-full">
         {/* Header */}
         <div className="mb-6">
           <div className={cn("inline-flex items-center justify-center w-12 h-12 rounded-lg mb-4", themeColors[plan.theme].split(" ").slice(3).join(" "))}>
             <Icon className="w-6 h-6" />
           </div>
           <h3 className="text-2xl font-bold text-white mb-2 tracking-tight">{plan.name}</h3>
-          <p className={cn("text-sm font-medium uppercase tracking-wider mb-4", themeColors[plan.theme].split(" ")[2])}>
+          <p className={cn("text-sm font-medium uppercase tracking-wider mb-4 min-h-[44px] flex items-center", themeColors[plan.theme].split(" ")[2])}>
             {plan.tagline}
           </p>
-          <p className="text-gray-400 leading-relaxed min-h-[60px]">
+          <p className="text-gray-400 leading-relaxed min-h-[100px] mb-4">
             {plan.description}
           </p>
+          
+          {/* Support Badge */}
+          <div className="flex items-center gap-2 text-xs font-medium text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 px-3 py-1.5 rounded-full w-fit">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            Suporte técnico remoto incluso
+          </div>
         </div>
 
         {/* Action Buttons */}
         <div className="mt-auto space-y-4">
-          <Button 
-            variant="outline" 
-            className="w-full border-white/10 hover:bg-white/5 text-white group"
-            onClick={() => setIsExpanded(!isExpanded)}
-          >
-            {isExpanded ? "Ocultar detalhes" : "Ver detalhes"}
-            {isExpanded ? (
-              <ChevronUp className="w-4 h-4 ml-2 text-gray-400" />
-            ) : (
-              <ChevronDown className="w-4 h-4 ml-2 text-gray-400 group-hover:translate-y-0.5 transition-transform" />
-            )}
-          </Button>
+          {showDetails && (
+            <Button 
+              variant="outline" 
+              className="w-full border-white/10 hover:bg-white/5 text-white group"
+              onClick={() => setIsExpanded(!isExpanded)}
+            >
+              {isExpanded ? "Ocultar detalhes" : "Ver detalhes"}
+              {isExpanded ? (
+                <ChevronUp className="w-4 h-4 ml-2 text-gray-400" />
+              ) : (
+                <ChevronDown className="w-4 h-4 ml-2 text-gray-400 group-hover:translate-y-0.5 transition-transform" />
+              )}
+            </Button>
+          )}
 
           {!isExpanded && (
             <Button 
-              className={cn("w-full text-white font-medium", buttonStyles[plan.id])}
+              className={cn("w-full text-white font-medium h-auto py-3 whitespace-normal leading-tight", buttonStyles[plan.id])}
               onClick={onAction}
             >
               {plan.buttonText}
@@ -269,7 +332,7 @@ const PlanCard = ({ plan, onAction }: { plan: Plan; onAction: () => void }) => {
 
         {/* Expanded Content */}
         <AnimatePresence>
-          {isExpanded && (
+          {isExpanded && showDetails && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
@@ -302,7 +365,7 @@ const PlanCard = ({ plan, onAction }: { plan: Plan; onAction: () => void }) => {
                   className={cn("w-full h-12 text-lg font-medium text-white mt-4", buttonStyles[plan.id])}
                   onClick={onAction}
                 >
-                  {plan.buttonText}
+                  {plan.id === 'lite' ? 'Solicitar proposta Lite' : plan.buttonText}
                   <ArrowRight className="w-5 h-5 ml-2" />
                 </Button>
               </div>
@@ -315,11 +378,25 @@ const PlanCard = ({ plan, onAction }: { plan: Plan; onAction: () => void }) => {
 };
 
 export const PlansSection = () => {
+  const { config } = usePresentationConfig();
   const [leadFormType, setLeadFormType] = useState<LeadFormType | null>(null);
   const [isComparisonOpen, setIsComparisonOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'carousel' | 'grid'>('carousel');
+
+  // Filter visible plans based on config
+  const visiblePlansList = plans.filter(plan => {
+    if (plan.id === 'lite' && !config.showLite) return false;
+    if (plan.id === 'flow' && !config.showFlow) return false;
+    if (plan.id === 'insight' && !config.showInsight) return false;
+    if (plan.id === 'impact' && !config.showImpact) return false;
+    return true;
+  });
+
+  const visiblePlanIds = visiblePlansList.map(p => p.id);
 
   const handlePlanAction = (planId: string) => {
     // Map plan IDs to form types
+    if (planId === "lite") setLeadFormType("lite");
     if (planId === "flow") setLeadFormType("flow");
     if (planId === "insight") setLeadFormType("insight");
     if (planId === "impact") setLeadFormType("impact");
@@ -347,7 +424,7 @@ export const PlansSection = () => {
       
       <div className="container mx-auto px-6 relative z-10">
         {/* Section Header */}
-        <div className="text-center max-w-4xl mx-auto mb-20">
+        <div className="text-center max-w-4xl mx-auto mb-12">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -360,47 +437,93 @@ export const PlansSection = () => {
                 inteligência de vendas
               </span>
             </h2>
-            <p className="text-xl text-gray-400 leading-relaxed">
-              Escolha o nível de tecnologia ideal para sua operação e evolua do controle total à personalização inteligente com dados reais de audiência.
+            <p className="text-xl text-gray-400 leading-relaxed mb-8">
+              Escolha o nível de tecnologia ideal para sua operação e evolua do controle total à personalização inteligente.
             </p>
+
+            {/* View Toggle */}
+            <div className="flex justify-center mb-12">
+              <ToggleGroup type="single" value={viewMode} onValueChange={(val) => val && setViewMode(val as 'carousel' | 'grid')} className="bg-zinc-900 p-1 rounded-full border border-zinc-800">
+                <ToggleGroupItem value="carousel" className="rounded-full px-4 data-[state=on]:bg-zinc-800 data-[state=on]:text-white text-zinc-400">
+                  <Presentation className="w-4 h-4 mr-2" />
+                  Apresentação
+                </ToggleGroupItem>
+                <ToggleGroupItem value="grid" className="rounded-full px-4 data-[state=on]:bg-zinc-800 data-[state=on]:text-white text-zinc-400">
+                  <LayoutTemplate className="w-4 h-4 mr-2" />
+                  Grade
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
           </motion.div>
         </div>
 
-        {/* Plans Grid */}
-        <div className="grid lg:grid-cols-3 gap-8 items-start mb-32">
-          {plans.map((plan, index) => (
+        {/* Plans Display */}
+        <AnimatePresence mode="wait">
+          {viewMode === 'carousel' ? (
             <motion.div
-              key={plan.id}
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
+              key="carousel"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="mb-20"
             >
-              <PlanCard plan={plan} onAction={() => handlePlanAction(plan.id)} />
+              <PlansCarousel onPlanSelect={handlePlanAction} visiblePlans={visiblePlanIds} />
             </motion.div>
-          ))}
+          ) : (
+            <motion.div
+              key="grid"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch mb-20"
+            >
+              {visiblePlansList.map((plan, index) => (
+                <motion.div
+                  key={plan.id}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                  className="h-full"
+                >
+                  <PlanCard plan={plan} onAction={() => handlePlanAction(plan.id)} showDetails={config.showDetails} />
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Global Support Note */}
+        <div className="text-center mb-24 max-w-3xl mx-auto">
+          <p className="text-gray-500 text-sm md:text-base border border-white/5 bg-white/5 rounded-full px-6 py-3 inline-block">
+            <span className="text-emerald-400 font-bold">Nota:</span> Todos os planos Mupa incluem suporte técnico remoto imediato para garantir máxima disponibilidade e agilidade no atendimento.
+          </p>
         </div>
 
         {/* Intermediate CTA - Comparison */}
-        <div className="text-center mb-32">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="inline-flex flex-col items-center gap-4"
-          >
-            <h3 className="text-2xl text-gray-300 font-medium">Ainda não sabe qual plano escolher?</h3>
-            <Button 
-              variant="outline" 
-              size="lg"
-              onClick={() => setIsComparisonOpen(true)}
-              className="h-14 px-8 text-lg rounded-full border-white/20 hover:bg-white/10 text-white gap-2"
+        {config.showComparison && (
+          <div className="text-center mb-32">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="inline-flex flex-col items-center gap-4"
             >
-              <Scale className="w-5 h-5" />
-              Comparar planos
-            </Button>
-          </motion.div>
-        </div>
+              <h3 className="text-2xl text-gray-300 font-medium">Ainda não sabe qual plano escolher?</h3>
+              <Button 
+                variant="outline" 
+                size="lg"
+                onClick={() => setIsComparisonOpen(true)}
+                className="h-14 px-8 text-lg rounded-full border-white/20 hover:bg-white/10 text-white gap-2"
+              >
+                <Scale className="w-5 h-5" />
+                Comparar planos
+              </Button>
+            </motion.div>
+          </div>
+        )}
 
         {/* Bottom CTA Block */}
         <motion.div
@@ -408,35 +531,35 @@ export const PlansSection = () => {
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.8 }}
-          className="relative rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-gray-900 to-black text-center p-12 md:p-20"
+          className="relative rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-b from-gray-900 to-black text-center p-8 md:p-20"
         >
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(120,0,255,0.15),transparent_70%)]" />
           
           <div className="relative z-10 max-w-3xl mx-auto">
-            <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">
+            <h2 className="text-2xl md:text-5xl font-bold text-white mb-6">
               Pronto para transformar suas telas em inteligência de mercado?
             </h2>
-            <p className="text-xl text-gray-400 mb-10 leading-relaxed">
+            <p className="text-lg md:text-xl text-gray-400 mb-10 leading-relaxed">
               A Mupa vai além do digital signage tradicional. Entregamos dados reais de comportamento, análise de audiência e personalização estratégica para o varejo moderno.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                      <Button 
-                        size="lg" 
-                        onClick={() => setLeadFormType("general")}
-                        className="h-14 px-8 text-lg rounded-full bg-white text-black hover:bg-gray-200 transition-colors"
-                      >
-                        Falar com especialista Mupa
-                      </Button>
-                      <Button 
-                        size="lg" 
-                        variant="outline" 
-                        onClick={() => setLeadFormType("demo")}
-                        className="h-14 px-8 text-lg rounded-full border-white/20 hover:bg-white/10 text-white"
-                      >
-                        Agendar reunião executiva
-                      </Button>
-                    </div>
+              <Button 
+                size="lg" 
+                onClick={() => setLeadFormType("general")}
+                className="w-full sm:w-auto h-14 px-8 text-lg rounded-full bg-white text-black hover:bg-gray-200 transition-colors"
+              >
+                Falar com especialista Mupa
+              </Button>
+              <Button 
+                size="lg" 
+                variant="outline" 
+                onClick={() => setLeadFormType("demo")}
+                className="w-full sm:w-auto h-14 px-8 text-lg rounded-full border-white/20 hover:bg-white/10 text-white"
+              >
+                Agendar reunião executiva
+              </Button>
+            </div>
           </div>
         </motion.div>
       </div>

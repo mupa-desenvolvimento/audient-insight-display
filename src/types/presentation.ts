@@ -23,4 +23,6 @@ export type Slide = {
     right: { label: string; image: string; color?: string };
   };
   reasons?: { title: string; desc: string }[];
+  planDetails?: { title: string; items: string[] }[];
+  planTheme?: "zinc" | "green" | "blue" | "purple";
 };
