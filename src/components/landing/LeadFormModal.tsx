@@ -263,7 +263,7 @@ export function LeadFormModal({ isOpen, onClose, type }: LeadFormModalProps) {
                           {fieldName === "name" && (
                             <FormField
                               control={form.control}
-                              name="name"
+                              name={"name" as any}
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel className="text-base">Qual seu nome completo?</FormLabel>
@@ -280,7 +280,7 @@ export function LeadFormModal({ isOpen, onClose, type }: LeadFormModalProps) {
                           {fieldName === "email" && (
                             <FormField
                               control={form.control}
-                              name="email"
+                              name={"email" as any}
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel className="text-base">Seu melhor email corporativo</FormLabel>
@@ -297,7 +297,7 @@ export function LeadFormModal({ isOpen, onClose, type }: LeadFormModalProps) {
                           {fieldName === "phone" && (
                             <FormField
                               control={form.control}
-                              name="phone"
+                              name={"phone" as any}
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel className="text-base">WhatsApp ou Telefone</FormLabel>
@@ -314,7 +314,7 @@ export function LeadFormModal({ isOpen, onClose, type }: LeadFormModalProps) {
                           {fieldName === "jobTitle" && (
                             <FormField
                               control={form.control}
-                              name="jobTitle"
+                              name={"jobTitle" as any}
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel className="text-base">Qual seu cargo atual?</FormLabel>
@@ -331,7 +331,7 @@ export function LeadFormModal({ isOpen, onClose, type }: LeadFormModalProps) {
                           {fieldName === "company" && (
                             <FormField
                               control={form.control}
-                              name="company"
+                              name={"company" as any}
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel className="text-base">Nome da Empresa</FormLabel>
@@ -348,7 +348,7 @@ export function LeadFormModal({ isOpen, onClose, type }: LeadFormModalProps) {
                           {fieldName === "city" && (
                             <FormField
                               control={form.control}
-                              name="city"
+                              name={"city" as any}
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel className="text-base">Em qual cidade está a matriz?</FormLabel>
@@ -365,7 +365,7 @@ export function LeadFormModal({ isOpen, onClose, type }: LeadFormModalProps) {
                           {fieldName === "stores" && (
                             <FormField
                               control={form.control}
-                              name="stores"
+                              name={"stores" as any}
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel className="text-base">Quantas lojas a rede possui?</FormLabel>
@@ -392,7 +392,7 @@ export function LeadFormModal({ isOpen, onClose, type }: LeadFormModalProps) {
                           {fieldName === "screens" && (
                             <FormField
                               control={form.control}
-                              name="screens"
+                              name={"screens" as any}
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel className="text-base">Quantas telas você gerencia hoje?</FormLabel>

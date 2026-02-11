@@ -119,7 +119,7 @@ export function PlansCarousel({ onPlanSelect, visiblePlans }: PlansCarouselProps
   return (
     <div className="w-full max-w-5xl mx-auto px-4">
       <Carousel
-        plugins={[plugin.current]}
+        plugins={[plugin.current as any]}
         className="w-full"
         onMouseEnter={plugin.current.stop}
         onMouseLeave={plugin.current.reset}
