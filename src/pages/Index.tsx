@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { motion, useScroll, useTransform, useInView } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { PlansSection } from "@/components/landing/PlansSection";
 import logoHorizontal from "@/assets/logo_horizontal.svg";
 import {
   Monitor,
@@ -23,6 +24,7 @@ import {
   ArrowRight,
   Brain,
   Smartphone,
+  LucideIcon,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -256,7 +258,7 @@ const Hero = () => {
   );
 };
 
-const FeatureCard = ({ feature, index }: { feature: any; index: number }) => {
+const FeatureCard = ({ feature, index }: { feature: { icon: LucideIcon; title: string; description: string }; index: number }) => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true });
 
@@ -496,6 +498,7 @@ const Index = () => {
         <Hero />
         <Features />
         <AISection />
+        <PlansSection />
         <CTA />
       </main>
 
