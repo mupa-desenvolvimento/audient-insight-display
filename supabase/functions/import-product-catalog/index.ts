@@ -261,8 +261,8 @@ Deno.serve(async (req) => {
     const validProducts = products.filter(p => getEan(p));
     console.log(`[import-catalog] ${validProducts.length}/${products.length} products have EAN`);
 
-    // Run processing in background
-    EdgeRuntime.waitUntil(processAllProducts(supabase, validProducts));
+    // Run processing (cannot use EdgeRuntime in Deno)
+    await processAllProducts(supabase, validProducts);
 
     // Return immediately
     return new Response(
