@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import inkyMascot from "@/assets/inky-mascot.svg";
+import inkyAvatar from "@/assets/inky-avatar.png";
 
 interface Message {
   id: string;
@@ -172,8 +173,8 @@ export const InkySection = () => {
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md shadow-2xl shadow-cyan-500/5 overflow-hidden flex flex-col" style={{ height: 480 }}>
               {/* Header */}
               <div className="px-5 py-4 border-b border-white/10 flex items-center gap-3 bg-white/[0.02]">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500/30 to-blue-600/30 border border-cyan-500/30 flex items-center justify-center">
-                  <img src={inkyMascot} alt="Inky" className="w-6 h-6" />
+                <div className="w-10 h-10 rounded-full overflow-hidden border border-cyan-500/30">
+                  <img src={inkyAvatar} alt="Inky" className="w-full h-full object-cover" />
                 </div>
                 <div>
                   <div className="text-sm font-bold text-white">Inky</div>
@@ -198,8 +199,8 @@ export const InkySection = () => {
                       }`}
                     >
                       {msg.role === "assistant" && (
-                        <div className="w-7 h-7 rounded-full bg-cyan-500/20 border border-cyan-500/20 flex items-center justify-center text-sm mr-2 mt-1 shrink-0">
-                          <img src={inkyMascot} alt="Inky" className="w-5 h-5" />
+                        <div className="w-7 h-7 rounded-full overflow-hidden border border-cyan-500/20 mr-2 mt-1 shrink-0">
+                          <img src={inkyAvatar} alt="Inky" className="w-full h-full object-cover" />
                         </div>
                       )}
                       <div
@@ -215,8 +216,8 @@ export const InkySection = () => {
                   ))}
                   {isLoading && (
                     <div className="flex justify-start">
-                      <div className="w-7 h-7 rounded-full bg-cyan-500/20 border border-cyan-500/20 flex items-center justify-center text-sm mr-2 mt-1 shrink-0">
-                        <img src={inkyMascot} alt="Inky" className="w-5 h-5" />
+                      <div className="w-7 h-7 rounded-full overflow-hidden border border-cyan-500/20 mr-2 mt-1 shrink-0">
+                        <img src={inkyAvatar} alt="Inky" className="w-full h-full object-cover" />
                       </div>
                       <div className="bg-white/[0.06] rounded-2xl rounded-tl-none px-4 py-3 border border-white/10 flex items-center gap-2">
                         <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
