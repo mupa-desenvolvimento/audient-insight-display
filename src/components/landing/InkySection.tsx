@@ -149,7 +149,7 @@ export const InkySection = () => {
                 transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
                 className="select-none"
               >
-                <img src={inkyMascot} alt="Inky mascot" className="w-24 h-24" />
+                <img src={inkyAvatar} alt="Inky mascot" className="w-24 h-24 rounded-full object-cover" />
               </motion.div>
               <div className="space-y-2 pb-3">
                 {["Inteligente", "Rápido", "Simpático"].map((tag) => (
