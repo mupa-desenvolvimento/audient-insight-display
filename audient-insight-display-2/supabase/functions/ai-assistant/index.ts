@@ -55,6 +55,37 @@ serve(async (req) => {
           },
         },
       },
+      {
+        type: "function",
+        function: {
+          name: "update_playlist",
+          description: "Update an existing playlist by ID",
+          parameters: {
+            type: "object",
+            properties: {
+              id: { type: "string", description: "The ID of the playlist to update" },
+              name: { type: "string", description: "New name of the playlist" },
+              description: { type: "string", description: "New description" },
+              is_active: { type: "boolean", description: "Set active status" },
+            },
+            required: ["id"],
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "delete_playlist",
+          description: "Delete a playlist by ID",
+          parameters: {
+            type: "object",
+            properties: {
+              id: { type: "string", description: "The ID of the playlist to delete" },
+            },
+            required: ["id"],
+          },
+        },
+      },
     ];
 
     const completion = await openai.chat.completions.create({
@@ -63,9 +94,11 @@ serve(async (req) => {
         {
           role: "system",
           content: `You are an AI assistant for the MUPA Digital Signage platform. 
-          You can manage playlists and answer questions about the system.
+          You can manage playlists (create, list, update, delete) and answer questions about the system.
           When asked to create a playlist, use the create_playlist tool.
           When asked to list playlists, use the list_playlists tool.
+          When asked to update/change a playlist, use the update_playlist tool.
+          When asked to delete/remove a playlist, use the delete_playlist tool.
           Be concise and helpful.`,
         },
         ...messages,
@@ -119,6 +152,39 @@ serve(async (req) => {
           toolResult = `Playlists: ${JSON.stringify(data)}`;
           actionTaken = true;
           actionDescription = "Listagem de playlists consultada.";
+        }
+      } else if (functionName === "update_playlist") {
+        const updates: any = {};
+        if (functionArgs.name) updates.name = functionArgs.name;
+        if (functionArgs.description) updates.description = functionArgs.description;
+        if (functionArgs.is_active !== undefined) updates.is_active = functionArgs.is_active;
+
+        const { data, error } = await supabaseClient
+          .from("playlists")
+          .update(updates)
+          .eq("id", functionArgs.id)
+          .select()
+          .single();
+
+        if (error) {
+          toolResult = `Error updating playlist: ${error.message}`;
+        } else {
+          toolResult = `Playlist updated successfully. New data: ${JSON.stringify(data)}`;
+          actionTaken = true;
+          actionDescription = `Playlist "${data.name}" atualizada.`;
+        }
+      } else if (functionName === "delete_playlist") {
+        const { error } = await supabaseClient
+          .from("playlists")
+          .delete()
+          .eq("id", functionArgs.id);
+
+        if (error) {
+          toolResult = `Error deleting playlist: ${error.message}`;
+        } else {
+          toolResult = `Playlist deleted successfully.`;
+          actionTaken = true;
+          actionDescription = "Playlist excluída.";
         }
       }
 
