@@ -17,6 +17,7 @@ import {
   Palette,
   ShoppingBag,
   Brush,
+  Brain,
 } from "lucide-react";
 import logoHorizontal from "@/assets/logo_horizontal.svg";
 import { NavLink, useNavigate } from "react-router-dom";
@@ -51,6 +52,7 @@ const menuItems = [
   { title: "Câmera", url: "/admin/camera", icon: Camera },
   { title: "Monitoramento", url: "/admin/monitoring", icon: Eye },
   { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },
+  { title: "Inky Intelligence", url: "/admin/inky", icon: Brain },
   { title: "Configurações", url: "/admin/settings", icon: Settings },
 ];
 

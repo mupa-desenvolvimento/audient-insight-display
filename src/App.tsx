@@ -38,6 +38,7 @@ import ProductDisplayConfig from "./pages/admin/ProductDisplayConfig";
 import ProductAnalytics from "./pages/admin/ProductAnalytics";
 import CanvaIntegration from "./pages/admin/CanvaIntegration";
 import CanvaEditor from "./pages/admin/CanvaEditor";
+import InkyIntelligence from "./pages/admin/InkyIntelligence";
 import Install from "./pages/Install";
  import Presentation from "./pages/Presentation";
 import { OfflineIndicator } from "./components/OfflineIndicator";
@@ -127,6 +128,7 @@ function AppContent() {
                         <Route path="product-analytics" element={<ProductAnalytics />} />
                         <Route path="canva" element={<CanvaIntegration />} />
                         <Route path="integrations/canva/editor" element={<CanvaEditor />} />
+                        <Route path="inky" element={<InkyIntelligence />} />
                       </Routes>
                     </AppLayout>
                   </div>
