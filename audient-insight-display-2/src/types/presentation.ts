@@ -25,4 +25,17 @@ export type Slide = {
   reasons?: { title: string; desc: string }[];
   planDetails?: { title: string; items: string[] }[];
   planTheme?: "zinc" | "green" | "blue" | "purple";
+  
+  // New fields for Assaí presentation
+  stats?: { label: string; value: string; icon?: ElementType }[];
+  chartData?: { name: string; value: number }[];
+  chartType?: "bar" | "line" | "pie";
+  tableData?: {
+    headers: string[];
+    rows: (string | number)[][];
+  };
+  leftTitle?: string;
+  leftPoints?: string[];
+  rightTitle?: string;
+  rightPoints?: string[];
 };

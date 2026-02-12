@@ -11,6 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import Devices from "./pages/Devices";
 import Media from "./pages/Media";
 import Analytics from "./pages/Analytics";
+import InkyIntelligence from "./pages/admin/InkyIntelligence";
 import Settings from "./pages/Settings";
 import Index from "./pages/Index";
 import DevicePlayer from "./pages/DevicePlayer";
@@ -40,6 +41,7 @@ import CanvaIntegration from "./pages/admin/CanvaIntegration";
 import CanvaEditor from "./pages/admin/CanvaEditor";
 import Install from "./pages/Install";
  import Presentation from "./pages/Presentation";
+import AssaiPresentation from "./pages/AssaiPresentation";
 import { OfflineIndicator } from "./components/OfflineIndicator";
 import { PWAUpdatePrompt, InstallPrompt } from "./components/PWAPrompts";
 import { useSyncManager } from "./hooks/useSyncManager";
@@ -84,7 +86,8 @@ function AppContent() {
           <Route path="/camera" element={<Camera />} />
           <Route path="/camera-fullscreen" element={<CameraFullscreen />} />
           <Route path="/demo" element={<DeviceDemo />} />
-           <Route path="/apresentacao" element={<Presentation />} />
+          <Route path="/apresentacao" element={<Presentation />} />
+          <Route path="/apresentacao-assai" element={<AssaiPresentation />} />
           <Route path="/mobile-demo" element={<MobileDemo />} />
           {/* Canva OAuth callback - must be outside ProtectedRoute to handle redirect properly */}
           <Route path="/admin/canva/callback" element={<CanvaCallback />} />
@@ -118,6 +121,7 @@ function AppContent() {
                         <Route path="playlists/new" element={<PlaylistEditorPage />} />
                         <Route path="media" element={<Media />} />
                         <Route path="analytics" element={<Analytics />} />
+                        <Route path="inky-intelligence" element={<InkyIntelligence />} />
                         <Route path="settings" element={<Settings />} />
                         <Route path="camera" element={<Camera />} />
                         <Route path="monitoring" element={<LiveMonitoring />} />
