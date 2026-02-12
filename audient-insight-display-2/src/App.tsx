@@ -15,7 +15,8 @@ import InkyIntelligence from "./pages/admin/InkyIntelligence";
 import Settings from "./pages/Settings";
 import Index from "./pages/Index";
 import DevicePlayer from "./pages/DevicePlayer";
-import DeviceSetup from "./pages/DeviceSetup";
+// import DeviceSetup from "./pages/DeviceSetup";
+import { DeviceOnboarding } from "@/modules/device-registration";
 import DeviceDetector from "./pages/DeviceDetector";
 import OfflinePlayer from "./pages/OfflinePlayer";
 import WebViewPlayer from "./pages/WebViewPlayer";
@@ -77,9 +78,9 @@ function AppContent() {
           <Route path="/install" element={<Install />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/device/:deviceId" element={<DevicePlayer />} />
-          <Route path="/setup/:deviceId" element={<DeviceSetup />} />
+          <Route path="/setup/:deviceId" element={<DeviceOnboarding />} />
           <Route path="/detect/:deviceCode" element={<DeviceDetector />} />
-          <Route path="/play/:deviceCode" element={<OfflinePlayer />} />
+          <Route path="/play/:deviceCode" element={<WebViewPlayer />} />
           <Route path="/webview/:deviceCode" element={<WebViewPlayer />} />
           {/* Rota específica para Android/Kodular usando query param ?device_id=XYZ */}
           <Route path="/android-player" element={<WebViewPlayer />} />

@@ -23,23 +23,95 @@ import {
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 
+import { contentScheduler } from "@/modules/content-engine";
+import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
+import { productService, Product } from "@/modules/product-service";
+import { PriceCheckOverlay } from "@/components/PriceCheckOverlay";
+import { analyticsService } from "@/modules/analytics-engine";
+import { pushHandlerService } from "@/modules/push-handler";
+import { kioskService } from "@/modules/kiosk-controller";
+import { SystemMonitor } from "@/modules/kiosk-controller/components/SystemMonitor";
+
 const WebViewPlayer = () => {
   const { deviceCode: paramDeviceCode } = useParams<{ deviceCode: string }>();
   const [searchParams] = useSearchParams();
   // Permite obter o código via URL param ou query param (ex: ?device_id=XYZ)
   const deviceCode = paramDeviceCode || searchParams.get("device_id") || searchParams.get("id");
 
+  // Inicializar Push Handler e Kiosk Mode
+  useEffect(() => {
+    if (deviceCode) {
+      pushHandlerService.init(deviceCode);
+      kioskService.enableKioskMode();
+      
+      return () => {
+        pushHandlerService.cleanup();
+        kioskService.disableKioskMode();
+      };
+    }
+  }, [deviceCode]);
+
   // Hook principal que gerencia todo o estado, sincronização e cache offline
   const {
     deviceState,
+    activeItems,
+    overrideMedia,
     isLoading,
-    isSyncing,
-    syncError,
-    downloadProgress,
-    getActiveItems,
-    getActivePlaylist,
-    syncWithServer,
+    forceSync
   } = useOfflinePlayer(deviceCode || "");
+
+  // Estado para Consulta de Preço
+  const [scannedProduct, setScannedProduct] = useState<Product | null>(null);
+  const [isCheckingPrice, setIsCheckingPrice] = useState(false);
+  const [priceCheckError, setPriceCheckError] = useState<string | null>(null);
+
+  // Integração com Scanner de Código de Barras
+  useBarcodeScanner({
+    onScan: async (barcode) => {
+      console.log("Barcode Scanned:", barcode);
+      setIsCheckingPrice(true);
+      setPriceCheckError(null);
+      setScannedProduct(null);
+
+      try {
+        const product = await productService.getProduct(barcode);
+        
+        // Registrar analítico
+        analyticsService.logPriceCheck({
+          device_id: deviceCode || "unknown",
+          gtin: barcode,
+          scanned_at: new Date().toISOString(),
+          found: !!product,
+          product_name: product?.descricao,
+          price: product?.preco
+        });
+
+        if (product) {
+          setScannedProduct(product);
+        } else {
+          setPriceCheckError("Produto não encontrado no sistema.");
+        }
+      } catch (err) {
+        console.error("Erro ao consultar produto:", err);
+        setPriceCheckError("Erro ao consultar servidor.");
+      } finally {
+        setIsCheckingPrice(false);
+      }
+    },
+    minLength: 3, // Aceitar códigos menores para teste manual se necessário
+    timeLimit: 100 // Scanner geralmente envia muito rápido
+  });
+
+  const handleClosePriceCheck = () => {
+    setScannedProduct(null);
+    setPriceCheckError(null);
+    setIsCheckingPrice(false);
+  };
+
+  // Deriva playlist ativa para exibir info
+  const activePlaylist = useMemo(() => 
+    contentScheduler.getActivePlaylist(deviceState), 
+  [deviceState]);
 
   // Estados de UI local
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -48,28 +120,40 @@ const WebViewPlayer = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [transitionState, setTransitionState] = useState<'visible' | 'fading'>('visible');
-  const [showUpdateNotification, setShowUpdateNotification] = useState(false);
-  const [updateMessage, setUpdateMessage] = useState('');
-
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Deriva dados atuais do hook
-  const items = getActiveItems();
-  const activePlaylist = getActivePlaylist();
-  const currentItem = items[currentIndex];
+  // Determina o item atual (Override tem prioridade)
+  const currentItem = overrideMedia 
+    ? { 
+        id: 'override', 
+        media: overrideMedia, 
+        duration: 15, // Default duration for override if not specified
+        order: 0,
+        playlist_id: 'override'
+      } 
+    : activeItems[currentIndex];
+
   const currentMedia = currentItem?.media;
   const isOnline = deviceState?.is_online ?? navigator.onLine;
 
+  // Reset index when active items change
+  useEffect(() => {
+    if (currentIndex >= activeItems.length) {
+      setCurrentIndex(0);
+    }
+  }, [activeItems.length]);
+
   // Memoize current content info for face detection
   const currentContentInfo = useMemo(() => {
-    if (!currentMedia || !activePlaylist) return null;
+    if (!currentMedia) return null;
     return {
       contentId: currentMedia.id,
       contentName: currentMedia.name,
-      playlistId: activePlaylist.id
+      playlistId: overrideMedia ? 'override' : (currentItem as any).playlist_id
     };
-  }, [currentMedia, activePlaylist]);
+  }, [currentMedia, overrideMedia, currentItem]);
 
   // Face detection - only active if device has camera enabled
   const { 
@@ -88,45 +172,21 @@ const WebViewPlayer = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Listener do Firebase Realtime Database
-  useEffect(() => {
-    if (!deviceCode) return;
-
-    // Escuta mudanças na raiz do dispositivo
-    const deviceRef = ref(db, `${deviceCode}`);
-    
-    const unsubscribe = onValue(deviceRef, (snapshot) => {
-      const data = snapshot.val();
-      
-      // Verifica se houve atualização
-      if (data && (data["last-update"] || data["atualizacao_plataforma"] === "true")) {
-        console.log("Firebase update received:", data);
-        
-        setUpdateMessage("Nova atualização recebida!");
-        setShowUpdateNotification(true);
-        
-        // Dispara sincronização com o "endpoint" (Supabase + Cache Local)
-        syncWithServer();
-        
-        setTimeout(() => setShowUpdateNotification(false), 3000);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [deviceCode, syncWithServer]);
-
-  // Inicialização Kiosk Mode (Nativo)
-  useEffect(() => {
-    if (Capacitor.isNativePlatform()) {
-      setupKioskMode();
-    }
-  }, []);
-
+  // Inicialização Kiosk Mode (Nativo) - Delegado para o módulo, mas mantemos aqui se necessário UI específica
+  // O KioskService deve ser inicializado pelo hook ou App, mas por enquanto mantemos a chamada simples se não houver conflito.
+  // Vamos assumir que o KioskService cuida disso se integrado, mas aqui podemos garantir.
+  
   // Controle de transição de mídia e Timer
   useEffect(() => {
-    if (!currentMedia || items.length === 0) return;
+    if (!currentMedia) return;
 
-    const duration = (currentItem?.duration_override || currentMedia.duration || 10) * 1000;
+    // Use duration from override, item override, or media default
+    const durationSec = overrideMedia 
+      ? (overrideMedia.duration || 15)
+      : (currentItem?.duration || currentMedia.duration || 10);
+      
+    const duration = durationSec * 1000;
+    
     setTimeRemaining(duration);
     setTransitionState('visible');
 
@@ -144,7 +204,12 @@ const WebViewPlayer = () => {
 
     // Troca de mídia
     const nextTimeout = setTimeout(() => {
-      setCurrentIndex(prev => (prev + 1) % items.length);
+      if (!overrideMedia && activeItems.length > 1) {
+        setCurrentIndex(prev => (prev + 1) % activeItems.length);
+      } else if (!overrideMedia && activeItems.length === 1) {
+        // Se só tem 1 item, apenas reseta o timer visualmente (o loop fará o refresh)
+        setTransitionState('visible'); 
+      }
     }, duration);
 
     return () => {
@@ -152,7 +217,7 @@ const WebViewPlayer = () => {
       clearTimeout(fadeTimeout);
       clearTimeout(nextTimeout);
     };
-  }, [currentIndex, currentMedia, currentItem, items.length]);
+  }, [currentIndex, currentMedia, activeItems.length, overrideMedia]);
 
   // Auto-play vídeo
   useEffect(() => {
@@ -200,14 +265,14 @@ const WebViewPlayer = () => {
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'f' || e.key === 'F') toggleFullscreen();
-      if (e.key === ' ') syncWithServer();
-      if (e.key === 'ArrowRight') setCurrentIndex(prev => (prev + 1) % items.length);
-      if (e.key === 'ArrowLeft') setCurrentIndex(prev => (prev - 1 + items.length) % items.length);
+      if (e.key === ' ') forceSync();
+      if (e.key === 'ArrowRight' && activeItems.length > 0) setCurrentIndex(prev => (prev + 1) % activeItems.length);
+      if (e.key === 'ArrowLeft' && activeItems.length > 0) setCurrentIndex(prev => (prev - 1 + activeItems.length) % activeItems.length);
     };
     
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [toggleFullscreen, syncWithServer, items.length]);
+  }, [toggleFullscreen, forceSync, activeItems.length]);
 
   // Tela de loading inicial
   if (isLoading && !deviceState) {
@@ -220,31 +285,8 @@ const WebViewPlayer = () => {
     );
   }
 
-  // Tela de download/sincronização inicial (apenas se não tiver dados ainda)
-  if (isSyncing && !deviceState && downloadProgress.total > 0) {
-     const percent = downloadProgress.total > 0 
-      ? (downloadProgress.downloaded / downloadProgress.total) * 100 
-      : 0;
-
-    return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white p-8">
-        <Download className="w-16 h-16 mb-6 text-primary animate-bounce" />
-        <h1 className="text-xl font-semibold mb-2">Sincronizando Conteúdo</h1>
-        <p className="text-white/60 mb-6 text-center text-sm">
-          {downloadProgress.current || 'Preparando arquivos...'}
-        </p>
-        <div className="w-full max-w-sm">
-          <Progress value={percent} className="h-2" />
-          <p className="text-center text-xs mt-2 text-white/60">
-            {downloadProgress.downloaded} de {downloadProgress.total} arquivos
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   // Sem conteúdo ou erro
-  if (!activePlaylist || items.length === 0) {
+  if ((!activeItems || activeItems.length === 0) && !overrideMedia) {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white p-8">
         <Monitor className="w-16 h-16 mb-6 text-white/30" />
@@ -252,28 +294,22 @@ const WebViewPlayer = () => {
         <p className="text-white/60 mb-4 text-center text-sm">
           {deviceState?.device_name || deviceCode}
         </p>
-        {syncError && (
-          <div className="flex items-center gap-2 text-red-400 mb-4">
-            <AlertCircle className="w-4 h-4" />
-            <span className="text-sm">{syncError}</span>
-          </div>
-        )}
         <button
-          onClick={syncWithServer}
+          onClick={forceSync}
           className="flex items-center gap-2 px-4 py-2 bg-primary/20 rounded-lg hover:bg-primary/30"
         >
           <RefreshCw className="w-4 h-4" />
-          Tentar Novamente
+          Sincronizar Agora
         </button>
       </div>
     );
   }
 
-  const duration = currentItem?.duration_override || currentMedia.duration || 10;
+  const duration = currentItem?.duration_override || currentMedia?.duration || 10;
   const progressPercent = ((duration * 1000 - timeRemaining) / (duration * 1000)) * 100;
   
   // URL da mídia: Prefere o blob_url (local/cache), senão usa o file_url (remoto)
-  const mediaUrl = currentMedia.blob_url || currentMedia.file_url;
+  const mediaUrl = currentMedia?.blob_url || currentMedia?.file_url || '';
 
   const getObjectFitClass = () => {
     switch (activePlaylist?.content_scale) {
@@ -282,6 +318,8 @@ const WebViewPlayer = () => {
       case 'cover': default: return 'object-cover';
     }
   };
+
+  if (!currentMedia) return null;
 
   return (
     <div className="relative min-h-screen bg-black overflow-hidden select-none">
@@ -312,7 +350,11 @@ const WebViewPlayer = () => {
             autoPlay
             muted
             playsInline
-            onEnded={() => setCurrentIndex(prev => (prev + 1) % items.length)}
+            onEnded={() => {
+              if (activeItems.length > 0) {
+                 setCurrentIndex(prev => (prev + 1) % activeItems.length);
+              }
+            }}
           />
         ) : (
           <img
@@ -326,7 +368,7 @@ const WebViewPlayer = () => {
             onError={(e) => {
               // Se falhar o blob, tenta a URL original
               if ((e.target as HTMLImageElement).src !== currentMedia.file_url) {
-                (e.target as HTMLImageElement).src = currentMedia.file_url;
+                (e.target as HTMLImageElement).src = currentMedia.file_url || '';
               }
             }}
           />
@@ -354,7 +396,7 @@ const WebViewPlayer = () => {
             )} />
             <div>
               <p className="text-white font-medium text-sm">{deviceState?.device_name || deviceCode}</p>
-              <p className="text-white/60 text-xs">{activePlaylist.name}</p>
+              <p className="text-white/60 text-xs">{activePlaylist?.name || 'Playlist'}</p>
             </div>
           </div>
 
@@ -372,8 +414,8 @@ const WebViewPlayer = () => {
                 <WifiOff className="w-4 h-4 text-yellow-400" />
               )}
               
-              <button onClick={syncWithServer} disabled={isSyncing} className="p-2 hover:bg-white/10 rounded-lg disabled:opacity-50">
-                <RefreshCw className={cn("w-4 h-4 text-white", isSyncing && "animate-spin")} />
+              <button onClick={forceSync} className="p-2 hover:bg-white/10 rounded-lg">
+                <RefreshCw className="w-4 h-4 text-white" />
               </button>
               
               <button onClick={toggleFullscreen} className="p-2 hover:bg-white/10 rounded-lg">
@@ -396,7 +438,7 @@ const WebViewPlayer = () => {
           <div>
             <p className="text-white font-medium text-sm">{currentMedia.name}</p>
             <p className="text-white/60 text-xs">
-              {currentIndex + 1} de {items.length} • {Math.ceil(timeRemaining / 1000)}s
+              {currentIndex + 1} de {activeItems.length} • {Math.ceil(timeRemaining / 1000)}s
             </p>
           </div>
         </div>
@@ -409,6 +451,17 @@ const WebViewPlayer = () => {
           <span className="text-yellow-200 text-xs">Offline</span>
         </div>
       )}
+
+      {/* Overlay de Consulta de Preço */}
+      <PriceCheckOverlay 
+        product={scannedProduct}
+        isLoading={isCheckingPrice}
+        error={priceCheckError}
+        onClose={handleClosePriceCheck}
+      />
+
+      {/* Monitoramento de Sistema */}
+      {deviceCode && <SystemMonitor deviceCode={deviceCode} />}
 
       {/* Indicador de detecção facial */}
       {/* (Opcional: Exibir apenas se soubermos que a câmera está ativa) */}
