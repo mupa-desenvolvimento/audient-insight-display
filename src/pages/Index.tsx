@@ -131,7 +131,9 @@ const Navbar = () => {
                     Planos
                   </a>
                   <Link to="/auth" className="w-full pt-4">
-                    <Button className="w-full h-12 text-lg bg-white text-black hover:bg-gray-200 rounded-full">Entrar</Button>
+                    <Button className="w-full h-12 text-lg bg-white text-black hover:bg-gray-200 rounded-full">
+                      Entrar
+                    </Button>
                   </Link>
                 </nav>
               </SheetContent>
@@ -148,11 +150,7 @@ const Hero = () => {
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
-      <LeadFormModal 
-        isOpen={!!leadFormType} 
-        onClose={() => setLeadFormType(null)} 
-        type={leadFormType || "general"} 
-      />
+      <LeadFormModal isOpen={!!leadFormType} onClose={() => setLeadFormType(null)} type={leadFormType || "general"} />
       {/* Background Elements */}
       <div className="absolute inset-0 bg-black">
         <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_0%,rgba(120,0,255,0.2),transparent_50%)]" />
@@ -194,7 +192,7 @@ const Hero = () => {
               className="w-full sm:w-auto min-h-[3.5rem] h-auto py-4 px-6 sm:px-8 text-base sm:text-lg rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 border-0 shadow-lg shadow-purple-500/20 whitespace-normal leading-tight"
             >
               <Zap className="mr-2 h-5 w-5 fill-current shrink-0" />
-              <span>Solicitar diagnóstico da minha operação</span>
+              <span>Começar Agora</span>
             </Button>
             <Button
               size="lg"
@@ -203,7 +201,7 @@ const Hero = () => {
               className="w-full sm:w-auto min-h-[3.5rem] h-auto py-4 px-6 sm:px-8 text-base sm:text-lg rounded-full border-white/20 bg-white/5 hover:bg-white/10 text-white backdrop-blur-sm whitespace-normal leading-tight"
             >
               <Play className="mr-2 h-5 w-5 shrink-0" />
-              <span>Ver demonstração</span>
+              <span>Ver demo</span>
             </Button>
           </motion.div>
 
@@ -304,7 +302,13 @@ const Hero = () => {
   );
 };
 
-const FeatureCard = ({ feature, index }: { feature: { icon: LucideIcon; title: string; description: string }; index: number }) => {
+const FeatureCard = ({
+  feature,
+  index,
+}: {
+  feature: { icon: LucideIcon; title: string; description: string };
+  index: number;
+}) => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true });
 
@@ -489,8 +493,6 @@ const AISection = () => {
     </section>
   );
 };
-
-
 
 const Index = () => {
   return (
