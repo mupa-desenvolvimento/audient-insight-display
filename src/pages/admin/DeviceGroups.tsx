@@ -68,7 +68,7 @@ const DeviceGroupsPage = () => {
   const filteredGroups = deviceGroups.filter(
     (group) =>
       group.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      group.screen_type.toLowerCase().includes(searchTerm.toLowerCase())
+      (group.screen_type || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleCreate = () => {
