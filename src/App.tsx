@@ -41,6 +41,7 @@ import CanvaEditor from "./pages/admin/CanvaEditor";
 import InkyIntelligence from "./pages/admin/InkyIntelligence";
 import Install from "./pages/Install";
  import Presentation from "./pages/Presentation";
+import AssaiPresentation from "./pages/AssaiPresentation";
 import { OfflineIndicator } from "./components/OfflineIndicator";
 import { PWAUpdatePrompt, InstallPrompt } from "./components/PWAPrompts";
 import { useSyncManager } from "./hooks/useSyncManager";
@@ -86,6 +87,7 @@ function AppContent() {
           <Route path="/camera-fullscreen" element={<CameraFullscreen />} />
           <Route path="/demo" element={<DeviceDemo />} />
            <Route path="/apresentacao" element={<Presentation />} />
+          <Route path="/apresentacao-assai" element={<AssaiPresentation />} />
           <Route path="/mobile-demo" element={<MobileDemo />} />
           {/* Canva OAuth callback - must be outside ProtectedRoute to handle redirect properly */}
           <Route path="/admin/canva/callback" element={<CanvaCallback />} />
