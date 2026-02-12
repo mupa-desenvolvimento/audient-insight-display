@@ -1,28 +1,32 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useOfflinePlayer, CachedPlaylistItem, CachedMedia, CachedChannel } from "@/hooks/useOfflinePlayer";
+import { useOfflinePlayer } from "@/hooks/useOfflinePlayer";
 import { useProductLookup } from "@/hooks/useProductLookup";
 import { useProductDisplaySettingsBySlug } from "@/hooks/useProductDisplaySettings";
 import { ProductLookupContainer } from "@/components/player/ProductLookupContainer";
 import { EanInput } from "@/components/player/EanInput";
-import { 
-  Wifi, 
-  WifiOff, 
-  RefreshCw, 
-  Download, 
-  Monitor, 
+import { useDeviceMonitor } from "@/hooks/useDeviceMonitor";
+import { useAutoHideControls, useFullscreen, useKeyboardShortcuts, useMediaRotation, useClock } from "@/hooks/player";
+import {
+  MediaRenderer,
+  PlayerProgressBar,
+  MediaIndicators,
+  PlayerControls,
+  LoadingScreen,
+  BlockedScreen,
+  EmptyContentScreen,
+  DownloadScreen,
+} from "@/components/player-core";
+import {
   AlertCircle,
-  Maximize,
-  Minimize,
-  Clock,
-  Image as ImageIcon,
+  RefreshCw,
   Video,
-  Lock
+  Image as ImageIcon,
+  Clock,
+  WifiOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { useDeviceMonitor } from "@/hooks/useDeviceMonitor";
 
 type PlayerMode = "media" | "product" | "blocked" | "override";
 
@@ -43,311 +47,141 @@ const OfflinePlayer = () => {
     clearAllData,
   } = useOfflinePlayer(deviceCode || "");
 
-  // Initialize Camera Monitoring & AI Analytics
   const { videoRef: cameraVideoRef, canvasRef: cameraCanvasRef } = useDeviceMonitor(deviceCode || "");
-
-  // Estado do player
   const [playerMode, setPlayerMode] = useState<PlayerMode>("media");
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showControls, setShowControls] = useState(true);
-  const [timeRemaining, setTimeRemaining] = useState(0);
-  const [currentTime, setCurrentTime] = useState(new Date());
-  
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const mediaTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Hook de consulta de produtos
-  const { 
-    product, 
-    isLoading: isProductLoading, 
-    error: productError, 
-    lookupProduct, 
-    clearProduct 
-  } = useProductLookup({
-    deviceCode: deviceCode || "",
-    onLookupStart: () => {
-      setPlayerMode("product");
-      // Pausa o timer de mídia durante a consulta
-      if (mediaTimerRef.current) {
-        clearTimeout(mediaTimerRef.current);
-      }
-    }
-  });
-
-  // Buscar configurações de display da empresa
-  // TODO: Pegar o slug da empresa do dispositivo quando disponível
-  const { data: displaySettings } = useProductDisplaySettingsBySlug(deviceState?.company_slug);
+  const { showControls } = useAutoHideControls();
+  const { isFullscreen, toggleFullscreen } = useFullscreen();
+  const { formattedTime, formattedDate } = useClock();
 
   const activePlaylist = getActivePlaylist();
   const activeChannel = activePlaylist?.has_channels ? getActiveChannel(activePlaylist) : null;
   const items = getActiveItems();
-  const currentItem = items[currentIndex];
-  const currentMedia = currentItem?.media;
 
-  // Função para voltar ao modo de mídias
-  const handleDismissProduct = useCallback(() => {
-    setPlayerMode("media");
-    clearProduct();
-  }, [clearProduct]);
-
-  // Função para lidar com entrada de EAN
-  const handleEanSubmit = useCallback((ean: string) => {
-    console.log("[OfflinePlayer] EAN submetido:", ean);
-    lookupProduct(ean);
-  }, [lookupProduct]);
-
-  // Função para resetar o dispositivo
-  const handleReset = useCallback(async () => {
-    console.log("[OfflinePlayer] Iniciando reset...");
-    toast.loading("Limpando dados...", { id: "reset" });
-    
-    try {
-      await clearAllData();
-      toast.success("Dados limpos com sucesso!", { id: "reset" });
-      
-      // Redireciona para a tela de setup
-      setTimeout(() => {
-        navigate(`/setup/${deviceCode}`);
-      }, 1000);
-    } catch (error) {
-      console.error("[OfflinePlayer] Erro ao resetar:", error);
-      toast.error("Erro ao limpar dados", { id: "reset" });
-    }
-  }, [clearAllData, navigate, deviceCode]);
-
-  // Atualiza relógio
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Controle de exibição de mídia - só roda quando em modo mídia
-  useEffect(() => {
-    if (!currentMedia || items.length === 0 || playerMode !== "media") return;
-
-    const duration = (currentItem?.duration_override || currentMedia.duration || 10) * 1000;
-    setTimeRemaining(duration);
-
-    // Barra de progresso
-    const startTime = Date.now();
-    progressIntervalRef.current = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      setTimeRemaining(Math.max(0, duration - elapsed));
-    }, 100);
-
-    // Timer para próxima mídia
-    mediaTimerRef.current = setTimeout(() => {
-      setCurrentIndex((prev) => (prev + 1) % items.length);
-    }, duration);
-
-    return () => {
-      if (mediaTimerRef.current) {
-        clearTimeout(mediaTimerRef.current);
-      }
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-      }
-    };
-  }, [currentIndex, currentMedia, currentItem, items.length, playerMode]);
-
-  // Reproduz vídeo automaticamente
-  useEffect(() => {
-    if (currentMedia?.type === "video" && videoRef.current) {
-      videoRef.current.play().catch(console.error);
-    }
-  }, [currentMedia]);
-
-  // Controles auto-hide
-  useEffect(() => {
-    const showControlsTemporarily = () => {
-      setShowControls(true);
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-      }
-      controlsTimeoutRef.current = setTimeout(() => {
-        setShowControls(false);
-      }, 3000);
-    };
-
-    const handleMouseMove = () => showControlsTemporarily();
-    const handleTouch = () => showControlsTemporarily();
-
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("touchstart", handleTouch);
-    showControlsTemporarily();
-
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("touchstart", handleTouch);
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Fullscreen toggle
-  const toggleFullscreen = useCallback(() => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().then(() => {
-        setIsFullscreen(true);
-      }).catch(console.error);
-    } else {
-      document.exitFullscreen().then(() => {
-        setIsFullscreen(false);
-      }).catch(console.error);
-    }
-  }, []);
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "f" || e.key === "F") toggleFullscreen();
-      if (e.key === " ") syncWithServer();
-      if (e.key === "ArrowRight") setCurrentIndex((prev) => (prev + 1) % items.length);
-      if (e.key === "ArrowLeft") setCurrentIndex((prev) => (prev - 1 + items.length) % items.length);
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [toggleFullscreen, syncWithServer, items.length]);
-
-  // Verifica se o dispositivo está bloqueado
-  const isDeviceBlocked = deviceState?.is_blocked === true;
-  
-  // Verifica se há mídia avulsa ativa
+  // Override media check
   const hasActiveOverrideMedia = (() => {
     if (!deviceState?.override_media) return false;
     const expiresAt = new Date(deviceState.override_media.expires_at);
     return expiresAt > new Date();
   })();
-  
   const overrideMedia = hasActiveOverrideMedia ? deviceState?.override_media : null;
-
-  // Tela de loading
-  if (isLoading && !deviceState) {
-    return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white">
-        <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mb-6" />
-        <h1 className="text-2xl font-semibold mb-2">Carregando Player</h1>
-        <p className="text-white/60">Dispositivo: {deviceCode}</p>
-      </div>
-    );
-  }
-
-  // TELA DE BLOQUEIO - Prioridade máxima
-  if (isDeviceBlocked) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-red-950 via-black to-red-950 flex flex-col items-center justify-center text-white p-8">
-        <div className="bg-red-500/20 p-8 rounded-full mb-8 animate-pulse">
-          <Lock className="w-24 h-24 text-red-500" />
-        </div>
-        <h1 className="text-4xl font-bold mb-4 text-red-400">Dispositivo Bloqueado</h1>
-        <p className="text-xl text-white/80 text-center max-w-lg mb-6">
-          {deviceState?.blocked_message || "Este dispositivo foi bloqueado pelo administrador."}
-        </p>
-        <div className="text-white/40 text-sm mt-8 flex items-center gap-2">
-          <Monitor className="w-4 h-4" />
-          <span>{deviceState?.device_name || deviceCode}</span>
-        </div>
-        <p className="text-white/30 text-xs mt-2">
-          Entre em contato com o suporte para mais informações
-        </p>
-        
-        {/* Botão de sincronização escondido para verificar desbloqueio */}
-        <button
-          onClick={syncWithServer}
-          disabled={isSyncing}
-          className="mt-8 flex items-center gap-2 px-4 py-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors text-white/50"
-        >
-          <RefreshCw className={cn("w-4 h-4", isSyncing && "animate-spin")} />
-          {isSyncing ? "Verificando..." : "Verificar status"}
-        </button>
-      </div>
-    );
-  }
-
-  // Tela de download inicial
-  if (isSyncing && downloadProgress.total > 0 && downloadProgress.downloaded < downloadProgress.total) {
-    const progress = (downloadProgress.downloaded / downloadProgress.total) * 100;
-    
-    return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white p-8">
-        <Download className="w-16 h-16 mb-6 text-primary animate-bounce" />
-        <h1 className="text-2xl font-semibold mb-2">Baixando Conteúdos</h1>
-        <p className="text-white/60 mb-6 text-center">
-          {downloadProgress.current || "Preparando..."}
-        </p>
-        <div className="w-full max-w-md">
-          <Progress value={progress} className="h-2" />
-          <p className="text-center text-sm mt-2 text-white/60">
-            {downloadProgress.downloaded} de {downloadProgress.total} arquivos
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // Se há mídia avulsa ativa, usar ela em vez da playlist
   const displayOverrideMedia = hasActiveOverrideMedia && overrideMedia;
 
-  // Sem conteúdo disponível (apenas se não tiver mídia avulsa)
-  if (!displayOverrideMedia && (!activePlaylist || items.length === 0)) {
-    // Debug info
-    const debugInfo = activePlaylist 
-      ? `Playlist "${activePlaylist.name}" ativa, mas ${activePlaylist.has_channels ? 'nenhum canal ativo' : 'sem itens'}`
-      : `${deviceState?.playlists?.length || 0} playlists em cache`;
-    
+  // Media rotation - must be called before using currentIndex
+  const firstItem = items[0];
+  const firstMedia = firstItem?.media;
+  const defaultDuration = displayOverrideMedia
+    ? (overrideMedia?.duration || 10)
+    : (firstItem?.duration_override || firstMedia?.duration || 10);
+
+  const { currentIndex, goToNext, goToPrev, progressPercent, timeRemaining } = useMediaRotation({
+    itemsLength: items.length,
+    currentDuration: defaultDuration,
+    isVideo: firstMedia?.type === "video",
+    enabled: playerMode === "media" && !displayOverrideMedia && items.length > 0,
+  });
+
+  // Derive active media from current index
+  const activeItem = items[currentIndex] || null;
+  const activeMedia = displayOverrideMedia ? overrideMedia : activeItem?.media;
+
+  // Product lookup
+  const mediaTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const {
+    product,
+    isLoading: isProductLoading,
+    error: productError,
+    lookupProduct,
+    clearProduct,
+  } = useProductLookup({
+    deviceCode: deviceCode || "",
+    onLookupStart: () => {
+      setPlayerMode("product");
+      if (mediaTimerRef.current) clearTimeout(mediaTimerRef.current);
+    },
+  });
+
+  const { data: displaySettings } = useProductDisplaySettingsBySlug(deviceState?.company_slug);
+
+  useKeyboardShortcuts({
+    onFullscreen: toggleFullscreen,
+    onSync: syncWithServer,
+    onNext: goToNext,
+    onPrev: goToPrev,
+    itemsLength: items.length,
+  });
+
+  const handleDismissProduct = useCallback(() => {
+    setPlayerMode("media");
+    clearProduct();
+  }, [clearProduct]);
+
+  const handleEanSubmit = useCallback((ean: string) => {
+    lookupProduct(ean);
+  }, [lookupProduct]);
+
+  const handleReset = useCallback(async () => {
+    toast.loading("Limpando dados...", { id: "reset" });
+    try {
+      await clearAllData();
+      toast.success("Dados limpos com sucesso!", { id: "reset" });
+      setTimeout(() => navigate(`/setup/${deviceCode}`), 1000);
+    } catch {
+      toast.error("Erro ao limpar dados", { id: "reset" });
+    }
+  }, [clearAllData, navigate, deviceCode]);
+
+  const isDeviceBlocked = deviceState?.is_blocked === true;
+
+  // State screens
+  if (isLoading && !deviceState) {
+    return <LoadingScreen subMessage={`Dispositivo: ${deviceCode}`} />;
+  }
+
+  if (isDeviceBlocked) {
     return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white">
-        <Monitor className="w-20 h-20 mb-6 text-white/30" />
-        <h1 className="text-2xl font-semibold mb-2">Aguardando Conteúdo</h1>
-        <p className="text-white/60 mb-4 text-center max-w-md">
-          {deviceState?.device_name || deviceCode}
-        </p>
-        {syncError && (
-          <div className="flex items-center gap-2 text-red-400 mb-4">
-            <AlertCircle className="w-4 h-4" />
-            <span className="text-sm">{syncError}</span>
-          </div>
-        )}
-        <button
-          onClick={syncWithServer}
-          disabled={isSyncing}
-          className="flex items-center gap-2 px-4 py-2 bg-primary/20 rounded-lg hover:bg-primary/30 transition-colors"
-        >
-          <RefreshCw className={cn("w-4 h-4", isSyncing && "animate-spin")} />
-          {isSyncing ? "Sincronizando..." : "Sincronizar"}
-        </button>
-        <p className="text-white/40 text-sm mt-6">
-          Nenhuma playlist ativa para o horário atual
-        </p>
-        <p className="text-white/30 text-xs mt-2">
-          {debugInfo}
-        </p>
-      </div>
+      <BlockedScreen
+        message={deviceState?.blocked_message || undefined}
+        deviceName={deviceState?.device_name || deviceCode}
+        onCheckStatus={syncWithServer}
+        isChecking={isSyncing}
+      />
     );
   }
 
-  // Mídia a exibir - prioridade para mídia avulsa
-  const displayMedia = displayOverrideMedia ? overrideMedia : currentMedia;
-  const displayMediaUrl = displayOverrideMedia 
+  if (isSyncing && downloadProgress.total > 0 && downloadProgress.downloaded < downloadProgress.total) {
+    return (
+      <DownloadScreen
+        downloaded={downloadProgress.downloaded}
+        total={downloadProgress.total}
+        current={downloadProgress.current}
+      />
+    );
+  }
+
+  if (!displayOverrideMedia && (!activePlaylist || items.length === 0)) {
+    const debugInfo = activePlaylist
+      ? `Playlist "${activePlaylist.name}" ativa, mas ${activePlaylist.has_channels ? "nenhum canal ativo" : "sem itens"}`
+      : `${deviceState?.playlists?.length || 0} playlists em cache`;
+
+    return (
+      <EmptyContentScreen
+        deviceName={deviceState?.device_name || deviceCode}
+        syncError={syncError}
+        onSync={syncWithServer}
+        isSyncing={isSyncing}
+        debugInfo={debugInfo}
+      />
+    );
+  }
+
+  if (!activeMedia) return null;
+
+  const displayMediaUrl = displayOverrideMedia
     ? (overrideMedia?.blob_url || overrideMedia?.file_url || "")
-    : (currentMedia?.blob_url || currentMedia?.file_url || "");
-  const displayDuration = displayOverrideMedia 
-    ? (overrideMedia?.duration || 10)
-    : (currentItem?.duration_override || currentMedia?.duration || 10);
-  const progressPercent = displayOverrideMedia 
-    ? 0 // Sem barra de progresso para mídia avulsa
-    : ((displayDuration * 1000 - timeRemaining) / (displayDuration * 1000)) * 100;
+    : (activeItem?.media?.blob_url || activeItem?.media?.file_url || "");
 
   return (
     <div className="relative min-h-screen bg-black overflow-hidden select-none">
-      {/* Input EAN - SEMPRE ativo para capturar scanner, mesmo durante exibição do produto */}
       <EanInput
         isVisible={playerMode === "media"}
         onSubmit={handleEanSubmit}
@@ -356,7 +190,6 @@ const OfflinePlayer = () => {
         alwaysListenForScanner={true}
       />
 
-      {/* Container de Produto - sobrepõe as mídias quando ativo */}
       {playerMode === "product" && (
         <ProductLookupContainer
           product={product}
@@ -368,7 +201,6 @@ const OfflinePlayer = () => {
         />
       )}
 
-      {/* Indicador de Mídia Avulsa */}
       {displayOverrideMedia && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-orange-500/90 backdrop-blur-sm rounded-full px-4 py-2">
           <AlertCircle className="w-4 h-4 text-white" />
@@ -376,172 +208,83 @@ const OfflinePlayer = () => {
         </div>
       )}
 
-      {/* Container de Mídias - visível apenas quando em modo mídia */}
       <div className={cn(
         "relative w-full h-screen transition-opacity duration-300",
         playerMode === "product" ? "opacity-0 pointer-events-none" : "opacity-100"
       )}>
-        {displayMedia?.type === "video" ? (
-          <video
-            ref={videoRef}
-            src={displayMediaUrl}
-            className="w-full h-full object-contain"
-            autoPlay
-            muted
-            loop={!!displayOverrideMedia} // Loop para mídia avulsa
-            playsInline
-            onEnded={() => {
-              if (!displayOverrideMedia) {
-                setCurrentIndex((prev) => (prev + 1) % items.length);
-              }
-            }}
-          />
-        ) : (
-          <img
-            src={displayMediaUrl}
-            alt={displayMedia?.name || "Mídia"}
-            className="w-full h-full object-contain transition-opacity duration-500"
-            onError={(e) => {
-              // Fallback para URL original se blob falhar
-              const fallbackUrl = displayOverrideMedia 
-                ? overrideMedia?.file_url 
-                : currentMedia?.file_url;
-              if (fallbackUrl && (e.target as HTMLImageElement).src !== fallbackUrl) {
-                (e.target as HTMLImageElement).src = fallbackUrl;
-              }
-            }}
-          />
-        )}
+        <MediaRenderer
+          media={activeMedia}
+          mediaUrl={displayMediaUrl}
+          objectFit="contain"
+          loop={!!displayOverrideMedia}
+          onEnded={!displayOverrideMedia ? goToNext : undefined}
+          onImageError={(e) => {
+            const fallbackUrl = displayOverrideMedia ? overrideMedia?.file_url : activeItem?.media?.file_url;
+            if (fallbackUrl && (e.target as HTMLImageElement).src !== fallbackUrl) {
+              (e.target as HTMLImageElement).src = fallbackUrl;
+            }
+          }}
+        />
       </div>
 
-      {/* Barra de Progresso - só visível no modo mídia normal (não avulsa) */}
       {playerMode === "media" && !displayOverrideMedia && (
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
-          <div
-            className="h-full bg-primary transition-all duration-100 ease-linear"
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
+        <PlayerProgressBar progressPercent={progressPercent} />
       )}
 
-      {/* Controles superiores - só visíveis no modo mídia */}
       {playerMode === "media" && (
-        <div
-          className={cn(
-            "absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/70 to-transparent transition-opacity duration-300",
-            showControls ? "opacity-100" : "opacity-0"
-          )}
-        >
-        <div className="flex justify-between items-start">
-          {/* Info do dispositivo */}
-          <div className="flex items-center gap-3">
-            <div className={cn(
-              "w-3 h-3 rounded-full",
-              deviceState?.is_online ? "bg-green-500" : "bg-red-500"
-            )} />
-            <div>
-              <p className="text-white font-medium text-sm">
-                {deviceState?.device_name || deviceCode}
-              </p>
-              <p className="text-white/60 text-xs">
-                {activePlaylist?.name}{activeChannel ? ` • ${activeChannel.name}` : ''}
-              </p>
-            </div>
-          </div>
-
-          {/* Relógio e status */}
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-white text-lg font-mono">
-                {currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-              </p>
-              <p className="text-white/60 text-xs">
-                {currentTime.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" })}
-              </p>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              {deviceState?.is_online ? (
-                <Wifi className="w-5 h-5 text-green-400" />
-              ) : (
-                <WifiOff className="w-5 h-5 text-yellow-400" />
-              )}
-              
-              <button
-                onClick={syncWithServer}
-                disabled={isSyncing}
-                className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-              >
-                <RefreshCw className={cn("w-5 h-5 text-white", isSyncing && "animate-spin")} />
-              </button>
-              
-              <button
-                onClick={toggleFullscreen}
-                className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-              >
-                {isFullscreen ? (
-                  <Minimize className="w-5 h-5 text-white" />
-                ) : (
-                  <Maximize className="w-5 h-5 text-white" />
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+        <PlayerControls
+          visible={showControls}
+          deviceName={deviceState?.device_name || deviceCode}
+          playlistName={activePlaylist?.name}
+          channelName={activeChannel?.name}
+          isOnline={deviceState?.is_online}
+          isFullscreen={isFullscreen}
+          isSyncing={isSyncing}
+          formattedTime={formattedTime}
+          formattedDate={formattedDate}
+          onToggleFullscreen={toggleFullscreen}
+          onSync={syncWithServer}
+          showClock
+          showSyncButton
+        />
       )}
 
-      {/* Info da mídia atual */}
       {playerMode === "media" && (
-      <div
-        className={cn(
+        <div className={cn(
           "absolute bottom-6 left-6 bg-black/60 backdrop-blur-sm rounded-lg p-3 transition-opacity duration-300",
           showControls ? "opacity-100" : "opacity-0"
-        )}
-      >
-        <div className="flex items-center gap-3">
-          {displayMedia?.type === "video" ? (
-            <Video className="w-5 h-5 text-primary" />
-          ) : (
-            <ImageIcon className="w-5 h-5 text-primary" />
-          )}
-          <div>
-            <p className="text-white font-medium text-sm">{displayMedia?.name}</p>
-            {displayOverrideMedia ? (
-              <p className="text-orange-400 text-xs">
-                Mídia avulsa • Expira: {new Date(overrideMedia!.expires_at).toLocaleTimeString("pt-BR")}
-              </p>
+        )}>
+          <div className="flex items-center gap-3">
+            {activeMedia?.type === "video" ? (
+              <Video className="w-5 h-5 text-primary" />
             ) : (
-              <p className="text-white/60 text-xs">
-                {currentIndex + 1} de {items.length} • {Math.ceil(timeRemaining / 1000)}s restantes
-              </p>
+              <ImageIcon className="w-5 h-5 text-primary" />
             )}
+            <div>
+              <p className="text-white font-medium text-sm">{activeMedia?.name}</p>
+              {displayOverrideMedia ? (
+                <p className="text-orange-400 text-xs">
+                  Mídia avulsa • Expira: {new Date(overrideMedia!.expires_at).toLocaleTimeString("pt-BR")}
+                </p>
+              ) : (
+                <p className="text-white/60 text-xs">
+                  {currentIndex + 1} de {items.length} • {Math.ceil(timeRemaining / 1000)}s restantes
+                </p>
+              )}
+            </div>
           </div>
         </div>
-      </div>
       )}
 
-      {/* Indicadores de mídia - esconde durante mídia avulsa */}
       {playerMode === "media" && !displayOverrideMedia && (
-        <div
-          className={cn(
-            "absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-1.5 transition-opacity duration-300",
-            showControls ? "opacity-100" : "opacity-0"
-          )}
-        >
-          {items.map((_, index) => (
-            <div
-              key={index}
-              className={cn(
-                "w-2 h-6 rounded-full transition-all duration-300",
-                index === currentIndex ? "bg-primary scale-110" : "bg-white/30"
-              )}
-            />
-          ))}
-        </div>
+        <MediaIndicators
+          total={items.length}
+          currentIndex={currentIndex}
+          visible={showControls}
+          activeColor="bg-primary"
+        />
       )}
 
-      {/* Status de sincronização */}
       {isSyncing && playerMode === "media" && (
         <div className="absolute bottom-6 right-6 flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-lg px-3 py-2">
           <RefreshCw className="w-4 h-4 text-primary animate-spin" />
@@ -549,7 +292,6 @@ const OfflinePlayer = () => {
         </div>
       )}
 
-      {/* Aviso offline */}
       {!deviceState?.is_online && playerMode === "media" && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-yellow-500/20 backdrop-blur-sm rounded-full px-4 py-1.5">
           <WifiOff className="w-4 h-4 text-yellow-400" />
@@ -557,19 +299,16 @@ const OfflinePlayer = () => {
         </div>
       )}
 
-      {/* Última sincronização */}
       {deviceState?.last_sync && playerMode === "media" && (
-        <div
-          className={cn(
-            "absolute bottom-10 left-1/2 -translate-x-1/2 text-white/40 text-xs transition-opacity duration-300",
-            showControls ? "opacity-100" : "opacity-0"
-          )}
-        >
+        <div className={cn(
+          "absolute bottom-10 left-1/2 -translate-x-1/2 text-white/40 text-xs transition-opacity duration-300",
+          showControls ? "opacity-100" : "opacity-0"
+        )}>
           <Clock className="w-3 h-3 inline mr-1" />
           Última sinc.: {new Date(deviceState.last_sync).toLocaleTimeString("pt-BR")}
         </div>
       )}
-      {/* Hidden elements for Camera Monitoring */}
+
       <div className="hidden">
         <video ref={cameraVideoRef} autoPlay muted playsInline />
         <canvas ref={cameraCanvasRef} />
