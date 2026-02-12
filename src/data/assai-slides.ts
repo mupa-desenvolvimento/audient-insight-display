@@ -44,10 +44,10 @@ export const ASSAI_SLIDES: Slide[] = [
     subtitle: "Infraestrutura massiva já instalada",
     description: "Cada terminal representa um ponto ativo de mídia no fluxo real do consumidor.",
     stats: [
-      { value: "300", label: "Lojas no Brasil", icon: Store },
+      { value: "312", label: "Lojas no Brasil", icon: Store },
       { value: "40M", label: "Visitas/Mês", icon: Users },
       { value: "6.400", label: "Terminais", icon: Monitor },
-      { value: "21", label: "Terminais/Loja (Média)", icon: Zap }
+      { value: "25", label: "Terminais/Loja (Média)", icon: Zap }
     ],
     icon: Globe
   },
@@ -60,7 +60,7 @@ export const ASSAI_SLIDES: Slide[] = [
     description: "Consulta de preço = momento de decisão de compra.",
     points: [
       "4.400 visitantes por loja/dia",
-      "21 terminais por loja",
+      "25 terminais por loja",
       "≈ 210 pessoas passam por cada terminal diariamente",
       "Ponto de contato no momento da decisão"
     ],
@@ -112,7 +112,7 @@ export const ASSAI_SLIDES: Slide[] = [
     description: "Validação do modelo em escala relevante.",
     stats: [
       { value: "26", label: "Lojas", icon: Store },
-      { value: "~21", label: "Terminais/Loja", icon: Monitor },
+      { value: "~25", label: "Terminais/Loja", icon: Monitor },
       { value: "546", label: "Terminais Ativos", icon: Zap },
       { value: "SP/RJ", label: "Foco Regional", icon: Globe }
     ],
