@@ -6,6 +6,7 @@ export type PushCommand = 'reload' | 'reboot' | 'clear_cache' | 'screenshot' | '
 class PushHandlerService {
   private static instance: PushHandlerService;
   private unsubscribe: Unsubscribe | null = null;
+  private notificationCallback: ((msg: string) => void) | null = null;
 
   private constructor() {}
 
@@ -36,7 +37,17 @@ class PushHandlerService {
     });
   }
 
+  onNotification(callback: (msg: string) => void) {
+    this.notificationCallback = callback;
+    return () => {
+      this.notificationCallback = null;
+    };
+  }
+
   private handleCommand(command: string, deviceCode: string) {
+    if (this.notificationCallback) {
+      this.notificationCallback(`Comando recebido: ${command}`);
+    }
     switch (command) {
       case 'reload':
       case 'reboot':

@@ -17,7 +17,7 @@ export const SystemMonitor = ({ deviceCode }: SystemMonitorProps) => {
       media_name: 'System Start',
       playlist_id: 'system',
       started_at: new Date().toISOString(),
-      duration_seconds: 0
+      duration_watched: 0
     });
 
     const interval = setInterval(() => {

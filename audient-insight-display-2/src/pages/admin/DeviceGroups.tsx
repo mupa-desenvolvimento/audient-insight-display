@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useDeviceGroups, DeviceGroupWithDetails, DeviceGroupInsert, DeviceGroupChannel } from "@/hooks/useDeviceGroups";
 import { useChannels } from "@/hooks/useChannels";
 import { useStores } from "@/hooks/useStores";
+import { useUserCompany } from "@/hooks/useUserCompany";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -33,6 +34,7 @@ const DeviceGroupsPage = () => {
   } = useDeviceGroups();
   const { channels } = useChannels();
   const { stores } = useStores();
+  const { company } = useUserCompany();
   const queryClient = useQueryClient();
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -72,7 +74,10 @@ const DeviceGroupsPage = () => {
   );
 
   const handleCreate = () => {
-    createDeviceGroup.mutate(formData, {
+    createDeviceGroup.mutate({
+      ...formData,
+      tenant_id: company?.tenant_id
+    }, {
       onSuccess: () => {
         setIsCreateOpen(false);
         resetForm();
@@ -222,8 +227,8 @@ const DeviceGroupsPage = () => {
                 </Select>
               </div>
               <DialogFooter>
-                <Button onClick={handleCreate} disabled={!formData.name}>
-                  Criar
+                <Button onClick={handleCreate} disabled={!formData.name || createDeviceGroup.isPending}>
+                  {createDeviceGroup.isPending ? "Criando..." : "Criar"}
                 </Button>
               </DialogFooter>
             </div>
@@ -368,8 +373,8 @@ const DeviceGroupsPage = () => {
               </Select>
             </div>
             <DialogFooter>
-              <Button onClick={handleUpdate} disabled={!formData.name}>
-                Salvar
+              <Button onClick={handleUpdate} disabled={!formData.name || updateDeviceGroup.isPending}>
+                {updateDeviceGroup.isPending ? "Salvando..." : "Salvar"}
               </Button>
             </DialogFooter>
           </div>
@@ -383,22 +388,26 @@ const DeviceGroupsPage = () => {
             <DialogTitle>Canais do Grupo: {channelDialogGroup?.name}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="flex gap-2">
-              <Select value={selectedChannelId} onValueChange={setSelectedChannelId}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Selecione um canal" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableChannels.map((channel) => (
-                    <SelectItem key={channel.id} value={channel.id}>
-                      {channel.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button onClick={handleAssignChannel} disabled={!selectedChannelId}>
-                <Plus className="w-4 h-4" />
-              </Button>
+            <div className="space-y-2">
+              <Label>Adicionar Canal</Label>
+              <div className="flex gap-2">
+                <Select value={selectedChannelId} onValueChange={setSelectedChannelId}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Selecione um canal" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableChannels.map((channel) => (
+                      <SelectItem key={channel.id} value={channel.id}>
+                        {channel.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button onClick={handleAssignChannel} disabled={!selectedChannelId}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Adicionar
+                </Button>
+              </div>
             </div>
 
             {groupChannels.length === 0 ? (
@@ -432,6 +441,11 @@ const DeviceGroupsPage = () => {
               </div>
             )}
           </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setChannelDialogGroup(null)}>
+              Fechar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

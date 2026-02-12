@@ -1,4 +1,7 @@
+// @ts-ignore
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+declare const Deno: any
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -22,9 +25,32 @@ interface ImportRequest {
   import_log_id: string
 }
 
+interface StoreRecord {
+  code: string
+}
+
+interface RegionRecord {
+  id: string
+  name: string
+  code: string
+}
+
+interface StateRecord {
+  id: string
+  name: string
+  code: string
+  region_id: string
+}
+
+interface CityRecord {
+  id: string
+  name: string
+  state_id: string
+}
+
 const BATCH_SIZE = 50
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -176,7 +202,7 @@ Deno.serve(async (req) => {
       .select('code')
       .eq('tenant_id', tenantId)
 
-    const existingStoreCodes = new Set(existingStores?.map(s => s.code.toLowerCase()) || [])
+    const existingStoreCodes = new Set(existingStores?.map((s: StoreRecord) => s.code.toLowerCase()) || [])
 
     let successCount = 0
     let errorCount = 0
@@ -211,7 +237,7 @@ Deno.serve(async (req) => {
           const regionKey = regionName.toLowerCase()
 
           // Find or create region
-          let region = existingRegions?.find(r => r.name.toLowerCase() === regionKey) || createdRegions[regionKey]
+          let region = existingRegions?.find((r: RegionRecord) => r.name.toLowerCase() === regionKey) || createdRegions[regionKey]
           
           if (!region) {
             const { data: newRegion, error: regionError } = await supabase
@@ -236,7 +262,7 @@ Deno.serve(async (req) => {
 
           // Find or create state
           const stateKey = `${stateCode.toLowerCase()}-${region.id}`
-          let state = existingStates?.find(s => 
+          let state = existingStates?.find((s: StateRecord) => 
             (s.code.toLowerCase() === stateCode.toLowerCase() || s.name.toLowerCase() === stateName.toLowerCase()) &&
             s.region_id === region.id
           ) || createdStates[stateKey]
@@ -264,7 +290,7 @@ Deno.serve(async (req) => {
 
           // Find or create city
           const cityKey = `${row.cidade.toLowerCase()}-${state.id}`
-          let city = existingCities?.find(c => 
+          let city = existingCities?.find((c: CityRecord) => 
             c.name.toLowerCase() === row.cidade.toLowerCase() &&
             c.state_id === state.id
           ) || createdCities[cityKey]

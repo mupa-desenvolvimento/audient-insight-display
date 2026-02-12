@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { Capacitor } from '@capacitor/core';
 import { 
   Loader2, 
   Building2, 
@@ -230,8 +231,15 @@ export const DeviceOnboarding: React.FC = () => {
 
       toast.success('Dispositivo configurado com sucesso!');
       
+      // Save ID locally for auto-login on native
+      localStorage.setItem('mupa_device_code', deviceId);
+
       // Navigate to Player
-      navigate(`/webview/${deviceId}`); // Using webview player as requested for "Player Oficial"
+      if (Capacitor.isNativePlatform()) {
+        navigate(`/android-player?device_id=${deviceId}`, { replace: true });
+      } else {
+        navigate(`/webview/${deviceId}`, { replace: true });
+      }
 
     } catch (error) {
       console.error(error);

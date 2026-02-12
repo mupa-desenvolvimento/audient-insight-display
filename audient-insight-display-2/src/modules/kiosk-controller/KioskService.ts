@@ -24,6 +24,7 @@ export class KioskService {
       }
 
       // 3. Disable Back Button (Android)
+      await App.removeAllListeners();
       App.addListener('backButton', () => {
         if (this.isKioskActive) {
           console.log("[Kiosk] Back button intercepted");
@@ -43,7 +44,7 @@ export class KioskService {
     try {
       await StatusBar.show();
       await ScreenOrientation.unlock();
-      await App.removeAllListeners('backButton');
+      await App.removeAllListeners();
     } catch (e) {
       console.error("[Kiosk] Error disabling kiosk mode", e);
     }

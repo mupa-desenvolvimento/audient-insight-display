@@ -1,27 +1,16 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { db } from "@/services/firebase";
-import { ref, onValue } from "firebase/database";
-import { usePlayerFaceDetection } from "@/hooks/usePlayerFaceDetection";
-import { setupKioskMode } from "@/utils/nativeBridge";
-import { Capacitor } from '@capacitor/core';
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useOfflinePlayer } from "@/hooks/useOfflinePlayer";
-import { 
-  Wifi, 
-  WifiOff, 
-  RefreshCw, 
-  Download, 
-  Monitor, 
-  AlertCircle,
-  Maximize,
-  Clock,
-  CheckCircle2,
-  Bell,
-  Camera,
-  Users
-} from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Wifi, WifiOff, RefreshCw, AlertTriangle, Info, X, Bell, Monitor, Maximize, Camera, Users, CheckCircle2 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { Progress } from "@/components/ui/progress";
+import { KioskService } from "@/modules/kiosk-controller/KioskService";
+import { PushHandlerService } from "@/modules/push-handler/PushHandlerService";
+import { usePlayerFaceDetection } from "@/hooks/usePlayerFaceDetection";
+import { CachedPlaylistItem } from "@/modules/shared/types";
 
 import { contentScheduler } from "@/modules/content-engine";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
@@ -38,15 +27,26 @@ const WebViewPlayer = () => {
   // Permite obter o código via URL param ou query param (ex: ?device_id=XYZ)
   const deviceCode = paramDeviceCode || searchParams.get("device_id") || searchParams.get("id");
 
+  const [updateMessage, setUpdateMessage] = useState<string | null>(null);
+  const [showUpdateNotification, setShowUpdateNotification] = useState(false);
+
   // Inicializar Push Handler e Kiosk Mode
   useEffect(() => {
     if (deviceCode) {
       pushHandlerService.init(deviceCode);
       kioskService.enableKioskMode();
       
+      // 3. Update Notifications
+      const unsubscribeNotifications = pushHandlerService.onNotification((msg) => {
+        setUpdateMessage(msg);
+        setShowUpdateNotification(true);
+        setTimeout(() => setShowUpdateNotification(false), 5000);
+      });
+
       return () => {
         pushHandlerService.cleanup();
         kioskService.disableKioskMode();
+        unsubscribeNotifications();
       };
     }
   }, [deviceCode]);
@@ -151,9 +151,9 @@ const WebViewPlayer = () => {
     return {
       contentId: currentMedia.id,
       contentName: currentMedia.name,
-      playlistId: overrideMedia ? 'override' : (currentItem as any).playlist_id
+      playlistId: overrideMedia ? 'override' : (activePlaylist?.id || 'unknown')
     };
-  }, [currentMedia, overrideMedia, currentItem]);
+  }, [currentMedia, overrideMedia, currentItem, activePlaylist]);
 
   // Face detection - only active if device has camera enabled
   const { 
@@ -183,7 +183,7 @@ const WebViewPlayer = () => {
     // Use duration from override, item override, or media default
     const durationSec = overrideMedia 
       ? (overrideMedia.duration || 15)
-      : (currentItem?.duration || currentMedia.duration || 10);
+      : (currentMedia?.duration || 10);
       
     const duration = durationSec * 1000;
     
@@ -305,7 +305,7 @@ const WebViewPlayer = () => {
     );
   }
 
-  const duration = currentItem?.duration_override || currentMedia?.duration || 10;
+  const duration = overrideMedia?.duration || (currentItem as CachedPlaylistItem)?.duration_override || currentMedia?.duration || 10;
   const progressPercent = ((duration * 1000 - timeRemaining) / (duration * 1000)) * 100;
   
   // URL da mídia: Prefere o blob_url (local/cache), senão usa o file_url (remoto)

@@ -14,7 +14,6 @@ export type Slide = {
   points?: string[];
   features?: { icon: ElementType; text: string; desc?: string }[];
   items?: { title: string; desc: string; icon?: ElementType }[];
-  stats?: { label: string; value: string }[];
   benefits?: string[];
   color?: string;
   cta?: string;

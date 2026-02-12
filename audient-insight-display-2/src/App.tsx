@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { ThemeProvider } from "@/hooks/useTheme";
 import AppLayout from "./components/layout/AppLayout";
@@ -41,11 +41,13 @@ import ProductAnalytics from "./pages/admin/ProductAnalytics";
 import CanvaIntegration from "./pages/admin/CanvaIntegration";
 import CanvaEditor from "./pages/admin/CanvaEditor";
 import Install from "./pages/Install";
- import Presentation from "./pages/Presentation";
+import Presentation from "./pages/Presentation";
 import AssaiPresentation from "./pages/AssaiPresentation";
 import { OfflineIndicator } from "./components/OfflineIndicator";
 import { PWAUpdatePrompt, InstallPrompt } from "./components/PWAPrompts";
 import { useSyncManager } from "./hooks/useSyncManager";
+import { Capacitor } from '@capacitor/core';
+import { useEffect } from "react";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -61,6 +63,36 @@ const queryClient = new QueryClient({
   },
 });
 
+// Componente para gerenciar redirecionamento inicial em apps nativos (Android)
+const NativeRouteHandler = () => {
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    // Só executa se for plataforma nativa (Android/iOS)
+    if (Capacitor.isNativePlatform()) {
+      const savedDeviceCode = localStorage.getItem("mupa_device_code");
+      const path = window.location.pathname;
+      
+      console.log("[NativeRouteHandler] Checking route...", { path, savedDeviceCode });
+
+      // Evita loops se já estiver nas rotas corretas
+      if (path.includes("/android-player") || path.includes("/device-setup") || path.includes("/setup")) {
+        return;
+      }
+
+      if (savedDeviceCode) {
+        console.log("[NativeRouteHandler] Redirecting to Player");
+        navigate(`/android-player?device_id=${savedDeviceCode}`, { replace: true });
+      } else {
+        console.log("[NativeRouteHandler] Redirecting to Setup");
+        navigate("/device-setup", { replace: true });
+      }
+    }
+  }, [navigate]);
+
+  return null;
+};
+
 function AppContent() {
   // Initialize sync manager at app level
   useSyncManager();
@@ -73,12 +105,14 @@ function AppContent() {
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <NativeRouteHandler />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/install" element={<Install />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/device/:deviceId" element={<DevicePlayer />} />
           <Route path="/setup/:deviceId" element={<DeviceOnboarding />} />
+          <Route path="/device-setup" element={<DeviceOnboarding />} />
           <Route path="/detect/:deviceCode" element={<DeviceDetector />} />
           <Route path="/play/:deviceCode" element={<WebViewPlayer />} />
           <Route path="/webview/:deviceCode" element={<WebViewPlayer />} />

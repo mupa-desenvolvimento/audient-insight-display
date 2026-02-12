@@ -1,1 +1,1 @@
-export * from './components/DeviceOnboarding';
+export { DeviceOnboarding } from './components/DeviceOnboarding';

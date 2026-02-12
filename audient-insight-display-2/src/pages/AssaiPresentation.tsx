@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, Variants } from "framer-motion";
 import { 
   ChevronRight,
   ChevronLeft,
@@ -73,16 +73,16 @@ export default function AssaiPresentation() {
   const slide = slides[currentSlide];
 
   // Animation Variants
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0 },
-    visible: {
+    visible: { 
       opacity: 1,
       transition: { staggerChildren: 0.1, delayChildren: 0.3 }
     },
     exit: { opacity: 0, transition: { duration: 0.3 } }
   };
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: { y: 20, opacity: 0 },
     visible: {
       y: 0,

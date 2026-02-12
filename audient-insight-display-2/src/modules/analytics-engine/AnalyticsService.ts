@@ -7,6 +7,7 @@ export interface PlayLog {
   playlist_id: string;
   started_at: string;
   duration_watched: number;
+  media_name?: string;
 }
 
 export interface PriceCheckLog {
@@ -87,7 +88,7 @@ export class AnalyticsService {
     
     try {
       const { error } = await supabase
-        .from('play_logs') 
+        .from('play_logs' as any) 
         .insert(batch);
 
       if (error) throw error;
@@ -112,7 +113,7 @@ export class AnalyticsService {
     try {
       // Assuming 'price_check_logs' table exists. If not, this will fail but queue persists.
       const { error } = await supabase
-        .from('price_check_logs') 
+        .from('price_check_logs' as any) 
         .insert(batch);
 
       if (error) {
