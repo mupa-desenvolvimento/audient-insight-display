@@ -14,7 +14,7 @@ export type Slide = {
   points?: string[];
   features?: { icon: ElementType; text: string; desc?: string }[];
   items?: { title: string; desc: string; icon?: ElementType }[];
-  stats?: { label: string; value: string }[];
+  stats?: { label: string; value: string; icon?: ElementType }[];
   benefits?: string[];
   color?: string;
   cta?: string;
@@ -25,4 +25,14 @@ export type Slide = {
   reasons?: { title: string; desc: string }[];
   planDetails?: { title: string; items: string[] }[];
   planTheme?: "zinc" | "green" | "blue" | "purple";
+  chartData?: { name: string; value: number }[];
+  chartType?: "bar" | "line" | "pie";
+  tableData?: {
+    headers: string[];
+    rows: (string | number)[][];
+  };
+  leftTitle?: string;
+  leftPoints?: string[];
+  rightTitle?: string;
+  rightPoints?: string[];
 };
