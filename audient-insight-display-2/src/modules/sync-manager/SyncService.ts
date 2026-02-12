@@ -8,17 +8,53 @@ export class SyncService {
   private deviceCode: string | null = null;
   private firebaseRef: any = null;
   private onUpdateCallback: ((state: DeviceState) => void) | null = null;
+  private heartbeatInterval: NodeJS.Timeout | null = null;
 
   init(deviceCode: string, onUpdate: (state: DeviceState) => void) {
     this.deviceCode = deviceCode;
     this.onUpdateCallback = onUpdate;
     this.startFirebaseListener();
+    this.startHeartbeat();
     this.performFullSync();
   }
 
   cleanup() {
+    this.stopHeartbeat();
     if (this.firebaseRef) {
       off(this.firebaseRef);
+    }
+  }
+
+  private startHeartbeat() {
+    this.stopHeartbeat();
+    this.sendHeartbeat(); // Immediate first beat
+    // Send heartbeat every 30 seconds
+    this.heartbeatInterval = setInterval(() => this.sendHeartbeat(), 30000);
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
+  private async sendHeartbeat() {
+    if (!this.deviceCode) return;
+    
+    try {
+      // Use RPC function to bypass RLS and ensure update
+      const { error } = await supabase.rpc('device_heartbeat', { 
+        p_device_code: this.deviceCode 
+      });
+
+      if (error) {
+        console.error("[SyncService] Heartbeat error:", error);
+      } else {
+        console.log("[SyncService] Heartbeat sent");
+      }
+    } catch (err) {
+       console.error("[SyncService] Heartbeat exception:", err);
     }
   }
 
