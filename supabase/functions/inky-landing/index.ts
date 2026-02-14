@@ -12,7 +12,36 @@ serve(async (req) => {
   }
 
   try {
-    const { messages } = await req.json();
+    const { messages, mode = "strategic" } = await req.json();
+
+    const modeInstructions: Record<string, string> = {
+      strategic: `\n\n🎯 MODO ATIVO: ESTRATÉGICO
+Neste modo, priorize SEMPRE:
+- Monetização do inventário de telas
+- Receita de mídia e ROI por anunciante
+- Pacotes comerciais e propostas para marcas
+- Performance comercial e sell-out
+- Oportunidades de upsell e cross-sell
+Responda como um gestor de mídia e estrategista de varejo.`,
+      operational: `\n\n⚙️ MODO ATIVO: OPERACIONAL
+Neste modo, priorize SEMPRE:
+- Status e saúde da rede de dispositivos
+- Distribuição e sincronização de conteúdo
+- Playlists, grades de programação e fallbacks
+- Alertas de falha e uptime
+- Execução técnica perfeita nas lojas
+Responda como um operador técnico de rede digital signage.`,
+      analytics: `\n\n📊 MODO ATIVO: ANALYTICS
+Neste modo, priorize SEMPRE:
+- Métricas de audiência e engajamento
+- Correlações entre exposição e vendas
+- Diagnósticos de performance por zona/tela/campanha
+- Insights acionáveis baseados em dados
+- Relatórios executivos e recomendações de otimização
+Responda como um analista de dados e especialista em trade marketing.`,
+    };
+
+    const activeModeSuffix = modeInstructions[mode] || modeInstructions["strategic"];
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -98,7 +127,7 @@ Sobre a MUPA:
 - IA: visão computacional para análise de audiência (gênero, faixa etária, emoções) — anônimo e LGPD
 - Multi-Tenancy para franquias e grandes redes
 - Planos: Starter (até 10 telas), Pro (até 50 com IA), Enterprise (ilimitado + SLA)
-- Integrações: APIs de produtos, Canva, Cloudflare R2`,
+- Integrações: APIs de produtos, Canva, Cloudflare R2` + activeModeSuffix,
             },
             ...messages,
           ],
