@@ -1840,6 +1840,29 @@ export type Database = {
         Args: { p_confirm: string; p_schema_name: string; p_tenant_id: string }
         Returns: undefined
       }
+      get_public_device_info: {
+        Args: { p_device_code: string }
+        Returns: {
+          blocked_message: string
+          camera_enabled: boolean
+          company_id: string
+          company_slug: string
+          current_playlist_id: string
+          id: string
+          is_blocked: boolean
+          last_sync_requested_at: string
+          name: string
+          override_media_data: Json
+          override_media_expires_at: string
+          override_media_id: string
+          store_code: string
+          store_id: string
+        }[]
+      }
+      get_public_playlists_data: {
+        Args: { p_channel_ids: string[]; p_playlist_ids: string[] }
+        Returns: Json
+      }
       get_user_tenant_id: { Args: { check_user_id?: string }; Returns: string }
       get_user_tenant_id_strict: {
         Args: { check_user_id?: string }
