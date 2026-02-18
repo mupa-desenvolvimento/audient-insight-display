@@ -456,6 +456,7 @@ export type Database = {
       }
       device_groups: {
         Row: {
+          channel_id: string | null
           created_at: string
           description: string | null
           id: string
@@ -466,6 +467,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          channel_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -476,6 +478,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          channel_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -486,6 +489,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "device_groups_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "distribution_channels"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "device_groups_store_id_fkey"
             columns: ["store_id"]
@@ -506,11 +516,14 @@ export type Database = {
         Row: {
           blocked_message: string | null
           camera_enabled: boolean
+          channel_id: string | null
           company_id: string | null
           created_at: string
           current_playlist_id: string | null
           device_code: string
+          device_token: string | null
           display_profile_id: string | null
+          group_id: string | null
           id: string
           is_active: boolean
           is_blocked: boolean
@@ -520,6 +533,7 @@ export type Database = {
           name: string
           override_media_expires_at: string | null
           override_media_id: string | null
+          region_id: string | null
           resolution: string | null
           status: string
           store_code: string | null
@@ -529,11 +543,14 @@ export type Database = {
         Insert: {
           blocked_message?: string | null
           camera_enabled?: boolean
+          channel_id?: string | null
           company_id?: string | null
           created_at?: string
           current_playlist_id?: string | null
           device_code: string
+          device_token?: string | null
           display_profile_id?: string | null
+          group_id?: string | null
           id?: string
           is_active?: boolean
           is_blocked?: boolean
@@ -543,6 +560,7 @@ export type Database = {
           name: string
           override_media_expires_at?: string | null
           override_media_id?: string | null
+          region_id?: string | null
           resolution?: string | null
           status?: string
           store_code?: string | null
@@ -552,11 +570,14 @@ export type Database = {
         Update: {
           blocked_message?: string | null
           camera_enabled?: boolean
+          channel_id?: string | null
           company_id?: string | null
           created_at?: string
           current_playlist_id?: string | null
           device_code?: string
+          device_token?: string | null
           display_profile_id?: string | null
+          group_id?: string | null
           id?: string
           is_active?: boolean
           is_blocked?: boolean
@@ -566,6 +587,7 @@ export type Database = {
           name?: string
           override_media_expires_at?: string | null
           override_media_id?: string | null
+          region_id?: string | null
           resolution?: string | null
           status?: string
           store_code?: string | null
@@ -573,6 +595,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "devices_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "distribution_channels"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "devices_company_id_fkey"
             columns: ["company_id"]
@@ -595,10 +624,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "devices_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "device_groups"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "devices_override_media_id_fkey"
             columns: ["override_media_id"]
             isOneToOne: false
             referencedRelation: "media_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "devices_region_id_fkey"
+            columns: ["region_id"]
+            isOneToOne: false
+            referencedRelation: "regions"
             referencedColumns: ["id"]
           },
           {
@@ -665,9 +708,11 @@ export type Database = {
           metadata: Json | null
           name: string
           priority: number
+          rules: Json | null
           source: string
           type: string
           updated_at: string
+          version: number | null
         }
         Insert: {
           created_at?: string
@@ -678,9 +723,11 @@ export type Database = {
           metadata?: Json | null
           name: string
           priority?: number
+          rules?: Json | null
           source?: string
           type?: string
           updated_at?: string
+          version?: number | null
         }
         Update: {
           created_at?: string
@@ -691,9 +738,11 @@ export type Database = {
           metadata?: Json | null
           name?: string
           priority?: number
+          rules?: Json | null
           source?: string
           type?: string
           updated_at?: string
+          version?: number | null
         }
         Relationships: [
           {
@@ -900,6 +949,48 @@ export type Database = {
             columns: ["folder_id"]
             isOneToOne: false
             referencedRelation: "folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      media_play_logs: {
+        Row: {
+          created_at: string | null
+          device_id: string | null
+          duration: number | null
+          id: string
+          media_id: string | null
+          played_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          device_id?: string | null
+          duration?: number | null
+          id?: string
+          media_id?: string | null
+          played_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          device_id?: string | null
+          duration?: number | null
+          id?: string
+          media_id?: string | null
+          played_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_play_logs_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_play_logs_media_id_fkey"
+            columns: ["media_id"]
+            isOneToOne: false
+            referencedRelation: "media_items"
             referencedColumns: ["id"]
           },
         ]
@@ -1836,10 +1927,19 @@ export type Database = {
         Args: { p_schema_name: string; p_tenant_id: string }
         Returns: undefined
       }
+      device_heartbeat: {
+        Args: {
+          p_current_playlist_id?: string
+          p_device_token: string
+          p_status: string
+        }
+        Returns: Json
+      }
       drop_tenant_schema: {
         Args: { p_confirm: string; p_schema_name: string; p_tenant_id: string }
         Returns: undefined
       }
+      get_device_config: { Args: { p_device_token: string }; Returns: Json }
       get_public_device_info: {
         Args: { p_device_code: string }
         Returns: {
@@ -1895,6 +1995,21 @@ export type Database = {
           tenant_id: string
           tenant_name: string
         }[]
+      }
+      register_device: {
+        Args: {
+          p_company_id: string
+          p_device_code: string
+          p_group_id: string
+          p_name: string
+          p_store_code?: string
+          p_store_id: string
+        }
+        Returns: Json
+      }
+      register_play_logs: {
+        Args: { p_device_token: string; p_logs: Json }
+        Returns: Json
       }
     }
     Enums: {
