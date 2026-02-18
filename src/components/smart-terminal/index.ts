@@ -1,0 +1,11 @@
+export { TerminalModeSwitcher } from "./TerminalModeSwitcher";
+export type { TerminalMode } from "./TerminalModeSwitcher";
+export { AIAssistantOverlay } from "./AIAssistantOverlay";
+export { MetricsOverlay } from "./MetricsOverlay";
+export { FacialRecognitionOverlay } from "./FacialRecognitionOverlay";
+export { LoyaltyOverlay } from "./LoyaltyOverlay";
+export { PeopleCounterOverlay } from "./PeopleCounterOverlay";
+export { TerminalSettingsOverlay } from "./TerminalSettingsOverlay";
+export type { TerminalTheme } from "./TerminalSettingsOverlay";
+export { DeviceSimulator } from "./DeviceSimulator";
+export type { SimulationMode } from "./DeviceSimulator";

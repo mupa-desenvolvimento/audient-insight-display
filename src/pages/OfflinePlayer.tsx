@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useOfflinePlayer } from "@/hooks/useOfflinePlayer";
 import { useProductLookup } from "@/hooks/useProductLookup";
@@ -6,6 +6,10 @@ import { useProductDisplaySettingsBySlug } from "@/hooks/useProductDisplaySettin
 import { ProductLookupContainer } from "@/components/player/ProductLookupContainer";
 import { EanInput } from "@/components/player/EanInput";
 import { useDeviceMonitor } from "@/hooks/useDeviceMonitor";
+import { useFaceDetection } from "@/hooks/useFaceDetection";
+import { useTerminalMetrics } from "@/hooks/useTerminalMetrics";
+import { useTerminalAI } from "@/hooks/useTerminalAI";
+import { usePeopleCounter } from "@/hooks/usePeopleCounter";
 import { useAutoHideControls, useFullscreen, useKeyboardShortcuts, useMediaRotation, useClock } from "@/hooks/player";
 import {
   MediaRenderer,
@@ -18,6 +22,19 @@ import {
   DownloadScreen,
 } from "@/components/player-core";
 import {
+  TerminalModeSwitcher,
+  AIAssistantOverlay,
+  MetricsOverlay,
+  FacialRecognitionOverlay,
+  LoyaltyOverlay,
+  PeopleCounterOverlay,
+  TerminalSettingsOverlay,
+  DeviceSimulator,
+} from "@/components/smart-terminal";
+import type { TerminalMode } from "@/components/smart-terminal";
+import type { TerminalTheme } from "@/components/smart-terminal/TerminalSettingsOverlay";
+import type { SimulationMode } from "@/components/smart-terminal/DeviceSimulator";
+import {
   AlertCircle,
   RefreshCw,
   Video,
@@ -28,11 +45,11 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-type PlayerMode = "media" | "product" | "blocked" | "override";
-
 const OfflinePlayer = () => {
   const { deviceCode } = useParams<{ deviceCode: string }>();
   const navigate = useNavigate();
+
+  // Core hooks
   const {
     deviceState,
     isLoading,
@@ -47,12 +64,36 @@ const OfflinePlayer = () => {
     clearAllData,
   } = useOfflinePlayer(deviceCode || "");
 
+  // Camera & face detection
   const { videoRef: cameraVideoRef, canvasRef: cameraCanvasRef } = useDeviceMonitor(deviceCode || "");
-  const [playerMode, setPlayerMode] = useState<PlayerMode>("media");
+  const faceVideoRef = useRef<HTMLVideoElement>(null);
+  const faceCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Terminal state
+  const [terminalMode, setTerminalMode] = useState<TerminalMode>("player");
+  const [theme, setTheme] = useState<TerminalTheme>(() => {
+    const saved = localStorage.getItem(`terminal_theme_${deviceCode}`);
+    return (saved as TerminalTheme) || "supermarket";
+  });
+
+  // Face detection for overlays
+  const { activeFaces } = useFaceDetection(faceVideoRef, faceCanvasRef, terminalMode === "facial" || terminalMode === "counter" || terminalMode === "loyalty");
+
+  // Metrics
+  const { metrics, trackEvent } = useTerminalMetrics(deviceCode || "");
+
+  // AI Assistant
+  const { messages: aiMessages, isLoading: aiLoading, sendMessage: aiSend, clearHistory: aiClear } = useTerminalAI(deviceCode || "");
+
+  // People counter
+  const { count: peopleCount, todayCount, processFaces } = usePeopleCounter();
+
+  // Player UI hooks
   const { showControls } = useAutoHideControls();
   const { isFullscreen, toggleFullscreen } = useFullscreen();
   const { formattedTime, formattedDate } = useClock();
 
+  // Playlists
   const activePlaylist = getActivePlaylist();
   const activeChannel = activePlaylist?.has_channels ? getActiveChannel(activePlaylist) : null;
   const items = getActiveItems();
@@ -66,7 +107,7 @@ const OfflinePlayer = () => {
   const overrideMedia = hasActiveOverrideMedia ? deviceState?.override_media : null;
   const displayOverrideMedia = hasActiveOverrideMedia && overrideMedia;
 
-  // Media rotation - must be called before using currentIndex
+  // Media rotation
   const firstItem = items[0];
   const firstMedia = firstItem?.media;
   const defaultDuration = displayOverrideMedia
@@ -77,12 +118,59 @@ const OfflinePlayer = () => {
     itemsLength: items.length,
     currentDuration: defaultDuration,
     isVideo: firstMedia?.type === "video",
-    enabled: playerMode === "media" && !displayOverrideMedia && items.length > 0,
+    enabled: terminalMode === "player" && !displayOverrideMedia && items.length > 0,
   });
 
-  // Derive active media from current index
   const activeItem = items[currentIndex] || null;
   const activeMedia = displayOverrideMedia ? overrideMedia : activeItem?.media;
+
+  // Track media views
+  useEffect(() => {
+    if (activeMedia && terminalMode === "player") {
+      trackEvent({ type: "media_view", media_id: activeMedia.id, duration: defaultDuration });
+    }
+  }, [currentIndex, activeMedia?.id]);
+
+  // Process faces for counter
+  useEffect(() => {
+    if (activeFaces.length > 0) {
+      processFaces(activeFaces);
+      activeFaces.forEach(face => {
+        trackEvent({ type: "face_detected" });
+        if (face.isRegistered) trackEvent({ type: "face_recognized" });
+      });
+    }
+  }, [activeFaces.length]);
+
+  // Initialize face camera when entering facial/counter/loyalty mode
+  useEffect(() => {
+    if (terminalMode === "facial" || terminalMode === "counter" || terminalMode === "loyalty") {
+      const startCamera = async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: 640, height: 480, facingMode: "user" },
+          });
+          if (faceVideoRef.current) {
+            faceVideoRef.current.srcObject = stream;
+            faceVideoRef.current.play().catch(() => {});
+          }
+        } catch (err) {
+          console.warn("Camera not available:", err);
+        }
+      };
+      startCamera();
+
+      return () => {
+        const stream = faceVideoRef.current?.srcObject as MediaStream;
+        stream?.getTracks().forEach(track => track.stop());
+      };
+    }
+  }, [terminalMode]);
+
+  // Save theme
+  useEffect(() => {
+    localStorage.setItem(`terminal_theme_${deviceCode}`, theme);
+  }, [theme, deviceCode]);
 
   // Product lookup
   const mediaTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -95,7 +183,8 @@ const OfflinePlayer = () => {
   } = useProductLookup({
     deviceCode: deviceCode || "",
     onLookupStart: () => {
-      setPlayerMode("product");
+      setTerminalMode("product");
+      trackEvent({ type: "product_lookup" });
       if (mediaTimerRef.current) clearTimeout(mediaTimerRef.current);
     },
   });
@@ -111,7 +200,7 @@ const OfflinePlayer = () => {
   });
 
   const handleDismissProduct = useCallback(() => {
-    setPlayerMode("media");
+    setTerminalMode("player");
     clearProduct();
   }, [clearProduct]);
 
@@ -123,12 +212,30 @@ const OfflinePlayer = () => {
     toast.loading("Limpando dados...", { id: "reset" });
     try {
       await clearAllData();
-      toast.success("Dados limpos com sucesso!", { id: "reset" });
+      toast.success("Dados limpos!", { id: "reset" });
       setTimeout(() => navigate(`/setup/${deviceCode}`), 1000);
     } catch {
       toast.error("Erro ao limpar dados", { id: "reset" });
     }
   }, [clearAllData, navigate, deviceCode]);
+
+  const handleModeChange = useCallback((mode: TerminalMode) => {
+    if (mode === "product") {
+      // Product mode is triggered by EAN scan, not menu
+      return;
+    }
+    setTerminalMode(mode);
+  }, []);
+
+  // Simulation mode derivation
+  const simulationMode: SimulationMode = (() => {
+    if (!deviceState?.is_online) return "offline";
+    if (terminalMode === "facial" && activeFaces.length > 0) return "recognizing";
+    if (terminalMode === "product") return "product_lookup";
+    if (terminalMode === "loyalty" && activeFaces.some(f => f.isRegistered)) return "personalized_offer";
+    if (items.length === 0 && terminalMode === "player") return "idle";
+    return "connected";
+  })();
 
   const isDeviceBlocked = deviceState?.is_blocked === true;
 
@@ -158,39 +265,50 @@ const OfflinePlayer = () => {
     );
   }
 
-  if (!displayOverrideMedia && (!activePlaylist || items.length === 0)) {
+  if (!displayOverrideMedia && (!activePlaylist || items.length === 0) && terminalMode === "player") {
     const debugInfo = activePlaylist
       ? `Playlist "${activePlaylist.name}" ativa, mas ${activePlaylist.has_channels ? "nenhum canal ativo" : "sem itens"}`
       : `${deviceState?.playlists?.length || 0} playlists em cache`;
 
     return (
-      <EmptyContentScreen
-        deviceName={deviceState?.device_name || deviceCode}
-        syncError={syncError}
-        onSync={syncWithServer}
-        isSyncing={isSyncing}
-        debugInfo={debugInfo}
-      />
+      <div className="relative">
+        <EmptyContentScreen
+          deviceName={deviceState?.device_name || deviceCode}
+          syncError={syncError}
+          onSync={syncWithServer}
+          isSyncing={isSyncing}
+          debugInfo={debugInfo}
+        />
+        <TerminalModeSwitcher
+          activeMode={terminalMode}
+          onModeChange={handleModeChange}
+          visible={true}
+          peopleCount={todayCount}
+          facesDetected={activeFaces.length}
+        />
+      </div>
     );
   }
-
-  if (!activeMedia) return null;
 
   const displayMediaUrl = displayOverrideMedia
     ? (overrideMedia?.blob_url || overrideMedia?.file_url || "")
     : (activeItem?.media?.blob_url || activeItem?.media?.file_url || "");
 
+  const isOverlayActive = terminalMode !== "player" && terminalMode !== "product";
+
   return (
     <div className="relative min-h-screen bg-black overflow-hidden select-none">
+      {/* Barcode scanner - always active in player mode */}
       <EanInput
-        isVisible={playerMode === "media"}
+        isVisible={terminalMode === "player"}
         onSubmit={handleEanSubmit}
         disabled={false}
         onReset={handleReset}
         alwaysListenForScanner={true}
       />
 
-      {playerMode === "product" && (
+      {/* Product lookup overlay */}
+      {terminalMode === "product" && (
         <ProductLookupContainer
           product={product}
           isLoading={isProductLoading}
@@ -201,6 +319,7 @@ const OfflinePlayer = () => {
         />
       )}
 
+      {/* Override media badge */}
       {displayOverrideMedia && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-orange-500/90 backdrop-blur-sm rounded-full px-4 py-2">
           <AlertCircle className="w-4 h-4 text-white" />
@@ -208,30 +327,38 @@ const OfflinePlayer = () => {
         </div>
       )}
 
+      {/* Device simulation indicator */}
+      <DeviceSimulator mode={simulationMode} visible={terminalMode === "player" && showControls} />
+
+      {/* Media player background */}
       <div className={cn(
         "relative w-full h-screen transition-opacity duration-300",
-        playerMode === "product" ? "opacity-0 pointer-events-none" : "opacity-100"
+        (terminalMode === "product" || isOverlayActive) ? "opacity-20 pointer-events-none" : "opacity-100"
       )}>
-        <MediaRenderer
-          media={activeMedia}
-          mediaUrl={displayMediaUrl}
-          objectFit="contain"
-          loop={!!displayOverrideMedia}
-          onEnded={!displayOverrideMedia ? goToNext : undefined}
-          onImageError={(e) => {
-            const fallbackUrl = displayOverrideMedia ? overrideMedia?.file_url : activeItem?.media?.file_url;
-            if (fallbackUrl && (e.target as HTMLImageElement).src !== fallbackUrl) {
-              (e.target as HTMLImageElement).src = fallbackUrl;
-            }
-          }}
-        />
+        {activeMedia && (
+          <MediaRenderer
+            media={activeMedia}
+            mediaUrl={displayMediaUrl}
+            objectFit="contain"
+            loop={!!displayOverrideMedia}
+            onEnded={!displayOverrideMedia ? goToNext : undefined}
+            onImageError={(e) => {
+              const fallbackUrl = displayOverrideMedia ? overrideMedia?.file_url : activeItem?.media?.file_url;
+              if (fallbackUrl && (e.target as HTMLImageElement).src !== fallbackUrl) {
+                (e.target as HTMLImageElement).src = fallbackUrl;
+              }
+            }}
+          />
+        )}
       </div>
 
-      {playerMode === "media" && !displayOverrideMedia && (
+      {/* Progress bar */}
+      {terminalMode === "player" && !displayOverrideMedia && (
         <PlayerProgressBar progressPercent={progressPercent} />
       )}
 
-      {playerMode === "media" && (
+      {/* Player controls */}
+      {terminalMode === "player" && (
         <PlayerControls
           visible={showControls}
           deviceName={deviceState?.device_name || deviceCode}
@@ -249,7 +376,8 @@ const OfflinePlayer = () => {
         />
       )}
 
-      {playerMode === "media" && (
+      {/* Media info */}
+      {terminalMode === "player" && activeMedia && (
         <div className={cn(
           "absolute bottom-6 left-6 bg-black/60 backdrop-blur-sm rounded-lg p-3 transition-opacity duration-300",
           showControls ? "opacity-100" : "opacity-0"
@@ -276,7 +404,8 @@ const OfflinePlayer = () => {
         </div>
       )}
 
-      {playerMode === "media" && !displayOverrideMedia && (
+      {/* Media indicators */}
+      {terminalMode === "player" && !displayOverrideMedia && (
         <MediaIndicators
           total={items.length}
           currentIndex={currentIndex}
@@ -285,21 +414,24 @@ const OfflinePlayer = () => {
         />
       )}
 
-      {isSyncing && playerMode === "media" && (
+      {/* Sync indicator */}
+      {isSyncing && terminalMode === "player" && (
         <div className="absolute bottom-6 right-6 flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-lg px-3 py-2">
           <RefreshCw className="w-4 h-4 text-primary animate-spin" />
           <span className="text-white text-sm">Sincronizando...</span>
         </div>
       )}
 
-      {!deviceState?.is_online && playerMode === "media" && (
+      {/* Offline indicator */}
+      {!deviceState?.is_online && terminalMode === "player" && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-yellow-500/20 backdrop-blur-sm rounded-full px-4 py-1.5">
           <WifiOff className="w-4 h-4 text-yellow-400" />
           <span className="text-yellow-200 text-sm">Modo Offline</span>
         </div>
       )}
 
-      {deviceState?.last_sync && playerMode === "media" && (
+      {/* Last sync */}
+      {deviceState?.last_sync && terminalMode === "player" && (
         <div className={cn(
           "absolute bottom-10 left-1/2 -translate-x-1/2 text-white/40 text-xs transition-opacity duration-300",
           showControls ? "opacity-100" : "opacity-0"
@@ -309,10 +441,81 @@ const OfflinePlayer = () => {
         </div>
       )}
 
+      {/* === MODULE OVERLAYS === */}
+
+      <AIAssistantOverlay
+        visible={terminalMode === "assistant"}
+        messages={aiMessages}
+        isLoading={aiLoading}
+        onSend={(text) => {
+          trackEvent({ type: "assistant_interaction" });
+          aiSend(text);
+        }}
+        onClear={aiClear}
+        onClose={() => setTerminalMode("player")}
+      />
+
+      <MetricsOverlay
+        visible={terminalMode === "metrics"}
+        metrics={metrics}
+        onClose={() => setTerminalMode("player")}
+      />
+
+      <FacialRecognitionOverlay
+        visible={terminalMode === "facial"}
+        activeFaces={activeFaces}
+        videoRef={faceVideoRef}
+        canvasRef={faceCanvasRef}
+        onClose={() => setTerminalMode("player")}
+      />
+
+      <LoyaltyOverlay
+        visible={terminalMode === "loyalty"}
+        activeFaces={activeFaces}
+        onClose={() => setTerminalMode("player")}
+      />
+
+      <PeopleCounterOverlay
+        visible={terminalMode === "counter"}
+        count={peopleCount}
+        todayCount={todayCount}
+        activeFaces={activeFaces}
+        onClose={() => setTerminalMode("player")}
+      />
+
+      <TerminalSettingsOverlay
+        visible={terminalMode === "settings"}
+        theme={theme}
+        onThemeChange={setTheme}
+        deviceCode={deviceCode}
+        isOnline={deviceState?.is_online}
+        onSync={syncWithServer}
+        onReset={handleReset}
+        onClose={() => setTerminalMode("player")}
+      />
+
+      {/* Mode switcher sidebar */}
+      <TerminalModeSwitcher
+        activeMode={terminalMode}
+        onModeChange={handleModeChange}
+        visible={showControls || isOverlayActive}
+        peopleCount={todayCount}
+        facesDetected={activeFaces.length}
+      />
+
+      {/* Hidden camera for device monitor */}
       <div className="hidden">
         <video ref={cameraVideoRef} autoPlay muted playsInline />
         <canvas ref={cameraCanvasRef} />
       </div>
+
+      {/* Hidden face camera refs (shown in overlay) */}
+      {terminalMode !== "facial" && (
+        <div className="hidden">
+          <video ref={faceVideoRef} autoPlay muted playsInline />
+          <canvas ref={faceCanvasRef} />
+        </div>
+      )}
     </div>
   );
 };
