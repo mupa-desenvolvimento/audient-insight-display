@@ -30,7 +30,7 @@ export const useTerminalAI = (deviceCode: string) => {
         content: m.content,
       }));
 
-      const { data, error } = await supabase.functions.invoke("inky-landing", {
+      const { data, error } = await supabase.functions.invoke("inky-chat", {
         body: {
           messages: conversationMessages,
           mode: "operational",
