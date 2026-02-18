@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -85,6 +85,20 @@ export function DeviceFormDialog({
       store_code: (device as any)?.store_code || "",
     },
   });
+
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        name: device?.name || "",
+        device_code: device?.device_code || generateDeviceCode(),
+        store_id: device?.store_id || undefined,
+        current_playlist_id: device?.current_playlist_id || undefined,
+        resolution: device?.resolution || "1920x1080",
+        camera_enabled: device?.camera_enabled || false,
+        store_code: (device as any)?.store_code || "",
+      });
+    }
+  }, [device, open, form]);
 
   const handleSubmit = async (data: FormData) => {
     setIsSubmitting(true);
