@@ -281,80 +281,27 @@ export default function DeviceSetup() {
         return;
       }
       
-      // Check if device exists, if not create it
-      const { data: existingDevice, error: fetchError } = await supabase
-        .from('devices')
-        .select('id')
-        .eq('device_code', deviceId)
-        .single();
-
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        throw fetchError;
-      }
-      
       // Usar o código da loja selecionada se não foi definido manualmente
       const finalStoreCode = storeCode || storeData.code;
+      const finalDeviceName = deviceName || `Dispositivo ${deviceId?.slice(0, 8)}`;
 
-      if (existingDevice) {
-        // Update existing device
-        const { error: updateError } = await supabase
-          .from('devices')
-          .update({ 
-            store_id: selectedStoreId,
-            company_id: validatedCompany.id,
-            name: deviceName || `Dispositivo ${deviceId?.slice(0, 8)}`,
-            status: 'online',
-            is_active: true,
-            store_code: finalStoreCode
-          })
-          .eq('id', existingDevice.id);
+      // Usar a função register_device (SECURITY DEFINER) que contorna RLS
+      const { data: result, error: rpcError } = await supabase.rpc('register_device', {
+        p_device_code: deviceId,
+        p_name: finalDeviceName,
+        p_store_id: selectedStoreId,
+        p_company_id: validatedCompany.id,
+        p_group_id: selectedGroupId,
+        p_store_code: finalStoreCode,
+      });
 
-        if (updateError) throw updateError;
-
-        // Add to device group
-        const { error: memberError } = await supabase
-          .from('device_group_members')
-          .upsert({
-            device_id: existingDevice.id,
-            group_id: selectedGroupId
-          }, { onConflict: 'device_id,group_id' });
-
-        if (memberError && memberError.code !== '23505') {
-          console.error('Error adding to group:', memberError);
-        }
-      } else {
-        // Create new device with company_id
-        const { data: newDevice, error: createError } = await supabase
-          .from('devices')
-          .insert({
-            device_code: deviceId,
-            name: deviceName || `Dispositivo ${deviceId?.slice(0, 8)}`,
-            store_id: selectedStoreId,
-            company_id: validatedCompany.id,
-            status: 'online',
-            is_active: true,
-            store_code: finalStoreCode
-          })
-          .select()
-          .single();
-
-        if (createError) throw createError;
-
-        // Add to device group
-        if (newDevice) {
-          const { error: memberError } = await supabase
-            .from('device_group_members')
-            .insert({
-              device_id: newDevice.id,
-              group_id: selectedGroupId
-            });
-
-          if (memberError) {
-            console.error('Error adding to group:', memberError);
-          }
-        }
+      if (rpcError) {
+        console.error('RPC register_device error:', rpcError);
+        throw new Error(rpcError.message || 'Erro ao registrar dispositivo');
       }
 
+      console.log('Device registered successfully:', result);
+      
       toast.success('Dispositivo configurado com sucesso!');
       setStep('complete');
       
@@ -365,7 +312,8 @@ export default function DeviceSetup() {
       }
     } catch (error) {
       console.error('Error configuring device:', error);
-      toast.error('Erro ao configurar dispositivo');
+      const msg = error instanceof Error ? error.message : 'Erro ao configurar dispositivo';
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
