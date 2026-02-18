@@ -134,6 +134,7 @@ export const useOfflinePlayer = (deviceCode: string) => {
     const cached = mediaCacheRef.current.get(mediaId);
     if (cached) return cached;
 
+    // Em plataforma nativa (APK), faz download real para o filesystem
     if (Capacitor.isNativePlatform()) {
       try {
         const cachedUrl = await MediaCacheService.isCached(url);
@@ -153,15 +154,28 @@ export const useOfflinePlayer = (deviceCode: string) => {
       }
     }
 
+    // No navegador web, NÃO tenta fetch() de URLs externas (CORS bloquearia).
+    // Tags <img> e <video> carregam cross-origin sem problemas.
+    // Apenas tenta cache se for mesma origem.
     try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      mediaCacheRef.current.set(mediaId, blobUrl);
-      await saveToIndexedDB(mediaId, blob);
-      return blobUrl;
+      const currentOrigin = window.location.origin;
+      const mediaOrigin = new URL(url).origin;
+      
+      if (mediaOrigin === currentOrigin) {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        mediaCacheRef.current.set(mediaId, blobUrl);
+        await saveToIndexedDB(mediaId, blob);
+        return blobUrl;
+      }
+      
+      // Cross-origin: usa URL direta (funciona em <img>/<video>)
+      mediaCacheRef.current.set(mediaId, url);
+      return url;
     } catch (e) {
-      console.error(`Erro ao baixar mídia ${mediaId}:`, e);
+      // Silencioso para cross-origin - usa URL original
+      mediaCacheRef.current.set(mediaId, url);
       return url;
     }
   }, []);
