@@ -302,6 +302,13 @@ export default function DeviceSetup() {
 
       console.log('Device registered successfully:', result);
       
+      // Salva device_token para heartbeat e autenticação do dispositivo
+      const resultObj = result as any;
+      if (resultObj?.device_token) {
+        localStorage.setItem(`device_token_${deviceId}`, resultObj.device_token);
+        console.log('Device token saved for heartbeat');
+      }
+      
       toast.success('Dispositivo configurado com sucesso!');
       setStep('complete');
       
