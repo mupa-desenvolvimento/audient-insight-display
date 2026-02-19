@@ -129,48 +129,46 @@
    }
  
    if (!isConnected) {
-     return (
-       <div className="space-y-6">
-         <div className="flex items-center gap-4">
-           <Button variant="ghost" size="icon" onClick={() => navigate('/admin/canva')}>
-             <ArrowLeft className="h-5 w-5" />
-           </Button>
-           <div>
-             <h1 className="text-2xl font-bold">Editor Canva</h1>
-             <p className="text-muted-foreground">Crie e edite designs no Canva</p>
-           </div>
-         </div>
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/admin/canva')}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <p className="text-muted-foreground">Crie e edite designs no Canva</p>
+          </div>
  
-         <Card>
-           <CardContent className="flex flex-col items-center justify-center py-12">
-             <ExternalLink className="h-12 w-12 text-muted-foreground mb-4" />
-             <h3 className="text-lg font-semibold mb-2">Conta Canva não conectada</h3>
-             <p className="text-muted-foreground text-center mb-4">
-               Você precisa conectar sua conta Canva para usar o editor.
-             </p>
-             <Button onClick={() => navigate('/admin/canva')}>
-               Conectar Canva
-             </Button>
-           </CardContent>
-         </Card>
+        </div>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <ExternalLink className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Conta Canva não conectada</h3>
+            <p className="text-muted-foreground text-center mb-4">
+              Você precisa conectar sua conta Canva para usar o editor.
+            </p>
+            <Button onClick={() => navigate('/admin/canva')}>
+              Conectar Canva
+            </Button>
+          </CardContent>
+        </Card>
        </div>
      );
    }
  
    return (
-     <div className="space-y-6">
-       <div className="flex items-center gap-4">
-         <Button variant="ghost" size="icon" onClick={() => navigate('/admin/canva')}>
-           <ArrowLeft className="h-5 w-5" />
-         </Button>
-         <div>
-           <h1 className="text-2xl font-bold">Editor Canva</h1>
-           <p className="text-muted-foreground">
-             {mode === 'select' && 'Escolha o tipo de mídia para criar'}
-             {mode === 'processing' && 'Edição em andamento'}
-           </p>
-         </div>
-       </div>
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={() => navigate('/admin/canva')}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div>
+          <p className="text-muted-foreground">
+            {mode === 'select' && 'Escolha o tipo de mídia para criar'}
+            {mode === 'processing' && 'Edição em andamento'}
+          </p>
+        </div>
+      </div>
  
        {mode === 'select' && (
          <div className="grid gap-6 md:grid-cols-2">

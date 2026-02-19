@@ -204,12 +204,6 @@ const InkyIntelligence = () => {
             <img src={inkyAvatar} alt="Inky" className="w-full h-full object-cover" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              Inky Intelligence
-              <Badge variant="secondary" className="bg-purple-500/20 text-purple-400 border-purple-500/30">
-                AI Powered
-              </Badge>
-            </h1>
             <p className="text-muted-foreground text-sm">
               Análises avançadas, recomendações e monetização de audiência
             </p>

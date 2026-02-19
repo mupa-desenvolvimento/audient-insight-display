@@ -37,7 +37,6 @@ const Dashboard = () => {
       {/* Header com refresh */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground text-sm">Visão geral da audiência em tempo real</p>
         </div>
         <Button variant="outline" size="sm" onClick={refresh} disabled={isLoading}>

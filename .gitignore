@@ -25,3 +25,8 @@ dist-ssr
 
 # Puppeteer cache
 .puppeteer/
+
+# Local dev configs / secrets
+.env
+.env.*
+ngrok.yml

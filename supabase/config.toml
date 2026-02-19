@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.inky-insights]
 verify_jwt = false
+
+[functions.auto-content-engine]
+verify_jwt = false

@@ -35,6 +35,9 @@ const Header = () => {
       case "/admin/monitoring":
         return "Monitoramento";
       default:
+        if (path.startsWith("/admin/auto-content/")) {
+          return "Conteúdo Automático";
+        }
         if (path.includes("/playlists/") && path.includes("/edit")) {
           return "Editor de Playlist";
         }

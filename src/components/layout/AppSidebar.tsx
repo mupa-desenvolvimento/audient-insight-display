@@ -18,6 +18,7 @@ import {
   ShoppingBag,
   Brush,
   Brain,
+  QrCode,
 } from "lucide-react";
 import logoHorizontal from "@/assets/logo_horizontal.svg";
 import { NavLink, useNavigate } from "react-router-dom";
@@ -56,6 +57,17 @@ const menuItems = [
   { title: "Configurações", url: "/admin/settings", icon: Settings },
 ];
 
+const autoContentItems = [
+  { title: "Clima", url: "/admin/auto-content/weather", icon: Tv },
+  { title: "Notícias", url: "/admin/auto-content/news", icon: BarChart3 },
+  { title: "Frases Motivacionais", url: "/admin/auto-content/quote", icon: Brain },
+  { title: "Curiosidades", url: "/admin/auto-content/curiosity", icon: Layers },
+  { title: "Aniversariantes", url: "/admin/auto-content/birthday", icon: ShoppingBag },
+  { title: "Nutrição", url: "/admin/auto-content/nutrition", icon: Store },
+  { title: "Instagram", url: "/admin/auto-content/instagram", icon: Camera },
+  { title: "QR Code Campanhas", url: "/admin/auto-content/qr_campaign", icon: QrCode },
+];
+
 const superAdminItems = [
   { title: "Clientes", url: "/admin/tenants", icon: Building2 },
   { title: "Empresas", url: "/admin/companies", icon: Plug2 },
@@ -88,6 +100,35 @@ const AppSidebar = () => {
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <NavLink
+                      to={item.url}
+                      className={({ isActive }) =>
+                        `flex items-center space-x-3 px-3 py-2 rounded-lg transition-all duration-200 ${
+                          isActive
+                            ? "bg-primary text-primary-foreground shadow-md"
+                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        }`
+                      }
+                    >
+                      <item.icon className="w-4 h-4" />
+                      <span className="font-medium">{item.title}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-xs font-medium text-muted-foreground px-3 py-2">
+            CONTEÚDO AUTOMÁTICO
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {autoContentItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink

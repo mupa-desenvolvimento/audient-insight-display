@@ -39,6 +39,8 @@ import ProductAnalytics from "./pages/admin/ProductAnalytics";
 import CanvaIntegration from "./pages/admin/CanvaIntegration";
 import CanvaEditor from "./pages/admin/CanvaEditor";
 import InkyIntelligence from "./pages/admin/InkyIntelligence";
+import ExampleListPage from "./pages/ExampleListPage";
+import AutoContentModulePage from "./pages/admin/AutoContentModulePage";
 import Install from "./pages/Install";
  import Presentation from "./pages/Presentation";
 import AssaiPresentation from "./pages/AssaiPresentation";
@@ -122,6 +124,7 @@ function AppContent() {
                         <Route path="media" element={<Media />} />
                         <Route path="analytics" element={<Analytics />} />
                         <Route path="settings" element={<Settings />} />
+                        <Route path="auto-content/:moduleType" element={<AutoContentModulePage />} />
                         <Route path="camera" element={<Camera />} />
                         <Route path="monitoring" element={<LiveMonitoring />} />
                         <Route path="tenants" element={<Tenants />} />
@@ -131,6 +134,7 @@ function AppContent() {
                         <Route path="canva" element={<CanvaIntegration />} />
                         <Route path="integrations/canva/editor" element={<CanvaEditor />} />
                         <Route path="inky" element={<InkyIntelligence />} />
+                        <Route path="list-example" element={<ExampleListPage />} />
                       </Routes>
                     </AppLayout>
                   </div>

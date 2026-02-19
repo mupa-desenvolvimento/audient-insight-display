@@ -153,7 +153,6 @@ const DeviceGroupsPage = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Grupos de Dispositivos</h1>
           <p className="text-muted-foreground">Organize dispositivos e atribua canais</p>
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>

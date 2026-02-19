@@ -43,7 +43,6 @@ const Analytics = () => {
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold">Analytics</h1>
           <p className="text-muted-foreground">Análise detalhada de audience e performance</p>
         </div>
         <Select defaultValue="7days">

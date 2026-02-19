@@ -204,7 +204,6 @@ const Camera = () => {
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold">Reconhecimento por Câmera</h1>
           <p className="text-muted-foreground">Sistema de detecção de pessoas em tempo real</p>
         </div>
         <div className="flex space-x-2">

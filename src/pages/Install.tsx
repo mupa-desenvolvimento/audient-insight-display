@@ -120,7 +120,6 @@ const Install = () => {
             alt="MupaMídias"
             className="w-24 h-24 mx-auto"
           />
-          <h1 className="text-3xl font-bold">MupaMídias</h1>
           <p className="text-muted-foreground">
             Sistema de Digital Signage com IA
           </p>

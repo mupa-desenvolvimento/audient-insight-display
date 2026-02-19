@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePlaylists, PlaylistWithChannel } from "@/hooks/usePlaylists";
 import { useChannels, Channel } from "@/hooks/useChannels";
@@ -16,6 +16,11 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, Search, ListVideo, Edit, Trash2, Calendar, Clock, AlertTriangle, Layers } from "lucide-react";
 import { format, parseISO, isAfter, isBefore, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { PageShell } from "@/components/layout/PageShell";
+import { ListViewport } from "@/components/list/ListViewport";
+import { ListControls } from "@/components/list/ListControls";
+import { UniversalPagination } from "@/components/list/UniversalPagination";
+import { useListState } from "@/hooks/useListState";
 
 const DAYS_OF_WEEK = [
   { value: 0, label: "Dom" },
@@ -200,11 +205,16 @@ const PlaylistForm = ({ formData, setFormData, channels, onSubmit, submitLabel }
   );
 };
 
+type PlaylistStatusFilter = "all" | "active" | "inactive" | "expired" | "expiring" | "scheduled";
+
+interface PlaylistFilters {
+  status: PlaylistStatusFilter;
+}
+
 const PlaylistsPage = () => {
   const navigate = useNavigate();
   const { playlists, isLoading, updatePlaylist, deletePlaylist } = usePlaylists();
   const { channels } = useChannels();
-  const [searchTerm, setSearchTerm] = useState("");
   const [editingPlaylist, setEditingPlaylist] = useState<PlaylistWithChannel | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -221,11 +231,18 @@ const PlaylistsPage = () => {
     priority: 5,
   });
 
-  const filteredPlaylists = playlists.filter(
-    (playlist) =>
-      playlist.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      playlist.channel?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const {
+    state,
+    setView,
+    setPage,
+    setPageSize,
+    setSearch,
+    setFilters,
+    reset,
+  } = useListState<PlaylistFilters>({
+    initialFilters: { status: "all" },
+    initialPageSize: 12,
+  });
 
   const handleUpdate = () => {
     if (!editingPlaylist) return;
@@ -324,42 +341,106 @@ const PlaylistsPage = () => {
     return { status: "active", message: "Ativa", color: "default" };
   };
 
+  const filteredPlaylists = useMemo(() => {
+    const term = state.search.toLowerCase().trim();
+    const statusFilter = state.filters.status;
+
+    return playlists.filter((playlist) => {
+      const matchesTerm =
+        !term ||
+        playlist.name.toLowerCase().includes(term) ||
+        playlist.channel?.name?.toLowerCase().includes(term);
+
+      const status = getPlaylistStatus(playlist).status as PlaylistStatusFilter;
+      const matchesStatus =
+        statusFilter === "all" ? true : statusFilter === status;
+
+      return matchesTerm && matchesStatus;
+    });
+  }, [playlists, state.search, state.filters]);
+
+  const totalPlaylists = filteredPlaylists.length;
+  const startIndex = (state.page - 1) * state.pageSize;
+  const paginatedPlaylists =
+    totalPlaylists === 0
+      ? []
+      : filteredPlaylists.slice(startIndex, startIndex + state.pageSize);
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Playlists</h1>
-          <p className="text-muted-foreground">Gerencie as playlists e programação de conteúdo</p>
+    <PageShell
+      className="space-y-0"
+      header={
+        <div className="flex items-center justify-between gap-4 py-4">
+          <p className="text-muted-foreground">
+            Gerencie as playlists e programação de conteúdo
+          </p>
+          <Button onClick={() => navigate("/admin/playlists/new")}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nova Playlist
+          </Button>
         </div>
-        <Button onClick={() => navigate("/admin/playlists/new")}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nova Playlist
-        </Button>
-      </div>
-
-      <div className="flex items-center space-x-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar playlists..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+      }
+      controls={
+        <div className="py-2">
+          <ListControls
+            state={state}
+            onSearchChange={setSearch}
+            onViewChange={setView}
+            onClearFilters={reset}
+          >
+            <Select
+              value={state.filters.status}
+              onValueChange={(value) =>
+                setFilters({
+                  ...state.filters,
+                  status: value as PlaylistStatusFilter,
+                })
+              }
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="active">Ativas</SelectItem>
+                <SelectItem value="inactive">Inativas</SelectItem>
+                <SelectItem value="expiring">Expiram em breve</SelectItem>
+                <SelectItem value="expired">Expiradas</SelectItem>
+                <SelectItem value="scheduled">Agendadas</SelectItem>
+              </SelectContent>
+            </Select>
+          </ListControls>
         </div>
-      </div>
-
-      {isLoading ? (
-        <div className="text-center py-8 text-muted-foreground">Carregando...</div>
-      ) : filteredPlaylists.length === 0 ? (
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-            Nenhuma playlist encontrada
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredPlaylists.map((playlist) => {
+      }
+      footer={
+        <UniversalPagination
+          page={state.page}
+          pageSize={state.pageSize}
+          total={totalPlaylists}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
+      }
+    >
+      <ListViewport
+        contentClassName={
+          state.view === "grid"
+            ? "grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+            : "flex flex-col gap-4"
+        }
+      >
+        {isLoading ? (
+          <div className="flex h-full items-center justify-center text-muted-foreground">
+            Carregando...
+          </div>
+        ) : totalPlaylists === 0 ? (
+          <Card className="col-span-full">
+            <CardContent className="py-8 text-center text-muted-foreground">
+              Nenhuma playlist encontrada
+            </CardContent>
+          </Card>
+        ) : (
+          paginatedPlaylists.map((playlist) => {
             const status = getPlaylistStatus(playlist);
             const schedule = playlist.schedule as Record<string, unknown> | null;
 
@@ -372,7 +453,13 @@ const PlaylistsPage = () => {
                       <CardTitle className="text-lg">{playlist.name}</CardTitle>
                     </div>
                     <Badge
-                      variant={status.color as "default" | "secondary" | "destructive" | "outline"}
+                      variant={
+                        status.color as
+                          | "default"
+                          | "secondary"
+                          | "destructive"
+                          | "outline"
+                      }
                       className={status.status === "expiring" ? "bg-yellow-500 text-white" : ""}
                     >
                       {status.message}
@@ -394,16 +481,25 @@ const PlaylistsPage = () => {
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-muted-foreground">Período:</span>
                           <span>
-                            {format(parseISO(schedule.start_date as string), "dd/MM/yyyy", { locale: ptBR })}
+                            {format(
+                              parseISO(schedule.start_date as string),
+                              "dd/MM/yyyy",
+                              { locale: ptBR }
+                            )}
                             {schedule.end_date &&
-                              ` - ${format(parseISO(schedule.end_date as string), "dd/MM/yyyy", { locale: ptBR })}`}
+                              ` - ${format(
+                                parseISO(schedule.end_date as string),
+                                "dd/MM/yyyy",
+                                { locale: ptBR }
+                              )}`}
                           </span>
                         </div>
                       )}
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Horário:</span>
                         <span>
-                          {schedule.start_time as string} - {schedule.end_time as string}
+                          {schedule.start_time as string} -{" "}
+                          {schedule.end_time as string}
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
@@ -412,8 +508,10 @@ const PlaylistsPage = () => {
                           {DAYS_OF_WEEK.map((day) => (
                             <span
                               key={day.value}
-                              className={`text-xs px-1 rounded ${
-                                (schedule.days_of_week as number[])?.includes(day.value)
+                              className={`rounded px-1 text-xs ${
+                                (schedule.days_of_week as number[])?.includes(
+                                  day.value
+                                )
                                   ? "bg-primary/20 text-primary"
                                   : "text-muted-foreground/50"
                               }`}
@@ -427,69 +525,92 @@ const PlaylistsPage = () => {
                   )}
 
                   {status.status === "expiring" && (
-                    <div className="flex items-center gap-2 p-2 rounded bg-yellow-500/10 text-yellow-600 text-sm">
-                      <AlertTriangle className="w-4 h-4" />
+                    <div className="flex items-center gap-2 rounded bg-yellow-500/10 p-2 text-sm text-yellow-600">
+                      <AlertTriangle className="h-4 w-4" />
                       Playlist expira em breve
                     </div>
                   )}
 
                   {status.status === "expired" && (
-                    <div className="flex items-center gap-2 p-2 rounded bg-destructive/10 text-destructive text-sm">
-                      <AlertTriangle className="w-4 h-4" />
+                    <div className="flex items-center gap-2 rounded bg-destructive/10 p-2 text-sm text-destructive">
+                      <AlertTriangle className="h-4 w-4" />
                       Playlist expirada
                     </div>
                   )}
 
-                  <div className="flex justify-end space-x-2 pt-2 border-t">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => navigate(`/admin/playlists/${playlist.id}/edit`)}
+                  <div className="flex justify-end space-x-2 border-t pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        navigate(`/admin/playlists/${playlist.id}/edit`)
+                      }
                       className="gap-1"
                     >
-                      <Layers className="w-4 h-4" />
+                      <Layers className="h-4 w-4" />
                       Conteúdo
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => openEdit(playlist)}>
-                      <Edit className="w-4 h-4" />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openEdit(playlist)}
+                    >
+                      <Edit className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setDeleteId(playlist.id)}>
-                      <Trash2 className="w-4 h-4 text-destructive" />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDeleteId(playlist.id)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
                 </CardContent>
               </Card>
             );
-          })}
-        </div>
-      )}
+          })
+        )}
+      </ListViewport>
 
-      {/* Edit Dialog */}
-      <Dialog open={!!editingPlaylist} onOpenChange={(open) => !open && setEditingPlaylist(null)}>
+      <Dialog
+        open={!!editingPlaylist}
+        onOpenChange={(open) => !open && setEditingPlaylist(null)}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Editar Playlist</DialogTitle>
           </DialogHeader>
-          <PlaylistForm formData={formData} setFormData={setFormData} channels={channels} onSubmit={handleUpdate} submitLabel="Salvar" />
+          <PlaylistForm
+            formData={formData}
+            setFormData={setFormData}
+            channels={channels}
+            onSubmit={handleUpdate}
+            submitLabel="Salvar"
+          />
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+      <AlertDialog
+        open={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir Playlist</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir esta playlist? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir esta playlist? Esta ação não pode
+              ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Excluir</AlertDialogAction>
+            <AlertDialogAction onClick={handleDelete}>
+              Excluir
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageShell>
   );
 };
 

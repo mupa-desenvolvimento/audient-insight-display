@@ -58,15 +58,14 @@ import { Checkbox } from '@/components/ui/checkbox';
    }
  
    return (
-     <div className="p-6 space-y-6">
-       {/* Header */}
-       <div className="flex items-center justify-between">
-         <div>
-           <h1 className="text-2xl font-bold">Integração Canva</h1>
-           <p className="text-muted-foreground">
-             Conecte sua conta do Canva para importar designs para suas playlists
-           </p>
-         </div>
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-muted-foreground">
+            Conecte sua conta do Canva para importar designs para suas playlists
+          </p>
+        </div>
          
          {isConnected ? (
            <div className="flex items-center gap-3">

@@ -24,7 +24,6 @@ const Settings = () => {
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold">Configurações</h1>
         <p className="text-muted-foreground">Gerencie configurações do sistema e usuários</p>
       </div>
 

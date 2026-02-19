@@ -98,7 +98,6 @@ const LiveMonitoring = () => {
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold">Monitoramento em Tempo Real</h1>
           <p className="text-muted-foreground">Visualização de faces cadastradas e não cadastradas</p>
         </div>
         <div className="flex space-x-2">

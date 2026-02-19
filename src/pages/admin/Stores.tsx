@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStores } from '@/hooks/useStores';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,18 @@ import { StoreWithHierarchy, City, State } from '@/types/database';
 import { toast } from 'sonner';
 import { StoreImportDialog } from '@/components/stores/StoreImportDialog';
 import { supabase } from '@/integrations/supabase/client';
+import { PageShell } from '@/components/layout/PageShell';
+import { ListViewport } from '@/components/list/ListViewport';
+import { ListControls } from '@/components/list/ListControls';
+import { UniversalPagination } from '@/components/list/UniversalPagination';
+import { useListState } from '@/hooks/useListState';
+import {
+  Select as UiSelect,
+  SelectContent as UiSelectContent,
+  SelectItem as UiSelectItem,
+  SelectTrigger as UiSelectTrigger,
+  SelectValue as UiSelectValue,
+} from '@/components/ui/select';
 
 interface StoreFormData {
   code: string;
@@ -203,7 +215,6 @@ const StoreForm = ({ formData, setFormData, cities }: StoreFormProps) => {
 export default function Stores() {
   const navigate = useNavigate();
   const { stores, cities, isLoading, updateStore, deleteStore, refetch } = useStores();
-  const [searchTerm, setSearchTerm] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -223,14 +234,56 @@ export default function Stores() {
     lng: '',
   });
 
-  const filteredStores = stores.filter(store =>
-    store.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    store.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    store.city?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    store.city?.state?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (store as any).cnpj?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (store as any).regional_responsavel?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  type StoreStatusFilter = 'all' | 'active' | 'inactive';
+
+  interface StoreFilters {
+    status: StoreStatusFilter;
+  }
+
+  const {
+    state,
+    setView,
+    setPage,
+    setPageSize,
+    setSearch,
+    setFilters,
+    reset,
+  } = useListState<StoreFilters>({
+    initialFilters: { status: 'all' },
+    initialPageSize: 10,
+  });
+
+  const filteredStores = useMemo(() => {
+    const term = state.search.toLowerCase().trim();
+    const statusFilter = state.filters.status;
+
+    return stores.filter((store) => {
+      const matchesTerm =
+        !term ||
+        store.name.toLowerCase().includes(term) ||
+        store.code.toLowerCase().includes(term) ||
+        store.city?.name.toLowerCase().includes(term) ||
+        store.city?.state?.name.toLowerCase().includes(term) ||
+        (store as any).cnpj?.toLowerCase().includes(term) ||
+        (store as any).regional_responsavel?.toLowerCase().includes(term);
+
+      const matchesStatus =
+        statusFilter === 'all'
+          ? true
+          : statusFilter === 'active'
+          ? store.is_active
+          : !store.is_active;
+
+      return matchesTerm && matchesStatus;
+    });
+  }, [stores, state.search, state.filters]);
+
+  const totalStores = filteredStores.length;
+  const startIndex = (state.page - 1) * state.pageSize;
+  const paginatedStores =
+    totalStores === 0
+      ? []
+      : filteredStores.slice(startIndex, startIndex + state.pageSize);
 
   const resetForm = () => {
     setFormData({ code: '', name: '', city_id: '', address: '', cnpj: '', bairro: '', cep: '', regional_responsavel: '', lat: '', lng: '' });
@@ -463,152 +516,267 @@ export default function Stores() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Lojas</h1>
-          <p className="text-muted-foreground">Gerencie todas as lojas do sistema ({stores.length} lojas)</p>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" onClick={() => navigate('/admin/stores/map')}>
-            <Map className="mr-2 h-4 w-4" />
-            Ver no Mapa
-          </Button>
-          <Button variant="outline" onClick={exportCSV}>
-            <Download className="mr-2 h-4 w-4" />
-            Exportar
-          </Button>
-          <Button variant="outline" onClick={syncCoordinates} disabled={isSubmitting} title="Buscar coordenadas para lojas sem lat/lng">
-            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-            Sincronizar Coordenadas
-          </Button>
-          <Button variant="outline" onClick={() => setIsImportOpen(true)}>
-            <Upload className="mr-2 h-4 w-4" />
-            Importar CSV
-          </Button>
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={resetForm}>
-                <Plus className="mr-2 h-4 w-4" />
-                Nova Loja
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Nova Loja</DialogTitle>
-                <DialogDescription>Adicione uma nova loja ao sistema</DialogDescription>
-              </DialogHeader>
-              <StoreForm formData={formData} setFormData={setFormData} cities={cities} />
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-                  Cancelar
+    <PageShell
+      className="animate-fade-in"
+      header={
+        <div className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-muted-foreground">
+            Gerencie todas as lojas do sistema ({stores.length} lojas)
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => navigate('/admin/stores/map')}>
+              <Map className="mr-2 h-4 w-4" />
+              Ver no Mapa
+            </Button>
+            <Button variant="outline" onClick={exportCSV}>
+              <Download className="mr-2 h-4 w-4" />
+              Exportar
+            </Button>
+            <Button
+              variant="outline"
+              onClick={syncCoordinates}
+              disabled={isSubmitting}
+              title="Buscar coordenadas para lojas sem lat/lng"
+            >
+              {isSubmitting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              Sincronizar Coordenadas
+            </Button>
+            <Button variant="outline" onClick={() => setIsImportOpen(true)}>
+              <Upload className="mr-2 h-4 w-4" />
+              Importar CSV
+            </Button>
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={resetForm}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nova Loja
                 </Button>
-                <Button onClick={handleCreate} disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Criar'}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por nome, código, cidade, estado, CNPJ ou regional..."
-                className="pl-10"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Nova Loja</DialogTitle>
+                  <DialogDescription>Adicione uma nova loja ao sistema</DialogDescription>
+                </DialogHeader>
+                <StoreForm formData={formData} setFormData={setFormData} cities={cities} />
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleCreate} disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Criar'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Cód.</TableHead>
-                  <TableHead>Unidade</TableHead>
-                  <TableHead>Regional</TableHead>
-                  <TableHead>CNPJ</TableHead>
-                  <TableHead>Localização</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredStores.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                      {searchTerm ? 'Nenhuma loja encontrada' : 'Nenhuma loja cadastrada'}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredStores.map((store) => (
-                    <TableRow key={store.id}>
-                      <TableCell className="font-mono font-medium">{store.code}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Store className="h-4 w-4 text-muted-foreground" />
-                          {store.name}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {(store as any).regional_responsavel || '-'}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {(store as any).cnpj || '-'}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <MapPin className="h-3 w-3" />
-                          <span className="text-sm">
-                            {store.city?.name}, {store.city?.state?.code}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={store.is_active ? 'default' : 'secondary'}
-                          className="cursor-pointer"
-                          onClick={() => toggleActive(store)}
-                        >
-                          {store.is_active ? 'Ativo' : 'Inativo'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button size="icon" variant="ghost" onClick={() => handleEdit(store)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" onClick={() => handleDelete(store)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
+        </div>
+      }
+      controls={
+        <div className="py-2">
+          <ListControls
+            state={state}
+            onSearchChange={setSearch}
+            onViewChange={setView}
+            onClearFilters={reset}
+          >
+            <UiSelect
+              value={state.filters.status}
+              onValueChange={(value) =>
+                setFilters({
+                  ...state.filters,
+                  status: value as StoreStatusFilter,
+                })
+              }
+            >
+              <UiSelectTrigger className="w-[160px]">
+                <UiSelectValue placeholder="Status" />
+              </UiSelectTrigger>
+              <UiSelectContent>
+                <UiSelectItem value="all">Todos</UiSelectItem>
+                <UiSelectItem value="active">Ativos</UiSelectItem>
+                <UiSelectItem value="inactive">Inativos</UiSelectItem>
+              </UiSelectContent>
+            </UiSelect>
+          </ListControls>
+        </div>
+      }
+      footer={
+        <UniversalPagination
+          page={state.page}
+          pageSize={state.pageSize}
+          total={totalStores}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
+      }
+    >
+      <ListViewport>
+        {isLoading ? (
+          <div className="flex h-full items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : totalStores === 0 ? (
+          <Card>
+            <CardContent className="py-8 text-center text-muted-foreground">
+              {state.search
+                ? 'Nenhuma loja encontrada'
+                : 'Nenhuma loja cadastrada'}
+            </CardContent>
+          </Card>
+        ) : state.view === 'list' ? (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Search className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">
+                  Listagem de lojas
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Cód.</TableHead>
+                      <TableHead>Unidade</TableHead>
+                      <TableHead>Regional</TableHead>
+                      <TableHead>CNPJ</TableHead>
+                      <TableHead>Localização</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedStores.map((store) => (
+                      <TableRow key={store.id}>
+                        <TableCell className="font-mono font-medium">
+                          {store.code}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Store className="h-4 w-4 text-muted-foreground" />
+                            {store.name}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {(store as any).regional_responsavel || '-'}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {(store as any).cnpj || '-'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 text-muted-foreground">
+                            <MapPin className="h-3 w-3" />
+                            <span className="text-sm">
+                              {store.city?.name}, {store.city?.state?.code}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={store.is_active ? 'default' : 'secondary'}
+                            className="cursor-pointer"
+                            onClick={() => toggleActive(store)}
+                          >
+                            {store.is_active ? 'Ativo' : 'Inativo'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleEdit(store)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleDelete(store)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {paginatedStores.map((store) => (
+              <Card key={store.id}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Store className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <div className="font-medium">{store.name}</div>
+                        <div className="text-xs font-mono text-muted-foreground">
+                          {store.code}
+                        </div>
+                      </div>
+                    </div>
+                    <Badge
+                      variant={store.is_active ? 'default' : 'secondary'}
+                      className="cursor-pointer"
+                      onClick={() => toggleActive(store)}
+                    >
+                      {store.is_active ? 'Ativo' : 'Inativo'}
+                    </Badge>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {store.city?.name}, {store.city?.state?.code}
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="text-xs text-muted-foreground">
+                    <div>
+                      Regional:{' '}
+                      <span className="font-medium">
+                        {(store as any).regional_responsavel || '-'}
+                      </span>
+                    </div>
+                    <div>
+                      CNPJ:{' '}
+                      <span className="font-mono">
+                        {(store as any).cnpj || '-'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => handleEdit(store)}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => handleDelete(store)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-        </CardContent>
-      </Card>
+        )}
+      </ListViewport>
 
-      {/* Edit Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -627,12 +795,11 @@ export default function Stores() {
         </DialogContent>
       </Dialog>
 
-      {/* Import Dialog */}
-      <StoreImportDialog 
-        open={isImportOpen} 
-        onOpenChange={setIsImportOpen} 
+      <StoreImportDialog
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
         onImportComplete={refetch}
       />
-    </div>
+    </PageShell>
   );
 }

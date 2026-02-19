@@ -77,7 +77,6 @@ const ProductDisplayConfig = () => {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold">Configuração da Tela de Consulta</h1>
               <p className="text-muted-foreground">{company?.name || "Empresa"}</p>
             </div>
           </div>

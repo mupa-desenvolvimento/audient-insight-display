@@ -1,14 +1,19 @@
-import { useState } from 'react';
-import { Building2, Plus, Search, Power, PowerOff, Trash2, Edit, Users, Monitor, Store as StoreIcon, Shield, UserPlus } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Building2, Plus, Power, PowerOff, Trash2, Edit, Users, Monitor, Store as StoreIcon, Shield, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PageShell } from '@/components/layout/PageShell';
+import { ListViewport } from '@/components/list/ListViewport';
+import { ListControls } from '@/components/list/ListControls';
+import { UniversalPagination } from '@/components/list/UniversalPagination';
+import { useListState } from '@/hooks/useListState';
 import { useTenants, Tenant } from '@/hooks/useTenants';
 import { useSuperAdmin } from '@/hooks/useSuperAdmin';
 import { TenantUsersDialog } from '@/components/admin/TenantUsersDialog';
@@ -16,11 +21,16 @@ import { TenantUsersList } from '@/components/admin/TenantUsersList';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+type TenantStatusFilter = 'all' | 'active' | 'inactive';
+
+interface TenantFilters {
+  status: TenantStatusFilter;
+}
+
 const Tenants = () => {
   const { tenants, isLoading, createTenant, updateTenant, toggleTenantStatus, deleteTenant } = useTenants();
   const { isSuperAdmin, isLoading: isCheckingAdmin } = useSuperAdmin();
   
-  const [searchTerm, setSearchTerm] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -34,10 +44,45 @@ const Tenants = () => {
     max_stores: 500,
   });
 
-  const filteredTenants = tenants.filter(tenant =>
-    tenant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tenant.slug.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const {
+    state,
+    setView,
+    setPage,
+    setPageSize,
+    setSearch,
+    setFilters,
+    reset,
+  } = useListState<TenantFilters>({
+    initialFilters: { status: 'all' },
+    initialPageSize: 12,
+  });
+
+  const filteredTenants = useMemo(() => {
+    const term = state.search.toLowerCase().trim();
+    const statusFilter = state.filters.status;
+
+    return tenants.filter((tenant) => {
+      const matchesTerm =
+        !term ||
+        tenant.name.toLowerCase().includes(term) ||
+        tenant.slug.toLowerCase().includes(term);
+
+      const isActive = tenant.is_active !== false;
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'active' && isActive) ||
+        (statusFilter === 'inactive' && !isActive);
+
+      return matchesTerm && matchesStatus;
+    });
+  }, [tenants, state.search, state.filters]);
+
+  const totalTenants = filteredTenants.length;
+  const startIndex = (state.page - 1) * state.pageSize;
+  const paginatedTenants =
+    totalTenants === 0
+      ? []
+      : filteredTenants.slice(startIndex, startIndex + state.pageSize);
 
   const resetForm = () => {
     setFormData({
@@ -114,14 +159,23 @@ const Tenants = () => {
 
   if (isCheckingAdmin || isLoading) {
     return (
-      <div className="space-y-6 p-6">
-        <Skeleton className="h-10 w-64" />
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3].map(i => (
+      <PageShell
+        header={
+          <div className="flex items-center justify-between gap-4 py-4">
+            <p className="text-muted-foreground">
+              Gerenciamento de clientes multi-tenant
+            </p>
+          </div>
+        }
+      >
+        <ListViewport
+          contentClassName="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+        >
+          {[1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-48" />
           ))}
-        </div>
-      </div>
+        </ListViewport>
+      </PageShell>
     );
   }
 
@@ -136,198 +190,315 @@ const Tenants = () => {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Building2 className="h-8 w-8 text-primary" />
-            Clientes (Tenants)
-          </h1>
-          <p className="text-muted-foreground mt-1">
+    <PageShell
+      className="space-y-6 p-6"
+      header={
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 py-2">
+          <p className="text-muted-foreground">
             Gerenciamento de clientes multi-tenant
           </p>
         </div>
-      </div>
+      }
+      controls={
+        <div className="flex items-center justify-between gap-4 py-2">
+          <Tabs defaultValue="clientes" className="w-full">
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <TabsList>
+                <TabsTrigger value="clientes" className="gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Clientes
+                </TabsTrigger>
+                <TabsTrigger value="usuarios" className="gap-2">
+                  <Users className="h-4 w-4" />
+                  Usuários
+                </TabsTrigger>
+              </TabsList>
+              <Button onClick={() => setIsCreateOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Novo Cliente
+              </Button>
+            </div>
 
-      <Tabs defaultValue="clientes" className="w-full">
-        <div className="flex items-center justify-between gap-4 mb-4">
-          <TabsList>
-            <TabsTrigger value="clientes" className="gap-2">
-              <Building2 className="h-4 w-4" />
-              Clientes
-            </TabsTrigger>
-            <TabsTrigger value="usuarios" className="gap-2">
-              <Users className="h-4 w-4" />
-              Usuários
-            </TabsTrigger>
-          </TabsList>
-          <Button onClick={() => setIsCreateOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Cliente
-          </Button>
+            <TabsContent value="clientes" className="mt-0 space-y-4">
+              <div className="grid gap-4 md:grid-cols-4">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      Total de Clientes
+                    </CardTitle>
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {tenants.length}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      Ativos
+                    </CardTitle>
+                    <Power className="h-4 w-4 text-green-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-green-600">
+                      {tenants.filter((t) => t.is_active !== false).length}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      Inativos
+                    </CardTitle>
+                    <PowerOff className="h-4 w-4 text-red-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-red-600">
+                      {tenants.filter((t) => t.is_active === false).length}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      Schemas Ativos
+                    </CardTitle>
+                    <Shield className="h-4 w-4 text-primary" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {
+                        tenants.filter(
+                          (t) => (t.migration_version || 0) > 0,
+                        ).length
+                      }
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="mt-4">
+                <ListControls
+                  state={state}
+                  onSearchChange={setSearch}
+                  onViewChange={setView}
+                  onClearFilters={reset}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      Status
+                    </span>
+                    <select
+                      className="h-9 w-[160px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      value={state.filters.status}
+                      onChange={(event) =>
+                        setFilters({
+                          ...state.filters,
+                          status: event.target
+                            .value as TenantStatusFilter,
+                        })
+                      }
+                    >
+                      <option value="all">Todos</option>
+                      <option value="active">Ativos</option>
+                      <option value="inactive">Inativos</option>
+                    </select>
+                  </div>
+                </ListControls>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="usuarios" className="mt-0">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Usuários por Cliente</CardTitle>
+                  <CardDescription>
+                    Gerencie os usuários vinculados a cada cliente
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <TenantUsersList tenants={tenants} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
-
-        <TabsContent value="clientes" className="space-y-6 mt-0">
-
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Clientes</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{tenants.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ativos</CardTitle>
-            <Power className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {tenants.filter(t => t.is_active !== false).length}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Inativos</CardTitle>
-            <PowerOff className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              {tenants.filter(t => t.is_active === false).length}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Schemas Ativos</CardTitle>
-            <Shield className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {tenants.filter(t => (t.migration_version || 0) > 0).length}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por nome ou slug..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
+      }
+      footer={
+        <UniversalPagination
+          page={state.page}
+          pageSize={state.pageSize}
+          total={totalTenants}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
         />
-      </div>
-
-      {/* Tenants Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filteredTenants.map(tenant => (
-          <Card key={tenant.id} className={`transition-all ${tenant.is_active === false ? 'opacity-60' : ''}`}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg font-semibold">{tenant.name}</CardTitle>
-                <Badge variant={tenant.is_active !== false ? 'default' : 'secondary'}>
-                  {tenant.is_active !== false ? 'Ativo' : 'Inativo'}
-                </Badge>
-              </div>
-              <p className="text-sm text-muted-foreground font-mono">{tenant.slug}</p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-center">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <p className="text-sm font-medium">{tenant.max_users || 50}</p>
-                  <p className="text-xs text-muted-foreground">Usuários</p>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center justify-center">
-                    <Monitor className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <p className="text-sm font-medium">{tenant.max_devices || 100}</p>
-                  <p className="text-xs text-muted-foreground">Dispositivos</p>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center justify-center">
-                    <StoreIcon className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <p className="text-sm font-medium">{tenant.max_stores || 500}</p>
-                  <p className="text-xs text-muted-foreground">Lojas</p>
-                </div>
-              </div>
-
-              <div className="text-xs text-muted-foreground">
-                <p>Schema: <span className="font-mono">{tenant.schema_name}</span></p>
-                <p>Criado: {tenant.created_at ? format(new Date(tenant.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '-'}</p>
-              </div>
-
-              <div className="flex gap-2 pt-2">
+      }
+    >
+      <ListViewport
+        contentClassName={
+          state.view === 'grid'
+            ? 'grid gap-4 md:grid-cols-2 lg:grid-cols-3'
+            : 'flex flex-col gap-4'
+        }
+      >
+        {totalTenants === 0 ? (
+          <Card className="col-span-full">
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Building2 className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+              <h3 className="mt-2 text-lg font-medium">
+                Nenhum cliente encontrado
+              </h3>
+              <p className="text-muted-foreground">
+                {state.search
+                  ? 'Nenhum cliente corresponde à sua busca.'
+                  : 'Crie seu primeiro cliente para começar.'}
+              </p>
+              {!state.search && (
                 <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => handleEdit(tenant)}
+                  className="mt-4"
+                  onClick={() => setIsCreateOpen(true)}
                 >
-                  <Edit className="h-4 w-4 mr-1" />
-                  Editar
+                  <Plus className="mr-2 h-4 w-4" />
+                  Criar Primeiro Cliente
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedTenant(tenant);
-                    setIsUsersOpen(true);
-                  }}
-                >
-                  <UserPlus className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant={tenant.is_active !== false ? 'outline' : 'default'}
-                  size="sm"
-                  onClick={() => toggleTenantStatus(tenant.id, tenant.is_active === false)}
-                >
-                  {tenant.is_active !== false ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedTenant(tenant);
-                    setIsDeleteOpen(true);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
+              )}
             </CardContent>
           </Card>
-        ))}
-      </div>
+        ) : (
+          paginatedTenants.map((tenant) => (
+            <Card
+              key={tenant.id}
+              className={`transition-all ${tenant.is_active === false ? 'opacity-60' : ''}`}
+            >
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg font-semibold">
+                    {tenant.name}
+                  </CardTitle>
+                  <Badge
+                    variant={
+                      tenant.is_active !== false ? 'default' : 'secondary'
+                    }
+                  >
+                    {tenant.is_active !== false ? 'Ativo' : 'Inativo'}
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground font-mono">
+                  {tenant.slug}
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-center">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm font-medium">
+                      {tenant.max_users || 50}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Usuários
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-center">
+                      <Monitor className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm font-medium">
+                      {tenant.max_devices || 100}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Dispositivos
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-center">
+                      <StoreIcon className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm font-medium">
+                      {tenant.max_stores || 500}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Lojas
+                    </p>
+                  </div>
+                </div>
 
-      {filteredTenants.length === 0 && (
-        <div className="text-center py-12">
-          <Building2 className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-2 text-lg font-medium">Nenhum cliente encontrado</h3>
-          <p className="text-muted-foreground">
-            {searchTerm ? 'Tente ajustar sua busca.' : 'Crie seu primeiro cliente para começar.'}
-          </p>
-        </div>
-      )}
-        </TabsContent>
+                <div className="text-xs text-muted-foreground">
+                  <p>
+                    Schema:{' '}
+                    <span className="font-mono">
+                      {tenant.schema_name}
+                    </span>
+                  </p>
+                  <p>
+                    Criado:{' '}
+                    {tenant.created_at
+                      ? format(
+                          new Date(tenant.created_at),
+                          "dd/MM/yyyy 'às' HH:mm",
+                          { locale: ptBR },
+                        )
+                      : '-'}
+                  </p>
+                </div>
 
-        <TabsContent value="usuarios" className="mt-0">
-          <TenantUsersList tenants={tenants} />
-        </TabsContent>
-      </Tabs>
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => handleEdit(tenant)}
+                  >
+                    <Edit className="h-4 w-4 mr-1" />
+                    Editar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedTenant(tenant);
+                      setIsUsersOpen(true);
+                    }}
+                  >
+                    <UserPlus className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant={
+                      tenant.is_active !== false ? 'outline' : 'default'
+                    }
+                    size="sm"
+                    onClick={() =>
+                      toggleTenantStatus(
+                        tenant.id,
+                        tenant.is_active === false,
+                      )
+                    }
+                  >
+                    {tenant.is_active !== false ? (
+                      <PowerOff className="h-4 w-4" />
+                    ) : (
+                      <Power className="h-4 w-4" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedTenant(tenant);
+                      setIsDeleteOpen(true);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </ListViewport>
 
       {/* Create Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -503,7 +674,7 @@ const Tenants = () => {
           if (!open) setSelectedTenant(null);
         }}
       />
-    </div>
+    </PageShell>
   );
 };
 
