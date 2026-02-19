@@ -9,6 +9,8 @@ interface MediaRotationOptions {
   fadeBeforeMs?: number;
 }
 
+const DEFAULT_IMAGE_DURATION = 10; // segundos padrão para imagens
+
 export const useMediaRotation = ({
   itemsLength,
   currentDuration,
@@ -37,14 +39,24 @@ export const useMediaRotation = ({
     setCurrentIndex(0);
   }, []);
 
-  // Timer-based rotation for images (videos use onEnded)
   useEffect(() => {
-    if (!enabled || itemsLength === 0 || currentDuration <= 0) return;
+    if (!enabled || itemsLength === 0) return;
 
-    // For videos without explicit duration control, skip timer
-    if (isVideo && !currentDuration) return;
+    // Vídeos sem duration_override: aguardam onEnded para respeitar a duração real.
+    // Apenas configura timer de progresso sem avanço automático.
+    if (isVideo && currentDuration <= 0) {
+      setTimeRemaining(0);
+      return;
+    }
 
-    const durationMs = currentDuration * 1000;
+    // Para imagens: usa o duration do banco ou o padrão de 10s
+    const effectiveDuration = isVideo
+      ? currentDuration
+      : currentDuration > 0
+      ? currentDuration
+      : DEFAULT_IMAGE_DURATION;
+
+    const durationMs = effectiveDuration * 1000;
     setTimeRemaining(durationMs);
 
     const startTime = Date.now();
@@ -56,13 +68,11 @@ export const useMediaRotation = ({
     if (fadeBeforeMs > 0 && onFadeStart) {
       fadeTimerRef.current = setTimeout(() => {
         onFadeStart();
-      }, durationMs - fadeBeforeMs);
+      }, Math.max(0, durationMs - fadeBeforeMs));
     }
 
-    // For images, auto-advance. For videos, let onEnded handle it unless duration_override is set
-    if (!isVideo || currentDuration) {
-      mediaTimerRef.current = setTimeout(goToNext, durationMs);
-    }
+    // Imagens avançam por timer; vídeos com duration_override também
+    mediaTimerRef.current = setTimeout(goToNext, durationMs);
 
     return () => {
       if (mediaTimerRef.current) clearTimeout(mediaTimerRef.current);
@@ -71,9 +81,10 @@ export const useMediaRotation = ({
     };
   }, [currentIndex, currentDuration, isVideo, enabled, itemsLength, goToNext, fadeBeforeMs, onFadeStart]);
 
-  const progressPercent = currentDuration > 0
-    ? ((currentDuration * 1000 - timeRemaining) / (currentDuration * 1000)) * 100
-    : 0;
+  const progressPercent =
+    currentDuration > 0
+      ? ((currentDuration * 1000 - timeRemaining) / (currentDuration * 1000)) * 100
+      : 0;
 
   return {
     currentIndex,
