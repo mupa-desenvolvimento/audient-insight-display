@@ -208,8 +208,9 @@ export const DeviceOnboarding: React.FC = () => {
       
       // Save ID and Token locally
       localStorage.setItem('mupa_device_code', deviceId);
-      if (data?.device_token) {
-        localStorage.setItem('mupa_device_token', data.device_token);
+      const dataAny = data as any;
+      if (dataAny?.device_token) {
+        localStorage.setItem('mupa_device_token', dataAny.device_token);
       }
 
       // Navigate to Player

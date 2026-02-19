@@ -1,4 +1,4 @@
-// @ts-expect-error Remote ESM import for Deno edge function
+// deno-lint-ignore-file
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 declare const Deno: {
@@ -110,7 +110,8 @@ Deno.serve(async (req: Request) => {
         .single()
 
       // Safe navigation for region_id
-      const region_id = storeData?.city?.state?.region_id || null
+      const cityData = storeData?.city as any
+      const region_id = cityData?.state?.region_id || null
 
       // B. Get Channel via Group
       const { data: groupData } = await supabase
