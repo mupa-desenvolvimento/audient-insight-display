@@ -54,12 +54,23 @@ const WebViewPlayer = () => {
 
   // Media rotation
   const firstItem = items[0];
-  const firstMedia = firstItem?.media;
+
+  // Helper para calcular duração efetiva de um item.
+  // Vídeos sem override retornam 0 (avançam via onEnded).
+  // Imagens usam duration do banco com fallback de 10s.
+  const getItemDuration = (item: typeof firstItem) => {
+    if (!item) return 10;
+    if (item.duration_override && item.duration_override > 0) return item.duration_override;
+    if (item.media?.type === "video") return 0; // usa onEnded
+    return item.media?.duration || 10;
+  };
+
+  const isFirstVideo = firstItem?.media?.type === "video";
 
   const { currentIndex, goToNext, goToPrev, progressPercent, timeRemaining } = useMediaRotation({
     itemsLength: items.length,
-    currentDuration: firstItem?.duration_override || firstMedia?.duration || 10,
-    isVideo: firstMedia?.type === "video",
+    currentDuration: getItemDuration(firstItem),
+    isVideo: isFirstVideo,
     enabled: items.length > 0,
     onFadeStart: () => setTransitionState("fading"),
     fadeBeforeMs: 500,
@@ -148,6 +159,12 @@ const WebViewPlayer = () => {
   if (!activeMedia) return null;
 
   const mediaUrl = activeMedia.blob_url || activeMedia.file_url;
+
+  // Próximo item para pré-carregamento
+  const nextItem = items[(currentIndex + 1) % items.length];
+  const nextMedia = nextItem?.media;
+  const nextMediaUrl = nextMedia?.blob_url || nextMedia?.file_url || undefined;
+
   const getObjectFit = (): "cover" | "contain" | "fill" => {
     switch (activePlaylist?.content_scale) {
       case "contain": return "contain";
@@ -180,6 +197,7 @@ const WebViewPlayer = () => {
             transitionState === "fading" ? "opacity-0" : "opacity-100"
           )}
           onEnded={goToNext}
+          nextMediaUrl={nextMediaUrl}
           onImageError={(e) => {
             if ((e.target as HTMLImageElement).src !== activeMedia.file_url) {
               (e.target as HTMLImageElement).src = activeMedia.file_url;

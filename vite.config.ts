@@ -42,6 +42,7 @@ export default defineConfig(({ mode }) => ({
         ]
       },
       workbox: {
+        navigateFallbackDenylist: [/^\/~oauth/],
         globPatterns: ['**/*.{js,css,html,ico,svg,woff,woff2}'],
         globIgnores: ['**/captura_pessoas*.png', '**/terminal_*.jpeg', '**/terminal_*.mp4', '**/concorrente_*.mp4'],
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024, // 8MB limit
