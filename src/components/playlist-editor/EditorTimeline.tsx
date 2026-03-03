@@ -381,7 +381,7 @@ export const EditorTimeline = ({
                                 isDragging ? "opacity-40 scale-95 rotate-1" : "opacity-100",
                                 isDropTarget ? "scale-[0.98] border-primary/50" : "",
                               )}
-                              style={{ width: `${width}px`, height: 80 }}
+                              style={{ width: `${width}px`, height: 110 }}
                             >
                               {/* Thumbnail */}
                               <div className="absolute inset-0 bg-muted">
