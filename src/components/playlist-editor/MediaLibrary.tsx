@@ -109,7 +109,6 @@ export const MediaLibrary = ({ onDragStart }: MediaLibraryProps) => {
                         src={media.file_url}
                         alt={media.name}
                         className="w-full h-full object-cover"
-                        loading="lazy"
                       />
                     )
                   ) : (
