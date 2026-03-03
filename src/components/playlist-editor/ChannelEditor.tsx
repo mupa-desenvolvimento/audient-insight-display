@@ -178,6 +178,7 @@ export const ChannelEditor = ({
         {activePanel === "media" && (
           <div className="w-72 flex flex-col overflow-hidden border-r bg-muted/50">
             <EditorPropertiesPanel
+              onAddAutoContent={() => {}}
               activePanel={activePanel}
               formData={{ 
                 name: channel.name, 
