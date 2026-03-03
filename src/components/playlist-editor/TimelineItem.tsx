@@ -137,7 +137,6 @@ export const TimelineItem = ({
               src={item.media.file_url}
               alt={item.media.name}
               className="w-full h-full object-cover"
-              loading="lazy"
             />
           )
         ) : (

@@ -173,13 +173,16 @@ const MediaLibraryPanel = ({ onAddMedia, itemsLength }: {
                         src={media.file_url}
                         className="w-full h-full object-cover"
                         muted
+                        preload="metadata"
                       />
                     ) : (
                       <img
                         src={media.file_url}
                         alt={media.name}
                         className="w-full h-full object-cover"
-                        loading="lazy"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
                       />
                     )
                   ) : (
