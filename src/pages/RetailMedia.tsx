@@ -6,8 +6,8 @@ import { ArrowRight, Building2, CircleDollarSign, TrendingUp, Monitor, BarChart3
 import { LeadFormModal } from "@/components/landing/LeadFormModal";
 import { useState } from "react";
 
-const Section = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
-  <section className={`w-full px-6 md:px-10 lg:px-16 ${className}`}>{children}</section>
+const Section = ({ children, className = "", id }: { children: React.ReactNode; className?: string; id?: string }) => (
+  <section id={id} className={`w-full px-6 md:px-10 lg:px-16 ${className}`}>{children}</section>
 );
 
 const SectionHeader = ({ eyebrow, title, subtitle }: { eyebrow?: string; title: string; subtitle?: string }) => (
