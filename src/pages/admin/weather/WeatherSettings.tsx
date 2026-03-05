@@ -1,4 +1,5 @@
 
+import { format } from "date-fns";
 import { useWeather, WeatherLocation } from "@/hooks/useWeather";
 import { CitySearch } from "./CitySearch";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -7,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, RefreshCw, CloudSun, LayoutGrid, List } from "lucide-react";
+import { Trash2, RefreshCw, CloudSun, LayoutGrid, List, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { WeatherPreview } from "./WeatherPreview";
 import { useState } from "react";
@@ -77,9 +78,10 @@ export function WeatherSettings() {
                   <TableRow>
                     <TableHead className="w-[50px]">Padrão</TableHead>
                     <TableHead>Cidade / Estado</TableHead>
-                    <TableHead>Clima Atual</TableHead>
-                    <TableHead>Modo de Exibição</TableHead>
-                    <TableHead>Ativo</TableHead>
+                     <TableHead>Clima Atual</TableHead>
+                     <TableHead>Layout</TableHead>
+                     <TableHead>Modo de Exibição</TableHead>
+                     <TableHead>Ativo</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -111,11 +113,38 @@ export function WeatherSettings() {
                             <div className="flex flex-col">
                               <span className="font-bold">{Math.round(loc.current_temp)}°C</span>
                               <span className="text-xs text-muted-foreground capitalize">{loc.weather_description}</span>
+                              {loc.last_updated_at && (
+                                <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                                  <Clock className="h-3 w-3" />
+                                  {format(new Date(loc.last_updated_at), "dd/MM HH:mm")}
+                                </span>
+                              )}
                             </div>
                           </div>
                         ) : (
                           <span className="text-xs text-muted-foreground">Sem dados</span>
                         )}
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={loc.layout_type || "apple"}
+                          onValueChange={(value: any) => 
+                            updateSettings.mutate({ 
+                              id: loc.id, 
+                              layout_type: value 
+                            })
+                          }
+                        >
+                          <SelectTrigger className="w-[140px] h-8 text-xs">
+                            <SelectValue placeholder="Layout" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="apple">Apple Style</SelectItem>
+                            <SelectItem value="minimal">Minimal Widget</SelectItem>
+                            <SelectItem value="card">Modern Card</SelectItem>
+                            <SelectItem value="grid">Forecast Grid</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-2">
@@ -141,26 +170,6 @@ export function WeatherSettings() {
                           {loc.type_view === "slide" && (
                             <div className="flex flex-col gap-2">
                               <Select
-                                value={loc.layout_type || "apple"}
-                                onValueChange={(value: any) => 
-                                  updateSettings.mutate({ 
-                                    id: loc.id, 
-                                    layout_type: value 
-                                  })
-                                }
-                              >
-                                <SelectTrigger className="w-[140px] h-8 text-xs">
-                                  <SelectValue placeholder="Layout" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="apple">Apple Style</SelectItem>
-                                  <SelectItem value="minimal">Minimal Widget</SelectItem>
-                                  <SelectItem value="card">Modern Card</SelectItem>
-                                  <SelectItem value="grid">Forecast Grid</SelectItem>
-                                </SelectContent>
-                              </Select>
-
-                              <Select
                                 value={loc.theme_color || "blue"}
                                 onValueChange={(value) => 
                                   updateSettings.mutate({ 
@@ -172,7 +181,7 @@ export function WeatherSettings() {
                                 <SelectTrigger className="w-[140px] h-8 text-xs">
                                   <div className="flex items-center gap-2">
                                     <div 
-                                      className="w-3 h-3 rounded-full border border-gray-200"
+                                      className="w-3 h-3 rounded-full border border-border"
                                       style={{ 
                                         backgroundColor: 
                                           loc.theme_color === "purple" ? "#7c3aed" :
