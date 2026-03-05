@@ -225,13 +225,15 @@ export function useNews() {
   // --- Edge Function Trigger ---
   const triggerCollection = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('rss-collector');
+      const { data, error } = await supabase.functions.invoke('rss-collector', {
+        body: { maxFeeds: 1, maxItems: 8, batchSize: 10 }
+      });
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["news-articles"] });
-      toast.success("Coleta de notícias iniciada");
+      toast.success(`Coleta concluída: ${data?.processed_feeds ?? 0} feed processado`);
     },
     onError: (err: any) => {
       console.error("News Collection Error:", err);
