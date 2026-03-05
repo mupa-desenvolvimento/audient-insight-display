@@ -8,6 +8,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const DEFAULT_MAX_FEEDS_PER_RUN = 1;
+const DEFAULT_MAX_ITEMS_PER_FEED = 8;
+const DEFAULT_BATCH_SIZE = 10;
+const MAX_RUNTIME_MS = 1400;
+
 function stripHtml(html: string) {
   if (!html) return "";
   return html.replace(/<[^>]*>?/gm, "").trim();
@@ -23,18 +28,18 @@ function createSlug(title: string) {
     .substring(0, 120);
 }
 
-const MAX_FEEDS_PER_RUN = 8;
-const MAX_ITEMS_PER_FEED = 15;
-const BATCH_SIZE = 50;
+function timeExceeded(startTime: number) {
+  return Date.now() - startTime >= MAX_RUNTIME_MS;
+}
 
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  try {
-    console.log("Iniciando coleta RSS...");
+  const startTime = Date.now();
 
+  try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -47,43 +52,67 @@ serve(async (req: Request) => {
 
     const supabaseClient = createClient(supabaseUrl, supabaseKey);
 
-    // Parse optional offset for rotating through feeds
-    let offset = 0;
+    let payload: any = {};
     try {
-      const body = await req.json();
-      offset = body?.offset || 0;
-    } catch { /* no body */ }
+      const rawBody = await req.text();
+      if (rawBody) payload = JSON.parse(rawBody);
+    } catch {
+      payload = {};
+    }
 
-    // Fetch active feeds with pagination
+    const maxFeeds = Math.max(1, Math.min(Number(payload.maxFeeds) || DEFAULT_MAX_FEEDS_PER_RUN, 3));
+    const maxItems = Math.max(1, Math.min(Number(payload.maxItems) || DEFAULT_MAX_ITEMS_PER_FEED, 10));
+    const batchSize = Math.max(1, Math.min(Number(payload.batchSize) || DEFAULT_BATCH_SIZE, 20));
+    const shouldCleanup = payload.cleanup === true;
+
+    const { count: totalFeeds, error: countError } = await supabaseClient
+      .from("news_feeds")
+      .select("id", { count: "exact", head: true })
+      .eq("active", true);
+
+    if (countError) throw countError;
+
+    const total = totalFeeds || 0;
+    if (total === 0) {
+      return new Response(
+        JSON.stringify({ message: "Nenhum feed ativo encontrado.", total_feeds: 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      );
+    }
+
+    const providedOffset = Number.isFinite(Number(payload.offset)) ? Number(payload.offset) : null;
+    const rotationSeed = Math.floor(Date.now() / 3600000); // rotates each hour
+    const offset = providedOffset ?? ((rotationSeed * maxFeeds) % total);
+
     const { data: feeds, error: feedsError } = await supabaseClient
       .from("news_feeds")
-      .select("*")
+      .select("id,name,category,rss_url")
       .eq("active", true)
       .order("priority", { ascending: false })
-      .range(offset, offset + MAX_FEEDS_PER_RUN - 1);
+      .order("created_at", { ascending: true })
+      .range(offset, Math.min(offset + maxFeeds - 1, total - 1));
 
     if (feedsError) throw feedsError;
 
     if (!feeds || feeds.length === 0) {
       return new Response(
-        JSON.stringify({ message: "Nenhum feed para processar neste lote." }),
+        JSON.stringify({ message: "Nenhum feed no intervalo solicitado.", offset, total_feeds: total }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
       );
     }
 
-    console.log(`Processando ${feeds.length} feeds (offset=${offset})`);
+    const results: any[] = [];
+    let inserted = 0;
 
-    const results = [];
-    const allArticles = [];
-
-    // Process feeds sequentially but collect articles for batch insert
     for (const feed of feeds) {
+      if (timeExceeded(startTime)) {
+        results.push({ feed: feed.name, status: "skipped", reason: "time_budget_exceeded" });
+        break;
+      }
+
       try {
-        console.log(`Feed: ${feed.name}`);
-
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8000);
-
+        const timeout = setTimeout(() => controller.abort(), 7000);
         const response = await fetch(feed.rss_url, { signal: controller.signal });
         clearTimeout(timeout);
 
@@ -92,14 +121,9 @@ serve(async (req: Request) => {
         }
 
         const xmlText = await response.text();
-        let xmlData: any;
-        try {
-          xmlData = parse(xmlText);
-        } catch (e) {
-          throw new Error(`XML parse error`);
-        }
+        const xmlData = parse(xmlText);
 
-        let items = [];
+        let items: any[] = [];
         if (xmlData?.rss?.channel?.item) {
           items = Array.isArray(xmlData.rss.channel.item)
             ? xmlData.rss.channel.item
@@ -110,89 +134,95 @@ serve(async (req: Request) => {
             : [xmlData.feed.entry];
         }
 
-        // Limit items per feed
-        items = items.slice(0, MAX_ITEMS_PER_FEED);
-        console.log(`${items.length} itens de ${feed.name}`);
+        const limitedItems = items.slice(0, maxItems);
 
-        for (const item of items) {
-          const title = (item.title || "Sem título").substring(0, 255);
-          const link = item.link || "";
-          const descriptionRaw = item.description || item.summary || item.content || "";
-          const description = stripHtml(descriptionRaw).substring(0, 300);
+        const articles = limitedItems.map((item: any) => {
+          const title = (item.title || "Sem título").toString().substring(0, 255);
+          const linkRaw = item.link || "";
+          const descriptionRaw = (item.description || item.summary || item.content || "").toString();
 
           let pubDate = item.pubDate || item.published || item.updated || new Date().toISOString();
           try {
             const d = new Date(pubDate);
             pubDate = isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
-          } catch { pubDate = new Date().toISOString(); }
+          } catch {
+            pubDate = new Date().toISOString();
+          }
 
           let imageUrl = null;
           if (item.enclosure?.["@url"]) {
             imageUrl = item.enclosure["@url"];
           } else if (item["media:content"]?.["@url"]) {
             imageUrl = item["media:content"]["@url"];
-          } else if (item["media:group"]?.["media:content"]?.["@url"]) {
-            imageUrl = item["media:group"]["media:content"]["@url"];
           } else {
             const imgMatch = descriptionRaw.match(/<img[^>]+src="([^">]+)"/);
             if (imgMatch) imageUrl = imgMatch[1];
           }
 
-          const slug = createSlug(`${title}-${pubDate.substring(0, 10)}`);
-
-          allArticles.push({
+          return {
             feed_id: feed.id,
             title,
-            description,
-            link: typeof link === "string" ? link : (link["@href"] || link.href || ""),
+            description: stripHtml(descriptionRaw).substring(0, 300),
+            link: typeof linkRaw === "string" ? linkRaw : (linkRaw["@href"] || linkRaw.href || ""),
             image_url: imageUrl,
             category: feed.category || "Geral",
             source: feed.name,
-            slug,
+            slug: createSlug(`${title}-${pubDate.substring(0, 10)}`),
             published_at: pubDate,
             active: true,
-          });
+          };
+        });
+
+        for (let i = 0; i < articles.length; i += batchSize) {
+          if (timeExceeded(startTime)) break;
+
+          const batch = articles.slice(i, i + batchSize);
+          const { error } = await supabaseClient
+            .from("news_articles")
+            .upsert(batch, { onConflict: "slug", ignoreDuplicates: true });
+
+          if (!error) {
+            inserted += batch.length;
+          } else {
+            console.error(`Erro ao inserir lote (${feed.name}):`, error.message);
+          }
         }
 
-        results.push({ feed: feed.name, status: "success", items: items.length });
+        results.push({ feed: feed.name, status: "success", items_processed: articles.length });
       } catch (err: any) {
-        console.error(`Erro ${feed.name}: ${err.message}`);
+        console.error(`Erro no feed ${feed.name}:`, err.message);
         results.push({ feed: feed.name, status: "error", error: err.message });
       }
     }
 
-    // Batch upsert all articles
-    console.log(`Inserindo ${allArticles.length} artigos em lotes de ${BATCH_SIZE}...`);
-    let inserted = 0;
-    for (let i = 0; i < allArticles.length; i += BATCH_SIZE) {
-      const batch = allArticles.slice(i, i + BATCH_SIZE);
-      const { error } = await supabaseClient
+    if (shouldCleanup && !timeExceeded(startTime)) {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      await supabaseClient
         .from("news_articles")
-        .upsert(batch, { onConflict: "slug", ignoreDuplicates: true });
-
-      if (error) {
-        console.error(`Erro batch ${i}:`, error.message);
-      } else {
-        inserted += batch.length;
-      }
+        .delete()
+        .lt("published_at", sevenDaysAgo.toISOString());
     }
 
-    // Cleanup old articles (> 7 days)
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    await supabaseClient
-      .from("news_articles")
-      .delete()
-      .lt("published_at", sevenDaysAgo.toISOString());
+    const nextOffset = (offset + feeds.length) % total;
 
     return new Response(
-      JSON.stringify({ message: "RSS coletado", inserted, results }),
+      JSON.stringify({
+        message: "Coleta de RSS concluída",
+        total_feeds: total,
+        processed_feeds: feeds.length,
+        inserted,
+        offset,
+        next_offset: nextOffset,
+        time_ms: Date.now() - startTime,
+        results,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
   } catch (error: any) {
-    console.error("Erro fatal:", error);
+    console.error("Erro fatal na função rss-collector:", error?.message || error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error?.message || "Unknown error" }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }
