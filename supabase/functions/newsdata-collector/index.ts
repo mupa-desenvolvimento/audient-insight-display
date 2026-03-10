@@ -74,7 +74,7 @@ function mapLocalCategoryToNewsData(localCategory: string | null) {
   if (!c) return null;
 
   const mapping: Record<string, string> = {
-    geral: "general",
+    geral: "top",
     politica: "politics",
     economia: "business",
     negocios: "business",
@@ -84,8 +84,8 @@ function mapLocalCategoryToNewsData(localCategory: string | null) {
     ciencia: "science",
     entretenimento: "entertainment",
     mundo: "world",
-    brasil: "general",
-    cotidiano: "general",
+    brasil: "top",
+    cotidiano: "top",
   };
 
   return mapping[c] || null;
