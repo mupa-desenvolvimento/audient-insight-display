@@ -149,7 +149,7 @@ export default function Presentation() {
   const { config } = usePresentationConfig();
 
   const filterSlides = (cfg: typeof config) => {
-    let slides = INITIAL_SLIDES.filter(slide => {
+    const slides = INITIAL_SLIDES.filter(slide => {
       if (slide.title === "MUPA LITE" && !cfg.showLite) return false;
       if (slide.title === "MUPA FLOW" && !cfg.showFlow) return false;
       if (slide.title === "MUPA INSIGHT" && !cfg.showInsight) return false;

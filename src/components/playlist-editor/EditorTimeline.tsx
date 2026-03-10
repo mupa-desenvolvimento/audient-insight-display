@@ -227,10 +227,11 @@ export const EditorTimeline = ({
       switch (type) {
         case "name":
           return (a.media?.name || "").localeCompare(b.media?.name || "");
-        case "duration":
+        case "duration": {
           const durA = a.duration_override || a.media?.duration || 0;
           const durB = b.duration_override || b.media?.duration || 0;
           return durA - durB;
+        }
         case "date":
           return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
         default:

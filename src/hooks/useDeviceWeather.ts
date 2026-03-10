@@ -11,7 +11,6 @@ export function useDeviceWeather(deviceCode: string) {
 
     const fetchWeatherSettings = async () => {
       try {
-        // @ts-ignore - RPC function added via migration but types not yet generated
         const { data, error } = await supabase.rpc('get_device_weather_settings' as any, {
           p_device_code: deviceCode
         });

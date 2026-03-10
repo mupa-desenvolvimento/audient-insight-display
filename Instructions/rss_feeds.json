@@ -7,8 +7,43 @@
     },
     {
       "categoria": "geral",
+      "fonte": "Folha (Em cima da hora)",
+      "url": "https://feeds.folha.uol.com.br/emcimadahora/rss091.xml"
+    },
+    {
+      "categoria": "geral",
+      "fonte": "Brasil de Fato",
+      "url": "https://www.brasildefato.com.br/rss"
+    },
+    {
+      "categoria": "geral",
+      "fonte": "Nexo Jornal",
+      "url": "https://www.nexojornal.com.br/rss.xml"
+    },
+    {
+      "categoria": "geral",
+      "fonte": "Agência Brasil",
+      "url": "https://agenciabrasil.ebc.com.br/rss"
+    },
+    {
+      "categoria": "geral",
+      "fonte": "Campo Grande News",
+      "url": "https://www.campograndenews.com.br/feed"
+    },
+    {
+      "categoria": "geral",
+      "fonte": "Gazeta do Povo",
+      "url": "https://www.gazetadopovo.com.br/rss/materia.xml"
+    },
+    {
+      "categoria": "geral",
       "fonte": "UOL Noticias",
       "url": "https://rss.uol.com.br/feed/noticias.xml"
+    },
+    {
+      "categoria": "geral",
+      "fonte": "UOL Notícias (Últimas)",
+      "url": "https://noticias.uol.com.br/rss/ultimas/"
     },
     {
       "categoria": "geral",
@@ -27,8 +62,23 @@
     },
     {
       "categoria": "economia",
+      "fonte": "G1 Economia (novo)",
+      "url": "https://g1.globo.com/economia/rss/g1/"
+    },
+    {
+      "categoria": "economia",
       "fonte": "UOL Economia",
       "url": "https://rss.uol.com.br/feed/economia.xml"
+    },
+    {
+      "categoria": "economia",
+      "fonte": "UOL Economia (portal)",
+      "url": "https://economia.uol.com.br/rss/"
+    },
+    {
+      "categoria": "economia",
+      "fonte": "Folha Mercado",
+      "url": "https://feeds.folha.uol.com.br/mercado/rss091.xml"
     },
     {
       "categoria": "economia",
@@ -39,6 +89,11 @@
       "categoria": "economia",
       "fonte": "Valor Economico",
       "url": "https://valor.globo.com/rss/"
+    },
+    {
+      "categoria": "economia",
+      "fonte": "Valor Econômico (principal)",
+      "url": "https://valor.globo.com/rss/valor.xml"
     },
     {
       "categoria": "economia",
@@ -122,6 +177,16 @@
     },
     {
       "categoria": "esportes",
+      "fonte": "G1 Esporte",
+      "url": "https://g1.globo.com/esporte/rss/g1/"
+    },
+    {
+      "categoria": "esportes",
+      "fonte": "ge.globo",
+      "url": "https://ge.globo.com/rss/"
+    },
+    {
+      "categoria": "esportes",
       "fonte": "UOL Esporte",
       "url": "https://rss.uol.com.br/feed/esporte.xml"
     },
@@ -129,6 +194,11 @@
       "categoria": "esportes",
       "fonte": "ESPN Brasil",
       "url": "https://www.espn.com.br/rss"
+    },
+    {
+      "categoria": "esportes",
+      "fonte": "Lance!",
+      "url": "https://www.lance.com.br/rss"
     },
     {
       "categoria": "entretenimento",
@@ -159,6 +229,11 @@
       "categoria": "saude",
       "fonte": "UOL VivaBem",
       "url": "https://rss.uol.com.br/feed/vivabem.xml"
+    },
+    {
+      "categoria": "saude",
+      "fonte": "Folha (Equilíbrio e Saúde)",
+      "url": "https://feeds.folha.uol.com.br/equilibrioesaude/rss091.xml"
     },
     {
       "categoria": "alimentacao",
@@ -192,8 +267,33 @@
     },
     {
       "categoria": "politica",
+      "fonte": "G1 Política (novo)",
+      "url": "https://g1.globo.com/politica/rss/g1/"
+    },
+    {
+      "categoria": "politica",
       "fonte": "UOL Politica",
       "url": "https://rss.uol.com.br/feed/politica.xml"
+    },
+    {
+      "categoria": "politica",
+      "fonte": "Folha Poder",
+      "url": "https://feeds.folha.uol.com.br/poder/rss091.xml"
+    },
+    {
+      "categoria": "politica",
+      "fonte": "Gazeta do Povo (Política)",
+      "url": "https://www.gazetadopovo.com.br/rss/politica.xml"
+    },
+    {
+      "categoria": "politica",
+      "fonte": "Brasil 247",
+      "url": "https://www.brasil247.com/feed"
+    },
+    {
+      "categoria": "politica",
+      "fonte": "Pragmatismo Político",
+      "url": "https://www.pragmatismopolitico.com.br/feeds/posts/default"
     },
     {
       "categoria": "politica",
@@ -207,13 +307,78 @@
     },
     {
       "categoria": "mundo",
+      "fonte": "G1 Mundo (novo)",
+      "url": "https://g1.globo.com/mundo/rss/g1/"
+    },
+    {
+      "categoria": "mundo",
       "fonte": "BBC Brasil",
-      "url": "https://www.bbc.com/portuguese/index.xml"
+      "url": "https://feeds.bbci.co.uk/portuguese/rss.xml"
+    },
+    {
+      "categoria": "mundo",
+      "fonte": "Reuters (BR top news)",
+      "url": "https://feeds.reuters.com/reuters/BRtopNews"
     },
     {
       "categoria": "mundo",
       "fonte": "CNN Brasil",
       "url": "https://www.cnnbrasil.com.br/feed/"
+    },
+    {
+      "categoria": "tecnologia",
+      "fonte": "G1 Tecnologia",
+      "url": "https://g1.globo.com/tecnologia/rss/g1/"
+    },
+    {
+      "categoria": "tecnologia",
+      "fonte": "UOL Tilt",
+      "url": "https://www.uol.com.br/tilt/rss/"
+    },
+    {
+      "categoria": "brasil",
+      "fonte": "G1 Brasil",
+      "url": "https://g1.globo.com/brasil/rss/g1/"
+    },
+    {
+      "categoria": "brasil",
+      "fonte": "Metrópoles",
+      "url": "https://www.metropoles.com/feed"
+    },
+    {
+      "categoria": "ciencia",
+      "fonte": "G1 Ciência e Saúde",
+      "url": "https://g1.globo.com/ciencia-e-saude/rss/g1/"
+    },
+    {
+      "categoria": "educacao",
+      "fonte": "G1 Educação",
+      "url": "https://g1.globo.com/educacao/rss/g1/"
+    },
+    {
+      "categoria": "independentes",
+      "fonte": "Agência Pública",
+      "url": "https://apublica.org/feed/"
+    },
+    {
+      "categoria": "independentes",
+      "fonte": "The Intercept Brasil",
+      "url": "https://www.intercept.com.br/feed/"
+    },
+    {
+      "categoria": "independentes",
+      "fonte": "Outras Palavras",
+      "url": "https://outraspalavras.net/feed/"
+    },
+    {
+      "categoria": "independentes",
+      "fonte": "Jacobin Brasil",
+      "url": "https://jacobin.com.br/feed/"
+    },
+    {
+      "categoria": "independentes",
+      "fonte": "A Verdade",
+      "url": "https://averdade.org.br/feed/"
     },
     {
       "categoria": "sustentabilidade",

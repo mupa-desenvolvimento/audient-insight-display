@@ -375,7 +375,7 @@ export const useOfflinePlayer = (deviceCode: string) => {
       }
 
       // 2. Busca playlists associadas ao dispositivo
-      let relevantPlaylistIds: string[] = [];
+      const relevantPlaylistIds: string[] = [];
       let relevantChannelIds: string[] = [];
 
       if (device.current_playlist_id) {

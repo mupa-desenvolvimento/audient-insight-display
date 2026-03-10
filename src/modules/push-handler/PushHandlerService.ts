@@ -65,7 +65,7 @@ class PushHandlerService {
         // For now, let's clear application storage (IndexedDB should also be cleared ideally)
         window.location.reload();
         break;
-      case 'identify':
+      case 'identify': {
         // Flash screen or show ID
         const identifyEl = document.createElement('div');
         identifyEl.style.position = 'fixed';
@@ -84,6 +84,7 @@ class PushHandlerService {
         document.body.appendChild(identifyEl);
         setTimeout(() => identifyEl.remove(), 5000);
         break;
+      }
       default:
         console.warn("[PushHandler] Unknown command:", command);
     }

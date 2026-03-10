@@ -150,7 +150,7 @@ export class SyncService {
       }
 
       // 3. Determine Relevant Playlists/Channels
-      let relevantPlaylistIds: string[] = [];
+      const relevantPlaylistIds: string[] = [];
       let relevantChannelIds: string[] = [];
 
       if (device.current_playlist_id) {

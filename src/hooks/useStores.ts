@@ -167,51 +167,39 @@ export function useStores() {
   };
 
   const createState = async (state: { region_id: string; name: string; code: string }) => {
-    try {
-      const { data, error } = await supabase
-        .from('states')
-        .insert(state)
-        .select()
-        .single();
+    const { data, error } = await supabase
+      .from('states')
+      .insert(state)
+      .select()
+      .single();
 
-      if (error) throw error;
-      await fetchStates();
-      return data;
-    } catch (error) {
-      throw error;
-    }
+    if (error) throw error;
+    await fetchStates();
+    return data;
   };
 
   const createCity = async (city: { state_id: string; name: string }) => {
-    try {
-      const { data, error } = await supabase
-        .from('cities')
-        .insert(city)
-        .select()
-        .single();
+    const { data, error } = await supabase
+      .from('cities')
+      .insert(city)
+      .select()
+      .single();
 
-      if (error) throw error;
-      await fetchCities();
-      return data;
-    } catch (error) {
-      throw error;
-    }
+    if (error) throw error;
+    await fetchCities();
+    return data;
   };
 
   const createRegion = async (region: { country_id: string; name: string; code?: string }) => {
-    try {
-      const { data, error } = await supabase
-        .from('regions')
-        .insert(region)
-        .select()
-        .single();
+    const { data, error } = await supabase
+      .from('regions')
+      .insert(region)
+      .select()
+      .single();
 
-      if (error) throw error;
-      await fetchRegions();
-      return data;
-    } catch (error) {
-      throw error;
-    }
+    if (error) throw error;
+    await fetchRegions();
+    return data;
   };
 
   return {

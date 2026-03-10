@@ -168,7 +168,7 @@ async function debugSync(deviceCode: string) {
   });
 
   // 2. Fetch Group Channels
-  let relevantPlaylistIds: string[] = [];
+  const relevantPlaylistIds: string[] = [];
   let relevantChannelIds: string[] = [];
 
   if (device.current_playlist_id) {

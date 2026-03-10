@@ -174,7 +174,9 @@ const InkyIntelligence = () => {
                 accumulated += content;
                 setInsights((prev) => ({ ...prev, [section]: accumulated }));
               }
-            } catch {}
+            } catch {
+              continue;
+            }
           }
         }
       } catch (err) {

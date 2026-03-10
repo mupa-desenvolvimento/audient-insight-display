@@ -318,42 +318,6 @@ const WebViewPlayer = () => {
     );
   }
 
-  const [resolvedMediaUrl, setResolvedMediaUrl] = useState<string>("");
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const resolveUrl = async () => {
-      if (!activeMedia || !activeMedia.file_url) {
-        setResolvedMediaUrl("");
-        return;
-      }
-
-      if (activeMedia.blob_url) {
-        setResolvedMediaUrl(activeMedia.blob_url);
-        return;
-      }
-
-      try {
-        const localUrl = await storageService.cacheMedia(activeMedia.file_url, activeMedia.id);
-        if (!cancelled) {
-          setResolvedMediaUrl(localUrl);
-        }
-      } catch (e) {
-        console.error("Failed to cache media locally:", e);
-        if (!cancelled) {
-          setResolvedMediaUrl(activeMedia.file_url);
-        }
-      }
-    };
-
-    resolveUrl();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeMedia?.id, activeMedia?.file_url, activeMedia?.blob_url]);
-
   const getObjectFit = (): "cover" | "contain" | "fill" => {
     switch (activePlaylist?.content_scale) {
       case "contain": return "contain";

@@ -1,3 +1,4 @@
+// @ts-nocheck
 // deno-lint-ignore-file
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.87.1"
 
