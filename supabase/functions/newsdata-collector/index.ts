@@ -3,7 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "../_shared/cors.ts";
 
-const NEWSDATA_ENDPOINT = "https://newsdata.io/api/1/news";
+const NEWSDATA_ENDPOINT = "https://newsdata.io/api/1/latest";
 
 const DEFAULT_MAX_FEEDS_PER_RUN = 4;
 const DEFAULT_MAX_ITEMS_PER_REQUEST = 10;
