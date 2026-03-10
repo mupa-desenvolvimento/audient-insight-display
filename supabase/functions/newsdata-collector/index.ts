@@ -266,7 +266,7 @@ serve(async (req: Request) => {
         url.searchParams.set("apikey", newsDataApiKey);
         url.searchParams.set("country", country);
         url.searchParams.set("language", language);
-        url.searchParams.set("timeframe", String(timeframe));
+        // timeframe removed - not available on free plan
         url.searchParams.set("size", String(itemsPerRequest));
 
         if (apiCategory) url.searchParams.set("category", apiCategory);
