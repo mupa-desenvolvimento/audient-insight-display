@@ -8,10 +8,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const DEFAULT_MAX_FEEDS_PER_RUN = 5;
-const DEFAULT_MAX_ITEMS_PER_FEED = 10;
-const DEFAULT_BATCH_SIZE = 20;
-const MAX_RUNTIME_MS = 45000;
+const DEFAULT_MAX_FEEDS_PER_RUN = 3;
+const DEFAULT_MAX_ITEMS_PER_FEED = 5;
+const DEFAULT_BATCH_SIZE = 10;
+const MAX_RUNTIME_MS = 25000;
 
 function stripHtml(html: string) {
   if (!html) return "";
@@ -110,9 +110,9 @@ serve(async (req: Request) => {
       payload = {};
     }
 
-    const maxFeeds = Math.max(1, Math.min(Number(payload.maxFeeds) || DEFAULT_MAX_FEEDS_PER_RUN, 10));
-    const maxItems = Math.max(1, Math.min(Number(payload.maxItems) || DEFAULT_MAX_ITEMS_PER_FEED, 15));
-    const batchSize = Math.max(1, Math.min(Number(payload.batchSize) || DEFAULT_BATCH_SIZE, 50));
+    const maxFeeds = Math.max(1, Math.min(Number(payload.maxFeeds) || DEFAULT_MAX_FEEDS_PER_RUN, 5));
+    const maxItems = Math.max(1, Math.min(Number(payload.maxItems) || DEFAULT_MAX_ITEMS_PER_FEED, 8));
+    const batchSize = Math.max(1, Math.min(Number(payload.batchSize) || DEFAULT_BATCH_SIZE, 20));
     const shouldCleanup = payload.cleanup === true;
     const force = payload.force === true;
 
@@ -188,7 +188,7 @@ serve(async (req: Request) => {
 
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 7000);
+        const timeout = setTimeout(() => controller.abort(), 5000);
         const response = await fetch(feed.rss_url, { signal: controller.signal });
         clearTimeout(timeout);
 
