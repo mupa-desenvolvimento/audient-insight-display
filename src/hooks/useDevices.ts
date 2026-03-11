@@ -12,6 +12,7 @@ export interface Device {
   display_profile_id: string | null;
   current_playlist_id: string | null;
   price_integration_id: string | null;
+  api_integration_id: string | null;
   status: string;
   last_seen_at: string | null;
   resolution: string | null;
@@ -33,6 +34,7 @@ export interface DeviceWithRelations extends Device {
   display_profile?: { id: string; name: string; resolution: string } | null;
   current_playlist?: { id: string; name: string } | null;
   price_check_integration?: { id: string; name: string } | null;
+  api_integration?: { id: string; name: string } | null;
 }
 
 export interface DeviceInsert {
@@ -43,6 +45,7 @@ export interface DeviceInsert {
   display_profile_id?: string | null;
   current_playlist_id?: string | null;
   price_integration_id?: string | null;
+  api_integration_id?: string | null;
   status?: string;
   resolution?: string | null;
   camera_enabled?: boolean;
@@ -56,6 +59,7 @@ export interface DeviceUpdate {
   display_profile_id?: string | null;
   current_playlist_id?: string | null;
   price_integration_id?: string | null;
+  api_integration_id?: string | null;
   status?: string;
   resolution?: string | null;
   camera_enabled?: boolean;
@@ -70,19 +74,59 @@ export const useDevices = () => {
   const { data: devices = [], isLoading, error, refetch } = useQuery({
     queryKey: ["devices"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const fullSelect = `
+        *,
+        store:stores(id, name, code),
+        company:companies(id, name, slug),
+        display_profile:display_profiles(id, name, resolution),
+        current_playlist:playlists(id, name),
+        price_check_integration:price_check_integrations(id, name),
+        api_integration:api_integrations(id, name)
+      `;
+
+      const fallbackSelect = `
+        id, device_code, name, store_id, company_id, display_profile_id, current_playlist_id,
+        status, last_seen_at, resolution, camera_enabled, metadata, is_active, is_blocked,
+        blocked_message, override_media_id, override_media_expires_at, last_sync_requested_at,
+        created_at, updated_at,
+        store:stores(id, name, code),
+        company:companies(id, name, slug),
+        display_profile:display_profiles(id, name, resolution),
+        current_playlist:playlists(id, name)
+      `;
+
+      let data: any[] | null = null;
+      let queryError: any = null;
+
+      const full = await supabase
         .from("devices")
-        .select(`
-          *,
-          store:stores(id, name, code),
-          company:companies(id, name, slug),
-          display_profile:display_profiles(id, name, resolution),
-          current_playlist:playlists(id, name),
-          price_check_integration:price_check_integrations(id, name)
-        `)
+        .select(fullSelect)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      data = full.data as any[] | null;
+      queryError = full.error;
+
+      if (queryError) {
+        const msg = String(queryError.message || "");
+        const shouldFallback =
+          msg.includes("schema cache") ||
+          msg.includes("price_integration_id") ||
+          msg.includes("api_integration_id") ||
+          msg.includes("price_check_integrations") ||
+          msg.includes("api_integrations");
+
+        if (shouldFallback) {
+          const fallback = await supabase
+            .from("devices")
+            .select(fallbackSelect)
+            .order("created_at", { ascending: false });
+
+          data = fallback.data as any[] | null;
+          queryError = fallback.error;
+        }
+      }
+
+      if (queryError) throw queryError;
       
       // Transform relations that might be arrays into single objects if needed
       // Supabase JS sometimes returns arrays for relations depending on how it's inferred
@@ -90,7 +134,10 @@ export const useDevices = () => {
         ...device,
         price_check_integration: Array.isArray(device.price_check_integration) 
           ? device.price_check_integration[0] 
-          : device.price_check_integration
+          : device.price_check_integration,
+        api_integration: Array.isArray(device.api_integration)
+          ? device.api_integration[0]
+          : device.api_integration
       }));
 
       return transformedData as DeviceWithRelations[];

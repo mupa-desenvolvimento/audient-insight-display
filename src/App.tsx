@@ -45,6 +45,8 @@ import InkyIntelligence from "./pages/admin/InkyIntelligence";
 import PriceCheckIntegrationsList from "./pages/admin/integrations/PriceCheckIntegrationsList";
 import PriceCheckIntegrationForm from "./pages/admin/integrations/PriceCheckIntegrationForm";
 import PriceCheckIntegrationLogs from "./pages/admin/integrations/PriceCheckIntegrationLogs";
+import ApiIntegrationsList from "./pages/admin/api-integrations/ApiIntegrationsList";
+import ApiIntegrationForm from "./pages/admin/api-integrations/ApiIntegrationForm";
 import ExampleListPage from "./pages/ExampleListPage";
 import AutoContentModulePage from "./pages/admin/AutoContentModulePage";
 import Install from "./pages/Install";
@@ -171,6 +173,9 @@ function AppContent() {
                         <Route path="integrations/new" element={<PriceCheckIntegrationForm />} />
                         <Route path="integrations/:id/edit" element={<PriceCheckIntegrationForm />} />
                         <Route path="integrations/:id/logs" element={<PriceCheckIntegrationLogs />} />
+                        <Route path="api-integrations" element={<ApiIntegrationsList />} />
+                        <Route path="api-integrations/new" element={<ApiIntegrationForm />} />
+                        <Route path="api-integrations/:id/edit" element={<ApiIntegrationForm />} />
                         <Route path="inky" element={<InkyIntelligence />} />
                         <Route path="list-example" element={<ExampleListPage />} />
                       </Routes>

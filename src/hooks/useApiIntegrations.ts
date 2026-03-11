@@ -1,0 +1,161 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import type { Json } from "@/integrations/supabase/types";
+
+export type ApiIntegrationRow = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  base_url: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  auth_url: string | null;
+  auth_method: string | null;
+  auth_body_json: Json;
+  auth_token_path: string | null;
+  token_expiration_seconds: number | null;
+  token_cache: Json;
+  token_expires_at: string | null;
+  request_url: string | null;
+  request_method: string | null;
+  request_headers_json: Json;
+  request_params_json: Json;
+  barcode_param_name: string | null;
+  store_param_name: string | null;
+  response_mapping_json: Json;
+};
+
+export type ApiIntegrationUpsert = Partial<ApiIntegrationRow> & {
+  name: string;
+  slug: string;
+  base_url: string;
+};
+
+export function useApiIntegrations() {
+  const queryClient = useQueryClient();
+
+  const { data: integrations, isLoading } = useQuery({
+    queryKey: ["api-integrations"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("api_integrations")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        toast.error("Erro ao carregar integrações");
+        throw error;
+      }
+
+      return data as ApiIntegrationRow[];
+    },
+  });
+
+  const createIntegration = useMutation({
+    mutationFn: async (newIntegration: ApiIntegrationUpsert) => {
+      const { data, error } = await (supabase as any)
+        .from("api_integrations")
+        .insert({
+          name: newIntegration.name,
+          slug: newIntegration.slug,
+          base_url: newIntegration.base_url,
+          description: newIntegration.description ?? null,
+          is_active: newIntegration.is_active ?? true,
+          auth_url: newIntegration.auth_url ?? null,
+          auth_method: newIntegration.auth_method ?? null,
+          auth_body_json: (newIntegration.auth_body_json ?? {}) as unknown as Json,
+          auth_token_path: newIntegration.auth_token_path ?? null,
+          token_expiration_seconds: newIntegration.token_expiration_seconds ?? null,
+          request_url: newIntegration.request_url ?? null,
+          request_method: newIntegration.request_method ?? null,
+          request_headers_json: (newIntegration.request_headers_json ?? {}) as unknown as Json,
+          request_params_json: (newIntegration.request_params_json ?? {}) as unknown as Json,
+          barcode_param_name: newIntegration.barcode_param_name ?? null,
+          store_param_name: newIntegration.store_param_name ?? null,
+          response_mapping_json: (newIntegration.response_mapping_json ?? {}) as unknown as Json,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as ApiIntegrationRow;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["api-integrations"] });
+      toast.success("Integração criada com sucesso");
+    },
+    onError: (error: any) => {
+      console.error(error);
+      toast.error("Erro ao criar integração");
+    },
+  });
+
+  const updateIntegration = useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<ApiIntegrationRow> & { id: string }) => {
+      const { data, error } = await (supabase as any)
+        .from("api_integrations")
+        .update({
+          name: updates.name,
+          slug: updates.slug,
+          base_url: updates.base_url,
+          description: updates.description ?? null,
+          is_active: updates.is_active,
+          auth_url: updates.auth_url ?? null,
+          auth_method: updates.auth_method ?? null,
+          auth_body_json: (updates.auth_body_json ?? {}) as unknown as Json,
+          auth_token_path: updates.auth_token_path ?? null,
+          token_expiration_seconds: updates.token_expiration_seconds ?? null,
+          request_url: updates.request_url ?? null,
+          request_method: updates.request_method ?? null,
+          request_headers_json: (updates.request_headers_json ?? {}) as unknown as Json,
+          request_params_json: (updates.request_params_json ?? {}) as unknown as Json,
+          barcode_param_name: updates.barcode_param_name ?? null,
+          store_param_name: updates.store_param_name ?? null,
+          response_mapping_json: (updates.response_mapping_json ?? {}) as unknown as Json,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as ApiIntegrationRow;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["api-integrations"] });
+      toast.success("Integração atualizada com sucesso");
+    },
+    onError: (error: any) => {
+      console.error(error);
+      toast.error("Erro ao atualizar integração");
+    },
+  });
+
+  const setActive = useMutation({
+    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
+      const { error } = await (supabase as any)
+        .from("api_integrations")
+        .update({ is_active })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["api-integrations"] });
+    },
+    onError: (error: any) => {
+      console.error(error);
+      toast.error("Erro ao atualizar status");
+    },
+  });
+
+  return {
+    integrations,
+    isLoading,
+    createIntegration,
+    updateIntegration,
+    setActive,
+  };
+}

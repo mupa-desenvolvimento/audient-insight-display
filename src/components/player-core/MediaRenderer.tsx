@@ -9,6 +9,7 @@ export interface MediaItem {
   file_url: string | null;
   blob_url?: string;
   duration: number | null;
+  metadata?: any;
 }
 
 interface MediaRendererProps {
@@ -88,7 +89,7 @@ export const MediaRenderer = ({
   }
 
   if (media.type === "news") {
-    return <NewsPlayerSlide onEnded={onEnded} />;
+    return <NewsPlayerSlide onEnded={onEnded} media={media} />;
   }
 
   const handleImageRef = (el: HTMLImageElement | null) => {

@@ -1,14 +1,16 @@
 import { useParams, useSearchParams } from "react-router-dom";
 import { useDeviceNews } from "@/hooks/useDeviceNews";
 import { NewsContainer } from "@/components/news/NewsContainer";
+import { NewsLayoutRenderer, type NewsLayoutId } from "@/components/news/NewsLayoutPreview";
 import { Loader2 } from "lucide-react";
-import { useEffect } from "react";
+import { useMemo } from "react";
 
 interface NewsPlayerSlideProps {
   onEnded?: () => void;
+  media?: { metadata?: any } | null;
 }
 
-export const NewsPlayerSlide = ({ onEnded }: NewsPlayerSlideProps) => {
+export const NewsPlayerSlide = ({ media }: NewsPlayerSlideProps) => {
   const { deviceCode, deviceId } = useParams();
   const [searchParams] = useSearchParams();
   const queryDeviceId = searchParams.get("device_id");
@@ -17,27 +19,32 @@ export const NewsPlayerSlide = ({ onEnded }: NewsPlayerSlideProps) => {
   
   const { data, isLoading } = useDeviceNews(code);
 
-  useEffect(() => {
-    if (!data || !onEnded) return;
-    
-    // Default to 15 seconds if not configured
-    const duration = (data.settings?.display_time || 15) * 1000;
-    
-    const timer = setTimeout(() => {
-      onEnded();
-    }, duration);
+  const meta = (media?.metadata || {}) as any;
+  const rawCategory = (meta.news_category as string | null | undefined) ?? null;
+  const category = rawCategory && rawCategory !== "all" ? rawCategory : null;
+  const layoutId = (meta.layout as NewsLayoutId | undefined) ?? null;
 
-    return () => clearTimeout(timer);
-  }, [data, onEnded]);
+  const filteredArticles = useMemo(() => {
+    const articles = data?.articles || [];
+    const perCategory = 5;
 
-  useEffect(() => {
-    if (!isLoading && (!data || !data.articles || data.articles.length === 0)) {
-       if (onEnded) {
-         const timer = setTimeout(onEnded, 3000);
-         return () => clearTimeout(timer);
-       }
+    if (category) {
+      return articles.filter((a) => a.category === category).slice(0, perCategory);
     }
-  }, [isLoading, data, onEnded]);
+
+    const countsByCategory = new Map<string, number>();
+    const picked: typeof articles = [];
+
+    for (const article of articles) {
+      const cat = article.category || "geral";
+      const count = countsByCategory.get(cat) ?? 0;
+      if (count >= perCategory) continue;
+      picked.push(article);
+      countsByCategory.set(cat, count + 1);
+    }
+
+    return picked;
+  }, [data?.articles, category]);
 
   if (isLoading) {
     return (
@@ -55,10 +62,18 @@ export const NewsPlayerSlide = ({ onEnded }: NewsPlayerSlideProps) => {
     );
   }
 
+  if (layoutId) {
+    return (
+      <div className="w-full h-full bg-black overflow-hidden">
+        <NewsLayoutRenderer layoutId={layoutId} articles={filteredArticles} category={category || "all"} />
+      </div>
+    );
+  }
+
   return (
     <div className="w-full h-full bg-background overflow-hidden">
       <NewsContainer 
-        articles={data.articles}
+        articles={filteredArticles}
         settings={data.settings || undefined}
         viewMode={data.settings?.type_view || "list"}
         orientation="horizontal"

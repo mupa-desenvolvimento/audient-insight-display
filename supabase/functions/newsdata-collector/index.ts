@@ -44,6 +44,59 @@ function safeString(input: unknown, maxLen = 255) {
   return String(input).replace(/\s+/g, " ").trim().slice(0, maxLen);
 }
 
+function decodeHtmlEntities(input: string) {
+  if (!input) return "";
+  const named: Record<string, string> = {
+    amp: "&",
+    lt: "<",
+    gt: ">",
+    quot: "\"",
+    apos: "'",
+    nbsp: " ",
+  };
+
+  return input.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (_m, raw) => {
+    const key = String(raw);
+    if (key[0] === "#") {
+      const isHex = key[1]?.toLowerCase() === "x";
+      const num = isHex ? parseInt(key.slice(2), 16) : parseInt(key.slice(1), 10);
+      if (!Number.isFinite(num) || num <= 0) return "";
+      try {
+        return String.fromCodePoint(num);
+      } catch {
+        return "";
+      }
+    }
+    const lower = key.toLowerCase();
+    return named[lower] ?? `&${key};`;
+  });
+}
+
+function maybeFixMojibake(input: string) {
+  if (!input) return "";
+  if (!/(Ã.|Â.)/.test(input)) return input;
+
+  const bytes = new Uint8Array(input.length);
+  for (let i = 0; i < input.length; i++) bytes[i] = input.charCodeAt(i) & 0xff;
+
+  let decoded = "";
+  try {
+    decoded = new TextDecoder("utf-8").decode(bytes);
+  } catch {
+    return input;
+  }
+
+  const score = (s: string) => (s.match(/[ÃÂ]/g)?.length ?? 0) + (s.match(/\uFFFD/g)?.length ?? 0);
+  return score(decoded) < score(input) ? decoded : input;
+}
+
+function normalizeText(input: unknown, maxLen: number) {
+  const base = safeString(input, maxLen);
+  const decoded = decodeHtmlEntities(base);
+  const fixed = maybeFixMojibake(decoded);
+  return safeString(fixed, maxLen);
+}
+
 function normalizeIsoDate(input: unknown) {
   const fallback = new Date().toISOString();
   if (!input) return fallback;
@@ -307,7 +360,7 @@ serve(async (req: Request) => {
         const articles = items.map((item: NewsDataResult) => {
           const publishedAt = normalizeIsoDate(item.pubDate);
           const slug = createSlugFromNewsData(item);
-          const title = safeString(item.title || "Sem título", 255);
+          const title = normalizeText(item.title || "Sem título", 255);
 
           const localCategory = safeString(feed.category, 80).toLowerCase();
           const normalizedCategory = localCategory || safeString(apiCategory, 80).toLowerCase() || "geral";
@@ -315,8 +368,8 @@ serve(async (req: Request) => {
           return {
             feed_id: feed.id,
             title,
-            description: safeString(item.description, 300),
-            content: safeString(item.content, 4000),
+            description: normalizeText(item.description, 300),
+            content: normalizeText(item.content, 4000),
             link: safeString(item.link, 2000) || null,
             image_url: safeString(item.image_url, 2000) || null,
             category: normalizedCategory,

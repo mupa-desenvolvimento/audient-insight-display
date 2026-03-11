@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -28,10 +28,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, Eye, EyeOff } from "lucide-react";
 import { useStores } from "@/hooks/useStores";
 import { usePlaylists } from "@/hooks/usePlaylists";
 import { usePriceCheckIntegrations } from "@/hooks/usePriceCheckIntegrations";
+import { useApiIntegrations } from "@/hooks/useApiIntegrations";
 import { DeviceInsert, DeviceWithRelations, DeviceUpdate } from "@/hooks/useDevices";
 
 const formSchema = z.object({
@@ -40,6 +41,7 @@ const formSchema = z.object({
   store_id: z.string().optional(),
   current_playlist_id: z.string().optional(),
   price_integration_id: z.string().optional(),
+  api_integration_id: z.string().optional(),
   resolution: z.string().optional(),
   camera_enabled: z.boolean().default(false),
   store_code: z.string().optional(),
@@ -74,7 +76,9 @@ export function DeviceFormDialog({
   const { stores, isLoading: storesLoading } = useStores();
   const { playlists, isLoading: playlistsLoading } = usePlaylists();
   const { integrations, isLoading: integrationsLoading } = usePriceCheckIntegrations();
+  const { integrations: apiIntegrations, isLoading: apiIntegrationsLoading } = useApiIntegrations();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeviceCodeVisible, setIsDeviceCodeVisible] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -84,6 +88,7 @@ export function DeviceFormDialog({
       store_id: device?.store_id || undefined,
       current_playlist_id: device?.current_playlist_id || undefined,
       price_integration_id: device?.price_integration_id || undefined,
+      api_integration_id: (device as any)?.api_integration_id || undefined,
       resolution: device?.resolution || "1920x1080",
       camera_enabled: device?.camera_enabled || false,
       store_code: (device as any)?.store_code || "",
@@ -98,6 +103,7 @@ export function DeviceFormDialog({
         store_id: device?.store_id || undefined,
         current_playlist_id: device?.current_playlist_id || undefined,
         price_integration_id: device?.price_integration_id || undefined,
+        api_integration_id: (device as any)?.api_integration_id || undefined,
         resolution: device?.resolution || "1920x1080",
         camera_enabled: device?.camera_enabled || false,
         store_code: (device as any)?.store_code || "",
@@ -105,30 +111,39 @@ export function DeviceFormDialog({
     }
   }, [device, open, form]);
 
+  const deviceCode = form.watch("device_code");
+
+  const maskedDeviceCode = useMemo(() => {
+    const value = String(deviceCode || "");
+    if (!value) return "";
+    if (value.length <= 3) return "*".repeat(value.length);
+    return `${value.slice(0, 2)}${"*".repeat(Math.max(0, value.length - 3))}${value.slice(-1)}`;
+  }, [deviceCode]);
+
   const handleSubmit = async (data: FormData) => {
     setIsSubmitting(true);
     try {
+      const optionalFields: Record<string, any> = {};
+      if (data.price_integration_id) optionalFields.price_integration_id = data.price_integration_id;
+      if (data.api_integration_id) optionalFields.api_integration_id = data.api_integration_id;
+      if (data.store_code) optionalFields.store_code = data.store_code;
+      if (data.current_playlist_id) optionalFields.current_playlist_id = data.current_playlist_id;
+      if (data.store_id) optionalFields.store_id = data.store_id;
+      if (data.resolution) optionalFields.resolution = data.resolution;
+
       if (device) {
         await onSubmit({
           id: device.id,
           name: data.name,
-          store_id: data.store_id || null,
-          current_playlist_id: data.current_playlist_id || null,
-          price_integration_id: data.price_integration_id || null,
-          resolution: data.resolution || null,
           camera_enabled: data.camera_enabled,
-          store_code: data.store_code || null,
+          ...optionalFields,
         } as any);
       } else {
         await onSubmit({
           device_code: data.device_code,
           name: data.name,
-          store_id: data.store_id || null,
-          current_playlist_id: data.current_playlist_id || null,
-          price_integration_id: data.price_integration_id || null,
-          resolution: data.resolution || null,
           camera_enabled: data.camera_enabled,
-          store_code: data.store_code || null,
+          ...optionalFields,
         } as any);
       }
       form.reset();
@@ -161,7 +176,7 @@ export function DeviceFormDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-3">
             <FormField
               control={form.control}
               name="name"
@@ -189,8 +204,22 @@ export function DeviceFormDialog({
                         {...field}
                         disabled={isEditing}
                         className="font-mono uppercase"
+                        type={isDeviceCodeVisible ? "text" : "password"}
                       />
                     </FormControl>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setIsDeviceCodeVisible((prev) => !prev)}
+                      title={isDeviceCodeVisible ? "Ocultar código" : "Mostrar código"}
+                    >
+                      {isDeviceCodeVisible ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </Button>
                     {!isEditing && (
                       <Button
                         type="button"
@@ -202,172 +231,186 @@ export function DeviceFormDialog({
                       </Button>
                     )}
                   </div>
-                  <FormDescription>
-                    Código único usado para identificar o dispositivo. Use no player: /play/{field.value}
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="store_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Loja</FormLabel>
-                  <Select
-                    value={field.value || "none"}
-                    onValueChange={(value) =>
-                      field.onChange(value === "none" ? undefined : value)
-                    }
-                  >
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="store_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Loja</FormLabel>
+                    <Select
+                      value={field.value || "none"}
+                      onValueChange={(value) =>
+                        field.onChange(value === "none" ? undefined : value)
+                      }
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione uma loja" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Sem loja</SelectItem>
+                        {stores.map((store) => (
+                          <SelectItem key={store.id} value={store.id}>
+                            {store.code} - {store.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="store_code"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cód. Filial</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione uma loja" />
-                      </SelectTrigger>
+                      <Input placeholder="Ex: 8" {...field} />
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">Sem loja</SelectItem>
-                      {stores.map((store) => (
-                        <SelectItem key={store.id} value={store.id}>
-                          {store.code} - {store.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="current_playlist_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Playlist</FormLabel>
-                  <Select
-                    value={field.value || "none"}
-                    onValueChange={(value) =>
-                      field.onChange(value === "none" ? undefined : value)
-                    }
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione uma playlist" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">Nenhuma</SelectItem>
-                      {playlists.map((playlist) => (
-                        <SelectItem key={playlist.id} value={playlist.id}>
-                          {playlist.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    Playlist que será exibida neste dispositivo
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="current_playlist_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Playlist</FormLabel>
+                    <Select
+                      value={field.value || "none"}
+                      onValueChange={(value) =>
+                        field.onChange(value === "none" ? undefined : value)
+                      }
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione uma playlist" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhuma</SelectItem>
+                        {playlists.map((playlist) => (
+                          <SelectItem key={playlist.id} value={playlist.id}>
+                            {playlist.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="resolution"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Resolução</FormLabel>
-                  <Select
-                    value={field.value || "1920x1080"}
-                    onValueChange={field.onChange}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a resolução" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="1920x1080">1920x1080 (Full HD)</SelectItem>
-                      <SelectItem value="1280x720">1280x720 (HD)</SelectItem>
-                      <SelectItem value="800x1280">800x1280 (Tablet Vertical)</SelectItem>
-                      <SelectItem value="1080x1920">1080x1920 (Full HD Vertical)</SelectItem>
-                      <SelectItem value="3840x2160">3840x2160 (4K)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="resolution"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Resolução</FormLabel>
+                    <Select
+                      value={field.value || "1920x1080"}
+                      onValueChange={field.onChange}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a resolução" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="1920x1080">1920x1080 (Full HD)</SelectItem>
+                        <SelectItem value="1280x720">1280x720 (HD)</SelectItem>
+                        <SelectItem value="800x1280">800x1280 (Tablet Vertical)</SelectItem>
+                        <SelectItem value="1080x1920">1080x1920 (Full HD Vertical)</SelectItem>
+                        <SelectItem value="3840x2160">3840x2160 (4K)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="price_integration_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Integração de Preço</FormLabel>
-                  <Select
-                    value={field.value || "none"}
-                    onValueChange={(value) =>
-                      field.onChange(value === "none" ? undefined : value)
-                    }
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione uma integração" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">Nenhuma</SelectItem>
-                      {integrations?.map((integration) => (
-                        <SelectItem key={integration.id} value={integration.id}>
-                          {integration.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    Integração usada para consulta de preços neste dispositivo
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="price_integration_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Preço (Legacy)</FormLabel>
+                    <Select
+                      value={field.value || "none"}
+                      onValueChange={(value) =>
+                        field.onChange(value === "none" ? undefined : value)
+                      }
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione uma integração" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhuma</SelectItem>
+                        {integrations?.map((integration) => (
+                          <SelectItem key={integration.id} value={integration.id}>
+                            {integration.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="store_code"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Código da Filial (Consulta Preço)</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Ex: 8"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Código da filial usado nas consultas de preço da API
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="api_integration_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Preço (API)</FormLabel>
+                    <Select
+                      value={field.value || "none"}
+                      onValueChange={(value) =>
+                        field.onChange(value === "none" ? undefined : value)
+                      }
+                      disabled={apiIntegrationsLoading}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione uma integração" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhuma</SelectItem>
+                        {(apiIntegrations || []).map((integration) => (
+                          <SelectItem key={integration.id} value={integration.id}>
+                            {integration.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <FormField
               control={form.control}
               name="camera_enabled"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                  <div className="space-y-0.5">
-                    <FormLabel className="text-base">Câmera IA</FormLabel>
-                    <FormDescription>
-                      Ativar reconhecimento facial e análise de audiência
-                    </FormDescription>
-                  </div>
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                  <FormLabel className="text-base">Câmera IA</FormLabel>
                   <FormControl>
                     <Switch
                       checked={field.value}

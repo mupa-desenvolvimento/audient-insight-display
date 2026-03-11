@@ -24,6 +24,7 @@ export interface PlaylistItem {
     file_size: number | null;
     resolution: string | null;
     status: string;
+    metadata?: any;
   };
 }
 
@@ -53,7 +54,7 @@ export const usePlaylistItems = (playlistId: string | null) => {
         .from("playlist_items")
         .select(`
           *,
-          media:media_items(id, name, type, file_url, duration, file_size, resolution, status)
+          media:media_items(id, name, type, file_url, duration, file_size, resolution, status, metadata)
         `)
         .eq("playlist_id", playlistId)
         .order("position", { ascending: true });
@@ -71,7 +72,7 @@ export const usePlaylistItems = (playlistId: string | null) => {
         .insert([item])
         .select(`
           *,
-          media:media_items(id, name, type, file_url, duration, file_size, resolution, status)
+          media:media_items(id, name, type, file_url, duration, file_size, resolution, status, metadata)
         `)
         .single();
 

@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useForm } from "react-hook-form";
+import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { usePriceCheckIntegrations, PriceCheckIntegration } from "@/hooks/usePriceCheckIntegrations";
@@ -13,9 +13,10 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Save, ArrowLeft, Check, Copy } from "lucide-react";
+import { Loader2, Save, ArrowLeft, Check, Copy, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useCompanies } from "@/hooks/useCompanies";
+import { supabase } from "@/integrations/supabase/client";
 
 import { IntegrationMapping } from "./components/IntegrationMapping";
 
@@ -50,6 +51,12 @@ export default function PriceCheckIntegrationForm() {
   const { companies } = useCompanies();
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("general");
+  const [isTestingAuth, setIsTestingAuth] = useState(false);
+  const [isTestingAuthEndpoint, setIsTestingAuthEndpoint] = useState(false);
+  const [isTestingBodyAuthEndpoint, setIsTestingBodyAuthEndpoint] = useState(false);
+  const [lastAuthTest, setLastAuthTest] = useState<{ tokenPreview?: string; expiresAt?: string } | null>(null);
+  const [lastAuthEndpointTest, setLastAuthEndpointTest] = useState<{ status: number; response: any; tokenPreview?: string; expiresAt?: string } | null>(null);
+  const [lastBodyAuthEndpointTest, setLastBodyAuthEndpointTest] = useState<{ status: number; response: any; tokenPreview?: string } | null>(null);
 
   const isEditing = !!id && id !== "new";
   const existingIntegration = integrations?.find(i => i.id === id);
@@ -71,6 +78,133 @@ export default function PriceCheckIntegrationForm() {
       mapping_config: {},
     },
   });
+
+  const tokenHeadersArray = useFieldArray({
+    control: form.control,
+    name: "auth_config.token_headers" as any,
+  });
+
+  const testHeadersArray = useFieldArray({
+    control: form.control,
+    name: "auth_config.test_headers" as any,
+  });
+
+  const handleTestAuth = async () => {
+    if (!isEditing || !id) return;
+    setIsTestingAuth(true);
+    setLastAuthTest(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("price-check-proxy", {
+        body: {
+          action: "auth_test",
+          integration_id: id,
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.error || "Falha ao testar autenticação");
+      }
+
+      if (data?.token_preview) {
+        setLastAuthTest({ tokenPreview: data.token_preview, expiresAt: data.expires_at });
+        toast.success("Token obtido com sucesso");
+      } else {
+        setLastAuthTest(null);
+        toast.success(data?.message || "Autenticação OK");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao testar autenticação");
+    } finally {
+      setIsTestingAuth(false);
+    }
+  };
+
+  const handleTestAuthEndpoint = async () => {
+    if (!isEditing || !id) return;
+    setIsTestingAuthEndpoint(true);
+    setLastAuthEndpointTest(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("price-check-proxy", {
+        body: {
+          action: "auth_endpoint_test",
+          integration_id: id,
+        },
+      });
+
+      if (error) throw error;
+      if (!data) throw new Error("Sem resposta do servidor");
+
+      setLastAuthEndpointTest({
+        status: Number(data.status ?? 0),
+        response: data.response,
+        tokenPreview: data.token_preview,
+        expiresAt: data.expires_at,
+      });
+
+      if (data.success) {
+        toast.success("Endpoint respondeu");
+      } else {
+        toast.error("Endpoint respondeu com falha");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao testar endpoint");
+    } finally {
+      setIsTestingAuthEndpoint(false);
+    }
+  };
+
+  const handleTestBodyAuthEndpoint = async () => {
+    const values = form.getValues();
+    const username = (values as any)?.auth_config?.username ?? (values as any)?.auth_config?.usuario;
+    const password = (values as any)?.auth_config?.password;
+    const testEndpointUrl = (values as any)?.auth_config?.test_endpoint_url;
+    const testMethod = (values as any)?.auth_config?.test_method;
+    const testTokenJsonPath = (values as any)?.auth_config?.test_token_json_path;
+    const testHeaders = (values as any)?.auth_config?.test_headers;
+
+    if (!testEndpointUrl || !username || !password) return;
+
+    setIsTestingBodyAuthEndpoint(true);
+    setLastBodyAuthEndpointTest(null);
+    try {
+      const requestBody: any = isEditing && id
+        ? { action: "auth_body_test", integration_id: id }
+        : {
+            action: "auth_body_test_direct",
+            test_endpoint_url: testEndpointUrl,
+            test_method: testMethod,
+            test_token_json_path: testTokenJsonPath,
+            test_headers: testHeaders,
+            usuario: username,
+            password,
+          };
+
+      const { data, error } = await supabase.functions.invoke("price-check-proxy", { body: requestBody });
+
+      if (error) throw error;
+      if (!data) throw new Error("Sem resposta do servidor");
+
+      setLastBodyAuthEndpointTest({
+        status: Number(data.status ?? 0),
+        response: data.response,
+        tokenPreview: data.token_preview,
+      });
+
+      if (data.success) {
+        toast.success("Endpoint respondeu");
+      } else {
+        toast.error("Endpoint respondeu com falha");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao testar endpoint");
+    } finally {
+      setIsTestingBodyAuthEndpoint(false);
+    }
+  };
 
   useEffect(() => {
     if (existingIntegration) {
@@ -283,7 +417,7 @@ export default function PriceCheckIntegrationForm() {
                             <FormItem>
                               <FormLabel>Nome do Header</FormLabel>
                               <FormControl>
-                                <Input placeholder="Ex: X-API-Key" {...field} />
+                                <Input placeholder="Ex: X-API-Key" {...field} value={field.value ?? ""} />
                               </FormControl>
                             </FormItem>
                           )}
@@ -295,7 +429,7 @@ export default function PriceCheckIntegrationForm() {
                             <FormItem>
                               <FormLabel>Chave da API</FormLabel>
                               <FormControl>
-                                <Input type="password" placeholder="Sua chave secreta" {...field} />
+                                <Input type="password" placeholder="Sua chave secreta" {...field} value={field.value ?? ""} />
                               </FormControl>
                             </FormItem>
                           )}
@@ -311,7 +445,7 @@ export default function PriceCheckIntegrationForm() {
                           <FormItem>
                             <FormLabel>Token Bearer</FormLabel>
                             <FormControl>
-                              <Input type="password" placeholder="eyJh..." {...field} />
+                              <Input type="password" placeholder="eyJh..." {...field} value={field.value ?? ""} />
                             </FormControl>
                             <FormDescription>Insira apenas o token, sem o prefixo "Bearer "</FormDescription>
                           </FormItem>
@@ -320,31 +454,172 @@ export default function PriceCheckIntegrationForm() {
                     )}
 
                     {form.watch("auth_type") === "basic_auth" && (
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-4 border rounded-lg p-4 bg-muted/10">
+                        <h4 className="font-medium text-sm text-muted-foreground">Configuração Basic Auth</h4>
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="auth_config.username"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Usuário</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="admin" {...field} value={field.value ?? ""} />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="auth_config.password"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Senha</FormLabel>
+                                <FormControl>
+                                  <Input type="password" placeholder="******" {...field} value={field.value ?? ""} />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <Separator className="bg-white/10" />
+
+                        <h4 className="font-medium text-sm text-muted-foreground">Teste de Endpoint (Body com usuário/senha)</h4>
                         <FormField
                           control={form.control}
-                          name="auth_config.username"
+                          name="auth_config.test_endpoint_url"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Usuário</FormLabel>
+                              <FormLabel>Endpoint de Teste</FormLabel>
                               <FormControl>
-                                <Input placeholder="admin" {...field} />
+                                <Input placeholder="https://api.cliente.com/api/login/login" {...field} value={field.value ?? ""} />
                               </FormControl>
                             </FormItem>
                           )}
                         />
-                        <FormField
-                          control={form.control}
-                          name="auth_config.password"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Senha</FormLabel>
-                              <FormControl>
-                                <Input type="password" placeholder="******" {...field} />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="auth_config.test_method"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Método</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value ?? "POST"}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Selecione" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="POST">POST</SelectItem>
+                                    <SelectItem value="GET">GET</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="auth_config.test_token_json_path"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Caminho do Token (Opcional)</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="token" {...field} value={field.value ?? ""} />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm font-medium">Headers (Opcional)</div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => testHeadersArray.append({ name: "", value: "" })}
+                              className="gap-2"
+                            >
+                              <Plus className="h-4 w-4" /> Adicionar header
+                            </Button>
+                          </div>
+
+                          {testHeadersArray.fields.length ? (
+                            <div className="space-y-2">
+                              {testHeadersArray.fields.map((f, index) => (
+                                <div key={f.id} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
+                                  <FormField
+                                    control={form.control}
+                                    name={`auth_config.test_headers.${index}.name` as any}
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Nome</FormLabel>
+                                        <FormControl>
+                                          <Input placeholder="Content-Type" {...field} value={field.value ?? ""} />
+                                        </FormControl>
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={form.control}
+                                    name={`auth_config.test_headers.${index}.value` as any}
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Valor</FormLabel>
+                                        <FormControl>
+                                          <Input placeholder="application/json" {...field} value={field.value ?? ""} />
+                                        </FormControl>
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <Button type="button" variant="ghost" size="icon" onClick={() => testHeadersArray.remove(index)}>
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <div className="flex items-center justify-between gap-3">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleTestBodyAuthEndpoint}
+                            disabled={
+                              isTestingBodyAuthEndpoint ||
+                              !form.watch("auth_config.test_endpoint_url") ||
+                              !(form.watch("auth_config.username") || (form.watch("auth_config.usuario") as any)) ||
+                              !form.watch("auth_config.password")
+                            }
+                            className="gap-2"
+                          >
+                            {isTestingBodyAuthEndpoint ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                            Testar endpoint
+                          </Button>
+                          {lastBodyAuthEndpointTest?.tokenPreview ? (
+                            <div className="text-xs text-muted-foreground">
+                              Token: <span className="font-mono">{lastBodyAuthEndpointTest.tokenPreview}</span>
+                            </div>
+                          ) : null}
+                        </div>
+
+                        {lastBodyAuthEndpointTest ? (
+                          <div className="space-y-2">
+                            <div className="text-xs text-muted-foreground">
+                              Status: <span className="font-mono">{lastBodyAuthEndpointTest.status}</span>
+                            </div>
+                            <div className="rounded-md bg-black/20 p-3 text-xs font-mono whitespace-pre-wrap break-words">
+                              {typeof lastBodyAuthEndpointTest.response === "string"
+                                ? lastBodyAuthEndpointTest.response
+                                : JSON.stringify(lastBodyAuthEndpointTest.response, null, 2)}
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
                     )}
 
@@ -358,11 +633,61 @@ export default function PriceCheckIntegrationForm() {
                             <FormItem>
                               <FormLabel>URL do Token</FormLabel>
                               <FormControl>
-                                <Input placeholder="https://api.exemplo.com/oauth/token" {...field} />
+                                <Input placeholder="https://api.exemplo.com/oauth/token" {...field} value={field.value ?? ""} />
                               </FormControl>
                             </FormItem>
                           )}
                         />
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm font-medium">Headers do Token (Opcional)</div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => tokenHeadersArray.append({ name: "", value: "" })}
+                              className="gap-2"
+                            >
+                              <Plus className="h-4 w-4" /> Adicionar header
+                            </Button>
+                          </div>
+
+                          {tokenHeadersArray.fields.length ? (
+                            <div className="space-y-2">
+                              {tokenHeadersArray.fields.map((f, index) => (
+                                <div key={f.id} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
+                                  <FormField
+                                    control={form.control}
+                                    name={`auth_config.token_headers.${index}.name` as any}
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Nome</FormLabel>
+                                        <FormControl>
+                                          <Input placeholder="Content-Type" {...field} value={field.value ?? ""} />
+                                        </FormControl>
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={form.control}
+                                    name={`auth_config.token_headers.${index}.value` as any}
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Valor</FormLabel>
+                                        <FormControl>
+                                          <Input placeholder="application/json" {...field} value={field.value ?? ""} />
+                                        </FormControl>
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <Button type="button" variant="ghost" size="icon" onClick={() => tokenHeadersArray.remove(index)}>
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
                         <div className="grid grid-cols-2 gap-4">
                           <FormField
                             control={form.control}
@@ -371,7 +696,7 @@ export default function PriceCheckIntegrationForm() {
                               <FormItem>
                                 <FormLabel>Client ID</FormLabel>
                                 <FormControl>
-                                  <Input placeholder="" {...field} />
+                                  <Input placeholder="" {...field} value={field.value ?? ""} />
                                 </FormControl>
                               </FormItem>
                             )}
@@ -383,7 +708,7 @@ export default function PriceCheckIntegrationForm() {
                               <FormItem>
                                 <FormLabel>Client Secret</FormLabel>
                                 <FormControl>
-                                  <Input type="password" placeholder="" {...field} />
+                                  <Input type="password" placeholder="" {...field} value={field.value ?? ""} />
                                 </FormControl>
                               </FormItem>
                             )}
@@ -396,11 +721,103 @@ export default function PriceCheckIntegrationForm() {
                             <FormItem>
                               <FormLabel>Escopo (Opcional)</FormLabel>
                               <FormControl>
-                                <Input placeholder="read:products" {...field} />
+                                <Input placeholder="read:products" {...field} value={field.value ?? ""} />
                               </FormControl>
                             </FormItem>
                           )}
                         />
+                        <Separator className="bg-white/10" />
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="auth_config.usuario"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Usuário (Opcional)</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="mupa" {...field} value={field.value ?? ""} />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="auth_config.password"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Senha (Opcional)</FormLabel>
+                                <FormControl>
+                                  <Input type="password" placeholder="******" {...field} value={field.value ?? ""} />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="auth_config.token_json_path"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Caminho do Token (Opcional)</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="token" {...field} value={field.value ?? ""} />
+                                </FormControl>
+                                <FormDescription>Ex: token, access_token, data.token</FormDescription>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="auth_config.expires_in_seconds"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Expiração (seg) (Opcional)</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="3600" {...field} value={field.value == null ? "" : String(field.value)} />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <Button type="button" variant="outline" onClick={handleTestAuth} disabled={!isEditing || isTestingAuth} className="gap-2">
+                              {isTestingAuth ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                              Testar token
+                            </Button>
+                            <Button type="button" variant="outline" onClick={handleTestAuthEndpoint} disabled={!isEditing || isTestingAuthEndpoint} className="gap-2">
+                              {isTestingAuthEndpoint ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                              Testar endpoint
+                            </Button>
+                          </div>
+                          {lastAuthTest?.tokenPreview ? (
+                            <div className="text-xs text-muted-foreground">
+                              Token: <span className="font-mono">{lastAuthTest.tokenPreview}</span>
+                              {lastAuthTest.expiresAt ? (
+                                <span className="ml-2">Expira: <span className="font-mono">{lastAuthTest.expiresAt}</span></span>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
+                        {lastAuthEndpointTest ? (
+                          <div className="space-y-2">
+                            <div className="text-xs text-muted-foreground">
+                              Status: <span className="font-mono">{lastAuthEndpointTest.status}</span>
+                              {lastAuthEndpointTest.tokenPreview ? (
+                                <span className="ml-2">Token: <span className="font-mono">{lastAuthEndpointTest.tokenPreview}</span></span>
+                              ) : null}
+                              {lastAuthEndpointTest.expiresAt ? (
+                                <span className="ml-2">Expira: <span className="font-mono">{lastAuthEndpointTest.expiresAt}</span></span>
+                              ) : null}
+                            </div>
+                            <div className="rounded-md bg-black/20 p-3 text-xs font-mono whitespace-pre-wrap break-words">
+                              {typeof lastAuthEndpointTest.response === "string"
+                                ? lastAuthEndpointTest.response
+                                : JSON.stringify(lastAuthEndpointTest.response, null, 2)}
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
                     )}
                   </CardContent>

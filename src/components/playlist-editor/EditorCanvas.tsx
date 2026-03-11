@@ -1,5 +1,7 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { PlaylistItem } from "@/hooks/usePlaylistItems";
+import { useNews } from "@/hooks/useNews";
+import { NewsLayoutRenderer, type NewsLayoutId } from "@/components/news/NewsLayoutPreview";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { 
@@ -12,7 +14,8 @@ import {
   VolumeX,
   ZoomIn,
   ZoomOut,
-  Grid3X3
+  Grid3X3,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +30,63 @@ interface EditorCanvasProps {
   zoom: number;
   onZoomChange: (zoom: number) => void;
 }
+
+const NewsCanvasSlide = ({ media }: { media: NonNullable<PlaylistItem["media"]> }) => {
+  const { articles, isLoading } = useNews();
+
+  const meta = (media.metadata || {}) as any;
+  const rawCategory = (meta.news_category as string | null | undefined) ?? null;
+  const category = rawCategory && rawCategory !== "all" ? rawCategory : null;
+  const layoutId = (meta.layout as NewsLayoutId | undefined) ?? "hero-sidebar";
+
+  const filteredArticles = useMemo(() => {
+    if (!articles) return [];
+    const perCategory = 5;
+
+    if (category) {
+      return articles.filter((a) => a.category === category).slice(0, perCategory);
+    }
+
+    const countsByCategory = new Map<string, number>();
+    const picked: typeof articles = [];
+
+    for (const article of articles) {
+      const cat = article.category || "geral";
+      const count = countsByCategory.get(cat) ?? 0;
+      if (count >= perCategory) continue;
+      picked.push(article);
+      countsByCategory.set(cat, count + 1);
+    }
+
+    return picked;
+  }, [articles, category]);
+
+  if (isLoading) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-black text-white">
+        <Loader2 className="w-8 h-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!filteredArticles || filteredArticles.length === 0) {
+    return (
+      <div className="w-full h-full bg-black flex items-center justify-center text-white/50">
+        <p>Sem notícias disponíveis</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full h-full bg-black overflow-hidden">
+      <NewsLayoutRenderer
+        layoutId={layoutId}
+        articles={filteredArticles}
+        category={category || "all"}
+      />
+    </div>
+  );
+};
 
 export const EditorCanvas = ({
   currentItem,
@@ -162,8 +222,10 @@ export const EditorCanvas = ({
             transformOrigin: 'center'
           }}
         >
-          {currentItem?.media?.file_url ? (
-            currentItem.media.type === "video" ? (
+          {currentItem?.media ? (
+            currentItem.media.type === "news" ? (
+              <NewsCanvasSlide media={currentItem.media} />
+            ) : currentItem.media.file_url && currentItem.media.type === "video" ? (
               <video
                 ref={videoRef}
                 src={currentItem.media.file_url}
@@ -178,12 +240,17 @@ export const EditorCanvas = ({
                   }
                 }}
               />
-            ) : (
+            ) : currentItem.media.file_url ? (
               <img
                 src={currentItem.media.file_url}
                 alt={currentItem.media.name}
                 className="w-full h-full object-contain"
               />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center text-white/30 gap-3">
+                <Grid3X3 className="w-16 h-16" />
+                <p className="text-sm">Mídia sem arquivo</p>
+              </div>
             )
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center text-white/30 gap-3">

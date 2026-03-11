@@ -326,6 +326,7 @@ const Devices = () => {
                     <TableHead>Status</TableHead>
                     <TableHead>Último acesso</TableHead>
                     <TableHead>Playlist</TableHead>
+                      <TableHead>Integração</TableHead>
                     <TableHead>Resolução</TableHead>
                     <TableHead>Câmera IA</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
@@ -355,6 +356,13 @@ const Devices = () => {
                         </TableCell>
                         <TableCell>
                           {device.current_playlist?.name || "Nenhuma"}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {device.api_integration?.name
+                            ? `API: ${device.api_integration.name}`
+                            : device.price_check_integration?.name
+                              ? `Legacy: ${device.price_check_integration.name}`
+                              : "Nenhuma"}
                         </TableCell>
                         <TableCell className="font-mono text-xs">
                           {device.resolution ||
@@ -537,6 +545,17 @@ const Devices = () => {
                     </span>
                     <span className="text-sm font-medium">
                       {device.current_playlist?.name || "Nenhuma"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">
+                      Integração de Preço
+                    </span>
+                    <span className="text-sm font-medium">
+                      {device.api_integration?.name ||
+                        device.price_check_integration?.name ||
+                        "Nenhuma"}
                     </span>
                   </div>
 

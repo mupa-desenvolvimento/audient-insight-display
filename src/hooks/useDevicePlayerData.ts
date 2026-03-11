@@ -8,6 +8,7 @@ export interface MediaItem {
   type: string;
   file_url: string | null;
   duration: number | null;
+  metadata?: any;
 }
 
 export interface DevicePlayerData {
@@ -71,7 +72,7 @@ export const useDevicePlayerData = (deviceCode: string | undefined) => {
         if (!isExpired) {
           const { data: overrideData } = await supabase
             .from("media_items")
-            .select("id, name, type, file_url, duration")
+            .select("id, name, type, file_url, duration, metadata")
             .eq("id", device.override_media_id)
             .maybeSingle();
           
@@ -154,7 +155,7 @@ export const useDevicePlayerData = (deviceCode: string | undefined) => {
                 id,
                 position,
                 duration_override,
-                media:media_items(id, name, type, file_url, duration)
+                media:media_items(id, name, type, file_url, duration, metadata)
               `)
               .eq("channel_id", activeChannel.id)
               .order("position", { ascending: true });
@@ -168,6 +169,7 @@ export const useDevicePlayerData = (deviceCode: string | undefined) => {
                   type: item.media!.type,
                   file_url: item.media!.file_url,
                   duration: item.duration_override || item.media!.duration,
+                  metadata: (item.media as any)?.metadata,
                 }));
             }
           }
@@ -180,7 +182,7 @@ export const useDevicePlayerData = (deviceCode: string | undefined) => {
             id,
             position,
             duration_override,
-            media:media_items(id, name, type, file_url, duration)
+            media:media_items(id, name, type, file_url, duration, metadata)
           `)
           .eq("playlist_id", playlist.id)
           .order("position", { ascending: true });
@@ -194,6 +196,7 @@ export const useDevicePlayerData = (deviceCode: string | undefined) => {
               type: item.media!.type,
               file_url: item.media!.file_url,
               duration: item.duration_override || item.media!.duration,
+              metadata: (item.media as any)?.metadata,
             }));
         }
       }

@@ -27,10 +27,10 @@ serve(async (req) => {
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    // Get device with company -> tenant_id
+    // Get device with company/store -> tenant_id
     let { data: device } = await supabase
       .from("devices")
-      .select("id, company_id, companies(tenant_id)")
+      .select("id, company_id, store_id, companies(tenant_id), stores(tenant_id)")
       .eq("device_code", deviceCode)
       .single();
 
@@ -38,7 +38,7 @@ serve(async (req) => {
       // Try by UUID
       const { data: deviceById } = await supabase
         .from("devices")
-        .select("id, company_id, companies(tenant_id)")
+        .select("id, company_id, store_id, companies(tenant_id), stores(tenant_id)")
         .eq("id", deviceCode)
         .single();
       
@@ -46,7 +46,7 @@ serve(async (req) => {
       device = deviceById;
     }
 
-    const tenantId = device.companies?.tenant_id;
+    const tenantId = device.companies?.tenant_id ?? device.stores?.tenant_id;
 
     if (!tenantId) {
       throw new Error("Device has no tenant assigned");

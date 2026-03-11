@@ -172,7 +172,7 @@ export const PlaylistEditor = () => {
     const id = await ensurePlaylistExists();
     if (!id) return;
     
-    const itemDuration = media.type === 'video' && media.duration ? media.duration : 8;
+    const itemDuration = (media.type === "video" && media.duration) ? media.duration : (media.duration ?? 8);
     
     addItem.mutate({
       playlist_id: id,

@@ -13,6 +13,94 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+type StandardPriceResponse = {
+  name: string
+  price: number
+  promo_price: number
+  image: string
+  barcode: string
+  store: string
+}
+
+const getPathValue = (obj: any, path: string) => {
+  if (!obj || !path) return undefined
+  const parts = String(path)
+    .replace(/\[(\d+)\]/g, '.$1')
+    .split('.')
+    .map((p) => p.trim())
+    .filter(Boolean)
+  let cur: any = obj
+  for (const part of parts) {
+    if (cur == null) return undefined
+    const key: any = /^\d+$/.test(part) ? Number(part) : part
+    cur = cur[key]
+  }
+  return cur
+}
+
+const isCacheValid = (cache: any) => {
+  const token = cache?.access_token
+  const expiresAt = cache?.expires_at
+  if (!token || !expiresAt) return false
+  const ms = Date.parse(expiresAt)
+  if (!Number.isFinite(ms)) return false
+  return Date.now() < ms - 30_000
+}
+
+const buildUrl = (baseUrl: string | null | undefined, urlOrPath: string | null | undefined) => {
+  const trimmed = String(urlOrPath || '').trim()
+  if (!trimmed) return ''
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  const base = String(baseUrl || '').trim()
+  if (!base) return trimmed
+  return `${base.replace(/\/+$/, '')}/${trimmed.replace(/^\/+/, '')}`
+}
+
+const interpolateString = (value: string, context: Record<string, string>) => {
+  return value.replace(/\{(\w+)\}/g, (_, key) => (context[key] ?? `{${key}}`))
+}
+
+const interpolateJson = (value: any, context: Record<string, string>): any => {
+  if (value == null) return value
+  if (typeof value === 'string') return interpolateString(value, context)
+  if (typeof value === 'number' || typeof value === 'boolean') return value
+  if (Array.isArray(value)) return value.map((v) => interpolateJson(v, context))
+  if (typeof value === 'object') {
+    const out: Record<string, any> = {}
+    for (const [k, v] of Object.entries(value)) out[k] = interpolateJson(v, context)
+    return out
+  }
+  return String(value)
+}
+
+const safeJsonParse = async (res: Response) => {
+  const contentType = res.headers.get('content-type') || ''
+  if (contentType.includes('application/json')) return await res.json()
+  const text = await res.text()
+  try {
+    return JSON.parse(text)
+  } catch {
+    return { _raw: text }
+  }
+}
+
+const toStandardResponse = (raw: any, mapping: any, barcode: string, store: string): StandardPriceResponse => {
+  const m = mapping && typeof mapping === 'object' ? mapping : {}
+  const name = typeof m.name === 'string' ? getPathValue(raw, m.name) : undefined
+  const price = typeof m.price === 'string' ? getPathValue(raw, m.price) : undefined
+  const promo = typeof m.promo_price === 'string' ? getPathValue(raw, m.promo_price) : undefined
+  const image = typeof m.image === 'string' ? getPathValue(raw, m.image) : undefined
+
+  return {
+    name: typeof name === 'string' ? name : '',
+    price: typeof price === 'number' ? price : Number(price || 0) || 0,
+    promo_price: typeof promo === 'number' ? promo : Number(promo || 0) || 0,
+    image: typeof image === 'string' ? image : '',
+    barcode,
+    store,
+  }
+}
+
 Deno.serve(async (req: Request) => {
   // Handle CORS
   if (req.method === 'OPTIONS') {
@@ -27,6 +115,155 @@ Deno.serve(async (req: Request) => {
   const path = url.pathname.split('/').pop() // Get last segment
 
   try {
+    if (path === 'price') {
+      const queryBarcode = url.searchParams.get('barcode') || ''
+      const queryStore = url.searchParams.get('store') || ''
+      const queryIntegrationId = url.searchParams.get('integration_id') || ''
+
+      const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {}
+
+      const barcode = String((body as any).barcode || queryBarcode || '').trim()
+      const store = String((body as any).store || queryStore || '').trim()
+      const integrationId = String((body as any).integration_id || queryIntegrationId || '').trim()
+
+      if (!barcode || !store || !integrationId) {
+        return new Response(JSON.stringify({ error: true, message: 'Missing: integration_id, barcode, store' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const { data: integration, error: integrationError } = await supabase
+        .from('api_integrations')
+        .select(
+          'id, base_url, auth_url, auth_method, auth_body_json, auth_token_path, token_expiration_seconds, token_cache, request_url, request_method, request_headers_json, request_params_json, barcode_param_name, store_param_name, response_mapping_json, is_active',
+        )
+        .eq('id', integrationId)
+        .maybeSingle()
+
+      if (integrationError || !integration) {
+        return new Response(JSON.stringify({ error: true, message: 'Integration not found' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (!integration.is_active) {
+        return new Response(JSON.stringify({ error: true, message: 'Integration is inactive' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      let token = ''
+
+      const authUrl = String((integration as any).auth_url || '').trim()
+      if (authUrl) {
+        const cache = (integration as any).token_cache as any
+        if (isCacheValid(cache)) {
+          token = String(cache.access_token || '')
+        } else {
+          const method = String((integration as any).auth_method || 'POST').toUpperCase()
+          const bodyJson = (integration as any).auth_body_json && typeof (integration as any).auth_body_json === 'object' ? (integration as any).auth_body_json : {}
+
+          let finalAuthUrl = authUrl
+          const headers: Record<string, string> = {}
+          let requestBody: string | undefined
+
+          if (method === 'GET') {
+            const u = new URL(authUrl)
+            for (const [k, v] of Object.entries(bodyJson)) u.searchParams.set(k, String(v ?? ''))
+            finalAuthUrl = u.toString()
+          } else {
+            headers['Content-Type'] = 'application/json'
+            requestBody = JSON.stringify(bodyJson)
+          }
+
+          const authRes = await fetch(finalAuthUrl, { method: method === 'GET' ? 'GET' : 'POST', headers, body: requestBody })
+          const authJson = await safeJsonParse(authRes)
+
+          const tokenPath = String((integration as any).auth_token_path || '').trim()
+          const extracted =
+            (tokenPath ? getPathValue(authJson, tokenPath) : undefined) ??
+            (authJson?.token ?? authJson?.access_token ?? authJson?.data?.token)
+
+          if (!extracted || typeof extracted !== 'string') {
+            return new Response(JSON.stringify({ error: true, message: 'Token não encontrado' }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            })
+          }
+
+          token = extracted
+
+          const ttlSeconds = (integration as any).token_expiration_seconds ? Number((integration as any).token_expiration_seconds) : 0
+          const expiresAt = ttlSeconds > 0 ? new Date(Date.now() + ttlSeconds * 1000).toISOString() : new Date(Date.now() + 55 * 60 * 1000).toISOString()
+
+          await supabase
+            .from('api_integrations')
+            .update({ token_cache: { access_token: token, expires_at: expiresAt } as any, token_expires_at: expiresAt })
+            .eq('id', integration.id)
+        }
+      }
+
+      const requestUrl = buildUrl((integration as any).base_url, (integration as any).request_url)
+      if (!requestUrl) {
+        return new Response(JSON.stringify({ error: true, message: 'request_url não configurada' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const requestMethod = String((integration as any).request_method || 'GET').toUpperCase()
+      const context = { token, barcode, store }
+
+      const headersJson = (integration as any).request_headers_json && typeof (integration as any).request_headers_json === 'object' ? (integration as any).request_headers_json : {}
+      const interpolatedHeaders = interpolateJson(headersJson, context)
+      const reqHeaders: Record<string, string> = {}
+      for (const [k, v] of Object.entries(interpolatedHeaders || {})) {
+        const name = String(k).trim()
+        if (!name) continue
+        reqHeaders[name] = String(v ?? '')
+      }
+
+      const paramsJson = (integration as any).request_params_json && typeof (integration as any).request_params_json === 'object' ? (integration as any).request_params_json : {}
+      let params: any = interpolateJson(paramsJson, context)
+      if (!params || typeof params !== 'object' || Array.isArray(params)) params = {}
+
+      const barcodeName = String((integration as any).barcode_param_name || '').trim()
+      const storeName = String((integration as any).store_param_name || '').trim()
+      if (barcodeName && params[barcodeName] == null) params[barcodeName] = barcode
+      if (storeName && params[storeName] == null) params[storeName] = store
+
+      let finalUrl = requestUrl
+      let requestBody: string | undefined
+
+      if (requestMethod === 'GET') {
+        const u = new URL(requestUrl)
+        for (const [k, v] of Object.entries(params)) u.searchParams.set(k, String(v ?? ''))
+        finalUrl = u.toString()
+      } else {
+        if (!reqHeaders['Content-Type']) reqHeaders['Content-Type'] = 'application/json'
+        requestBody = JSON.stringify(params)
+      }
+
+      try {
+        const res = await fetch(finalUrl, { method: requestMethod === 'POST' ? 'POST' : 'GET', headers: reqHeaders, body: requestBody })
+        const raw = await safeJsonParse(res)
+        const mapped = toStandardResponse(raw, (integration as any).response_mapping_json, barcode, store)
+
+        return new Response(JSON.stringify(mapped), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      } catch (e: any) {
+        return new Response(JSON.stringify({ error: true, message: e?.message || 'Product not found' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+    }
+
     // 1. Validate Company
     if (path === 'validate-company' && req.method === 'POST') {
       const { cod_user } = await req.json()

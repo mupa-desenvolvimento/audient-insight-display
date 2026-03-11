@@ -63,7 +63,7 @@ export const ChannelEditor = ({
   };
 
   const handleAddMedia = useCallback(async (media: MediaItem, position: number) => {
-    const itemDuration = media.type === 'video' && media.duration ? media.duration : 8;
+    const itemDuration = (media.type === "video" && media.duration) ? media.duration : (media.duration ?? 8);
     
     addItem.mutate({
       channel_id: channel.id,

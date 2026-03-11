@@ -18,6 +18,78 @@ function stripHtml(html: string) {
   return html.replace(/<[^>]*>?/gm, "").trim();
 }
 
+function decodeHtmlEntities(input: string) {
+  if (!input) return "";
+  const named: Record<string, string> = {
+    amp: "&",
+    lt: "<",
+    gt: ">",
+    quot: "\"",
+    apos: "'",
+    nbsp: " ",
+  };
+
+  return input.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (_m, raw) => {
+    const key = String(raw);
+    if (key[0] === "#") {
+      const isHex = key[1]?.toLowerCase() === "x";
+      const num = isHex ? parseInt(key.slice(2), 16) : parseInt(key.slice(1), 10);
+      if (!Number.isFinite(num) || num <= 0) return "";
+      try {
+        return String.fromCodePoint(num);
+      } catch {
+        return "";
+      }
+    }
+    const lower = key.toLowerCase();
+    return named[lower] ?? `&${key};`;
+  });
+}
+
+function maybeFixMojibake(input: string) {
+  if (!input) return "";
+  if (!/(Ã.|Â.)/.test(input)) return input;
+
+  const bytes = new Uint8Array(input.length);
+  for (let i = 0; i < input.length; i++) bytes[i] = input.charCodeAt(i) & 0xff;
+
+  let decoded = "";
+  try {
+    decoded = new TextDecoder("utf-8").decode(bytes);
+  } catch {
+    return input;
+  }
+
+  const score = (s: string) => (s.match(/[ÃÂ]/g)?.length ?? 0) + (s.match(/\uFFFD/g)?.length ?? 0);
+  return score(decoded) < score(input) ? decoded : input;
+}
+
+function normalizeText(input: string) {
+  const stripped = stripHtml(input);
+  const decoded = decodeHtmlEntities(stripped);
+  const fixed = maybeFixMojibake(decoded);
+  return fixed.replace(/\s+/g, " ").trim();
+}
+
+async function readResponseText(response: Response) {
+  const contentType = response.headers.get("content-type") || "";
+  const m = contentType.match(/charset\s*=\s*([^\s;]+)/i);
+  const charset = (m?.[1] || "utf-8").toLowerCase();
+
+  const buf = await response.arrayBuffer();
+  const u8 = new Uint8Array(buf);
+
+  const candidates = [charset, "utf-8", "windows-1252", "iso-8859-1"];
+  for (const label of candidates) {
+    try {
+      return new TextDecoder(label).decode(u8);
+    } catch {
+      continue;
+    }
+  }
+  return new TextDecoder("utf-8").decode(u8);
+}
+
 function extractImage(item: any, description: string): string | null {
   // 1. Media Content / Enclosure
   if (item["media:content"]) {
@@ -216,7 +288,7 @@ serve(async (req: Request) => {
           throw new Error(`HTTP ${response.status}`);
         }
 
-        const xmlText = await response.text();
+        const xmlText = await readResponseText(response);
         const xmlData = parse(xmlText);
 
         let items: any[] = [];
@@ -234,7 +306,7 @@ serve(async (req: Request) => {
 
         const normalizedCategory = (feed.category || "geral").toString().trim().toLowerCase() || "geral";
         const articles = limitedItems.map((item: any) => {
-          const title = (item.title || "Sem título").toString().substring(0, 255);
+          const title = normalizeText((item.title || "Sem título").toString()).substring(0, 255);
           const linkRaw = item.link || "";
           const descriptionRaw = (item.description || item.summary || item.content || "").toString();
 
@@ -251,7 +323,7 @@ serve(async (req: Request) => {
           return {
             feed_id: feed.id,
             title,
-            description: stripHtml(descriptionRaw).substring(0, 300),
+            description: normalizeText(descriptionRaw).substring(0, 300),
             link: typeof linkRaw === "string" ? linkRaw : (linkRaw["@href"] || linkRaw.href || ""),
             image_url: imageUrl,
             category: normalizedCategory,

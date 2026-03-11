@@ -14,6 +14,7 @@ import {
   Image,
   Video,
   FileText,
+  Newspaper,
   Clock,
   Calendar,
   Zap,
@@ -73,6 +74,7 @@ const getMediaIcon = (type: string) => {
   switch (type) {
     case "video": return Video;
     case "image": return Image;
+    case "news": return Newspaper;
     default: return FileText;
   }
 };
@@ -132,6 +134,7 @@ const MediaLibraryPanel = ({ onAddMedia, itemsLength }: {
             { value: "all", label: "Todos" },
             { value: "image", label: "Imagens" },
             { value: "video", label: "Vídeos" },
+            { value: "news", label: "Notícias" },
           ].map((filter) => (
             <button
               key={filter.value}
@@ -227,10 +230,15 @@ const MediaLibraryPanel = ({ onAddMedia, itemsLength }: {
 
 const AutoContentPanel = ({
   onAddAutoContent,
+  onAddMedia,
+  itemsLength,
 }: {
   onAddAutoContent: (item: AutoContentItem) => void;
+  onAddMedia: (media: MediaItem, position: number) => void;
+  itemsLength: number;
 }) => {
   const { items, isLoadingItems } = useAutoContent();
+  const { mediaItems, isLoading: isLoadingMedia } = useMediaItems();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
 
@@ -266,6 +274,23 @@ const AutoContentPanel = ({
       return matchesStatus && matchesSearch && matchesType;
     });
   }, [items, search, typeFilter]);
+
+  const filteredNewsSlides = useMemo(() => {
+    const q = search.toLowerCase();
+    const matchesType = typeFilter === "all" || typeFilter === "news";
+
+    if (!matchesType) return [];
+
+    return mediaItems
+      .filter((m) => m.status === "active" && m.type === "news")
+      .filter((m) => {
+        const meta = m.metadata as any;
+        const isSlide = !!(meta && typeof meta === "object" && ("layout" in meta || "news_category" in meta));
+        if (!isSlide) return false;
+        if (!q) return true;
+        return (m.name || "").toLowerCase().includes(q);
+      });
+  }, [mediaItems, search, typeFilter]);
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -308,16 +333,63 @@ const AutoContentPanel = ({
       </div>
 
       <ScrollArea className="flex-1 min-h-0" showScrollbar="always">
-        {isLoadingItems ? (
+        {isLoadingItems || isLoadingMedia ? (
           <div className="p-4 text-center text-muted-foreground text-sm">
             Carregando...
           </div>
-        ) : filteredItems.length === 0 ? (
+        ) : filteredItems.length === 0 && filteredNewsSlides.length === 0 ? (
           <div className="p-4 text-center text-muted-foreground text-sm">
             Nenhum conteúdo automático
           </div>
         ) : (
           <div className="flex flex-col gap-2 p-3">
+            {filteredNewsSlides.length > 0 && (
+              <div className="pt-1 pb-1">
+                <p className="text-[10px] text-muted-foreground">Slides de Notícias</p>
+              </div>
+            )}
+            {filteredNewsSlides.map((media) => {
+              const meta = media.metadata as any;
+              const layout = meta?.layout as string | undefined;
+              const category = meta?.news_category as string | null | undefined;
+              const subtitle = [
+                category ? `Categoria: ${category}` : null,
+                layout ? `Layout: ${layout}` : null,
+              ].filter(Boolean).join(" • ");
+
+              return (
+                <div
+                  key={media.id}
+                  className="flex items-start gap-3 p-2 rounded-lg border border-border bg-muted/60"
+                >
+                  <div className="w-12 h-12 rounded-md bg-background flex items-center justify-center text-primary flex-shrink-0">
+                    <Newspaper className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium truncate">{media.name}</p>
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                        Notícias
+                      </span>
+                    </div>
+                    {subtitle ? (
+                      <p className="text-[10px] text-muted-foreground line-clamp-2">
+                        {subtitle}
+                      </p>
+                    ) : null}
+                    <div className="flex items-center justify-end pt-1">
+                      <button
+                        onClick={() => onAddMedia(media, itemsLength)}
+                        className="inline-flex items-center justify-center h-7 px-2 rounded-md text-[11px] font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                      >
+                        Adicionar na playlist
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
             {filteredItems.map((item) => (
               <div
                 key={item.id}
@@ -608,7 +680,7 @@ export const EditorPropertiesPanel = ({
           mediaTab === "library" ? (
             <MediaLibraryPanel onAddMedia={onAddMedia} itemsLength={itemsLength} />
           ) : (
-            <AutoContentPanel onAddAutoContent={onAddAutoContent} />
+            <AutoContentPanel onAddAutoContent={onAddAutoContent} onAddMedia={onAddMedia} itemsLength={itemsLength} />
           )
         ) : (
           <SettingsPanel

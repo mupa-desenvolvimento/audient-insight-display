@@ -82,9 +82,18 @@ interface FolderBreadcrumb {
    const checkConnection = useCallback(async () => {
      try {
        setIsLoading(true);
+       const { data: { session } } = await supabase.auth.getSession();
+       if (!session) {
+         setIsConnected(false);
+         return;
+       }
        const result = await callCanvaApi('status', {});
        setIsConnected(result.connected);
      } catch (error) {
+       if (error instanceof Error && error.message === "Not authenticated") {
+         setIsConnected(false);
+         return;
+       }
        console.error('Error checking Canva connection:', error);
        setIsConnected(false);
      } finally {
