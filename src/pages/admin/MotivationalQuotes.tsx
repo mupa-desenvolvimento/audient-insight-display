@@ -9,15 +9,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import {
   Sparkles,
-  Grid3X3,
   List,
   RefreshCw,
   Tv,
   Trash2,
   Eye,
-  EyeOff,
-  Quote,
   LayoutGrid,
+  Quote,
 } from "lucide-react";
 
 interface MotivationalQuote {
