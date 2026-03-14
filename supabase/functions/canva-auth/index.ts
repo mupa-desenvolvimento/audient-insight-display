@@ -502,22 +502,14 @@ Deno.serve(async (req) => {
      }
      
      // Action: Get connection status
-     if (action === 'status') {
-       const body = await req.json();
-       const { user_id } = body;
-       
-       if (!user_id) {
-         return new Response(
-           JSON.stringify({ connected: false }),
-           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-         );
-       }
-       
-       const { data: connection } = await supabase
-         .from('canva_connections')
-         .select('expires_at, scopes')
-         .eq('user_id', user_id)
-         .single();
+    if (action === 'status') {
+        const user_id = authedUser.id; // Use verified JWT user
+        
+        const { data: connection } = await supabase
+          .from('canva_connections')
+          .select('expires_at, scopes')
+          .eq('user_id', user_id)
+          .single();
        
        return new Response(
          JSON.stringify({ 
