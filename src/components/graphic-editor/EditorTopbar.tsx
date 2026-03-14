@@ -1,8 +1,8 @@
-import { Undo2, Redo2, Download, FileImage, Save, ZoomIn, ZoomOut } from "lucide-react";
+import { Undo2, Redo2, Download, FileImage, Save, ZoomIn, ZoomOut, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { toast } from "sonner";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface Props {
   projectName: string;
@@ -13,12 +13,13 @@ interface Props {
   onExportPNG: () => void;
   onExportSVG: () => void;
   onSave: () => void;
+  onSaveToGallery: () => void;
   onZoom: (d: number) => void;
 }
 
 export function EditorTopbar({
   projectName, setProjectName, zoom,
-  onUndo, onRedo, onExportPNG, onExportSVG, onSave, onZoom,
+  onUndo, onRedo, onExportPNG, onExportSVG, onSave, onSaveToGallery, onZoom,
 }: Props) {
   return (
     <div className="h-14 border-b border-border bg-card flex items-center px-4 gap-3 shrink-0">
@@ -55,14 +56,33 @@ export function EditorTopbar({
       <div className="flex-1" />
 
       <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={onExportPNG}>
-          <Download className="h-3.5 w-3.5" /> PNG
-        </Button>
-        <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={onExportSVG}>
-          <FileImage className="h-3.5 w-3.5" /> SVG
-        </Button>
-        <Button size="sm" className="h-8 gap-1.5" onClick={() => { onSave(); toast.success("Projeto salvo!"); }}>
-          <Save className="h-3.5 w-3.5" /> Salvar
+        {/* Export dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5">
+              <Download className="h-3.5 w-3.5" /> Exportar
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onExportPNG}>
+              <FileImage className="h-4 w-4 mr-2" /> Exportar PNG (alta qualidade)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onExportSVG}>
+              <FileImage className="h-4 w-4 mr-2" /> Exportar SVG (vetorial)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Save locally */}
+        <Tooltip><TooltipTrigger asChild>
+          <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={onSave}>
+            <Save className="h-3.5 w-3.5" /> Salvar
+          </Button>
+        </TooltipTrigger><TooltipContent>Salvar projeto localmente</TooltipContent></Tooltip>
+
+        {/* Save to gallery */}
+        <Button size="sm" className="h-8 gap-1.5" onClick={onSaveToGallery}>
+          <Upload className="h-3.5 w-3.5" /> Salvar na Galeria
         </Button>
       </div>
     </div>
