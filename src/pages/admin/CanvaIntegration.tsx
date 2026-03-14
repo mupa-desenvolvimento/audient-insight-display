@@ -38,6 +38,7 @@ import { Checkbox } from '@/components/ui/checkbox';
     selectAll,
     clearSelection,
     exportSelectedDesigns,
+    exportDesign,
   } = useCanvaIntegration();
  
   // Load designs when connected
