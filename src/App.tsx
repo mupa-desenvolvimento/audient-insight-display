@@ -154,6 +154,16 @@ function AppContent() {
             }
           />
 
+          {/* Fullscreen Graphic Editor - No Layout/Sidebar */}
+          <Route
+            path="/admin/graphic-editor"
+            element={
+              <ProtectedRoute>
+                <GraphicEditor />
+              </ProtectedRoute>
+            }
+          />
+
           <Route
             path="/admin/*"
             element={
@@ -184,7 +194,7 @@ function AppContent() {
                         <Route path="product-analytics" element={<ProductAnalytics />} />
                         <Route path="canva" element={<CanvaIntegration />} />
                         <Route path="integrations/canva/editor" element={<CanvaEditor />} />
-                        <Route path="graphic-editor" element={<GraphicEditor />} />
+                        
                         <Route path="integrations" element={<PriceCheckIntegrationsList />} />
                         <Route path="integrations/new" element={<PriceCheckIntegrationForm />} />
                         <Route path="integrations/:id/edit" element={<PriceCheckIntegrationForm />} />
