@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useDeviceGroups, DeviceGroupWithDetails, DeviceGroupInsert, DeviceGroupChannel } from "@/hooks/useDeviceGroups";
 import { useChannels } from "@/hooks/useChannels";
 import { useStores } from "@/hooks/useStores";
@@ -10,16 +10,28 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Search, Layers, Edit, Trash2, Monitor, Tv, AlertTriangle, Link2 } from "lucide-react";
+import { Plus, Layers, Edit, Trash2, Monitor, Tv, AlertTriangle, Link2, Loader2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { PageShell } from "@/components/layout/PageShell";
+import { ListViewport } from "@/components/list/ListViewport";
+import { ListControls } from "@/components/list/ListControls";
+import { UniversalPagination } from "@/components/list/UniversalPagination";
+import { useListState } from "@/hooks/useListState";
 
 const SCREEN_TYPES = [
   { value: "tv", label: "TV", icon: Tv },
   { value: "totem", label: "Totem", icon: Monitor },
   { value: "terminal", label: "Terminal", icon: Monitor },
 ];
+
+type ScreenTypeFilter = "all" | "tv" | "totem" | "terminal";
+
+interface GroupFilters {
+  screenType: ScreenTypeFilter;
+}
 
 const DeviceGroupsPage = () => {
   const {
@@ -35,7 +47,6 @@ const DeviceGroupsPage = () => {
   const { stores } = useStores();
   const queryClient = useQueryClient();
 
-  const [searchTerm, setSearchTerm] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<DeviceGroupWithDetails | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -49,7 +60,19 @@ const DeviceGroupsPage = () => {
     screen_type: "tv",
   });
 
-  // Fetch group channels when dialog opens
+  const {
+    state,
+    setView,
+    setPage,
+    setPageSize,
+    setSearch,
+    setFilters,
+    reset,
+  } = useListState<GroupFilters>({
+    initialFilters: { screenType: "all" },
+    initialPageSize: 12,
+  });
+
   const { data: groupChannels = [] } = useQuery({
     queryKey: ["device-group-channels", channelDialogGroup?.id],
     queryFn: async () => {
@@ -65,11 +88,30 @@ const DeviceGroupsPage = () => {
     enabled: !!channelDialogGroup,
   });
 
-  const filteredGroups = deviceGroups.filter(
-    (group) =>
-      group.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (group.screen_type || "").toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredGroups = useMemo(() => {
+    const term = state.search.toLowerCase().trim();
+    const typeFilter = state.filters.screenType;
+
+    return deviceGroups.filter((group) => {
+      const matchesTerm =
+        !term ||
+        group.name.toLowerCase().includes(term) ||
+        (group.description || "").toLowerCase().includes(term) ||
+        (group.store?.name || "").toLowerCase().includes(term);
+
+      const matchesType =
+        typeFilter === "all" || group.screen_type === typeFilter;
+
+      return matchesTerm && matchesType;
+    });
+  }, [deviceGroups, state.search, state.filters]);
+
+  const totalGroups = filteredGroups.length;
+  const startIndex = (state.page - 1) * state.pageSize;
+  const paginatedGroups =
+    totalGroups === 0
+      ? []
+      : filteredGroups.slice(startIndex, startIndex + state.pageSize);
 
   const handleCreate = () => {
     createDeviceGroup.mutate(formData, {
@@ -149,162 +191,271 @@ const DeviceGroupsPage = () => {
     (c) => !groupChannels.some((gc) => gc.distribution_channel_id === c.id)
   );
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-muted-foreground">Organize dispositivos e atribua canais</p>
-        </div>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={resetForm}>
-              <Plus className="w-4 h-4 mr-2" />
-              Novo Grupo
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Criar Grupo</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Nome *</Label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Nome do grupo"
-                />
+  const renderGroupForm = () => (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label>Nome *</Label>
+        <Input
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          placeholder="Nome do grupo"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>Descrição</Label>
+        <Textarea
+          value={formData.description || ""}
+          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          placeholder="Descrição do grupo"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>Tipo de Tela</Label>
+        <Select
+          value={formData.screen_type}
+          onValueChange={(v) => setFormData({ ...formData, screen_type: v })}
+        >
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {SCREEN_TYPES.map((type) => (
+              <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <Label>Loja (opcional)</Label>
+        <Select
+          value={formData.store_id || "none"}
+          onValueChange={(v) => setFormData({ ...formData, store_id: v === "none" ? null : v })}
+        >
+          <SelectTrigger><SelectValue placeholder="Selecione uma loja" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Nenhuma (grupo global)</SelectItem>
+            {stores.map((store) => (
+              <SelectItem key={store.id} value={store.id}>
+                {store.name} ({store.code})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+
+  const renderGridView = () => (
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {paginatedGroups.map((group) => {
+        const screenType = SCREEN_TYPES.find((t) => t.value === group.screen_type);
+        const ScreenIcon = screenType?.icon || Monitor;
+
+        return (
+          <Card key={group.id} className="relative">
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center space-x-2">
+                  <Layers className="w-5 h-5 text-primary" />
+                  <CardTitle className="text-lg">{group.name}</CardTitle>
+                </div>
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <ScreenIcon className="w-3 h-3" />
+                  {screenType?.label}
+                </Badge>
               </div>
-              <div className="space-y-2">
-                <Label>Descrição</Label>
-                <Textarea
-                  value={formData.description || ""}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Descrição do grupo"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Tipo de Tela</Label>
-                <Select
-                  value={formData.screen_type}
-                  onValueChange={(v) => setFormData({ ...formData, screen_type: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SCREEN_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Loja (opcional)</Label>
-                <Select
-                  value={formData.store_id || "none"}
-                  onValueChange={(v) => setFormData({ ...formData, store_id: v === "none" ? null : v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione uma loja" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Nenhuma (grupo global)</SelectItem>
-                    {stores.map((store) => (
-                      <SelectItem key={store.id} value={store.id}>
-                        {store.name} ({store.code})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <DialogFooter>
-                <Button onClick={handleCreate} disabled={!formData.name}>
-                  Criar
+              <CardDescription>{group.description}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {group.store && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Loja:</span>
+                  <Badge variant="secondary">
+                    {group.store.name} ({group.store.code})
+                  </Badge>
+                </div>
+              )}
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => setChannelDialogGroup(group)}
+              >
+                <Link2 className="w-4 h-4 mr-2" />
+                Gerenciar Canais
+              </Button>
+
+              <div className="flex justify-end space-x-2 pt-2 border-t">
+                <Button variant="ghost" size="sm" onClick={() => openEdit(group)}>
+                  <Edit className="w-4 h-4" />
                 </Button>
-              </DialogFooter>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
+                <Button variant="ghost" size="sm" onClick={() => setDeleteId(group.id)}>
+                  <Trash2 className="w-4 h-4 text-destructive" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
 
-      <div className="flex items-center space-x-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar grupos..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-      </div>
+  const renderListView = () => (
+    <Card>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Grupo</TableHead>
+              <TableHead>Tipo de Tela</TableHead>
+              <TableHead>Loja</TableHead>
+              <TableHead>Descrição</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {paginatedGroups.map((group) => {
+              const screenType = SCREEN_TYPES.find((t) => t.value === group.screen_type);
+              const ScreenIcon = screenType?.icon || Monitor;
 
-      {isLoading ? (
-        <div className="text-center py-8 text-muted-foreground">Carregando...</div>
-      ) : filteredGroups.length === 0 ? (
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-            Nenhum grupo encontrado
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredGroups.map((group) => {
-            const screenType = SCREEN_TYPES.find((t) => t.value === group.screen_type);
-            const ScreenIcon = screenType?.icon || Monitor;
-
-            return (
-              <Card key={group.id} className="relative">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Layers className="w-5 h-5 text-primary" />
-                      <CardTitle className="text-lg">{group.name}</CardTitle>
+              return (
+                <TableRow key={group.id}>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <Layers className="h-4 w-4 text-primary" />
+                      {group.name}
                     </div>
-                    <Badge variant="outline" className="flex items-center gap-1">
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="flex items-center gap-1 w-fit">
                       <ScreenIcon className="w-3 h-3" />
                       {screenType?.label}
                     </Badge>
-                  </div>
-                  <CardDescription>{group.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {group.store && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Loja:</span>
-                      <Badge variant="secondary">
-                        {group.store.name} ({group.store.code})
-                      </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {group.store ? (
+                      <Badge variant="secondary">{group.store.name}</Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">Global</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+                    {group.description || "-"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => setChannelDialogGroup(group)} title="Gerenciar Canais">
+                        <Link2 className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => openEdit(group)} title="Editar">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => setDeleteId(group.id)} title="Excluir">
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
                     </div>
-                  )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => setChannelDialogGroup(group)}
-                  >
-                    <Link2 className="w-4 h-4 mr-2" />
-                    Gerenciar Canais
-                  </Button>
-
-                  <div className="flex justify-end space-x-2 pt-2 border-t">
-                    <Button variant="ghost" size="sm" onClick={() => openEdit(group)}>
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setDeleteId(group.id)}>
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+  return (
+    <PageShell
+      className="animate-fade-in"
+      header={
+        <div className="flex items-center justify-between gap-4 py-4">
+          <p className="text-muted-foreground">
+            Organize dispositivos e atribua canais
+          </p>
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={resetForm}>
+                <Plus className="w-4 h-4 mr-2" />
+                Novo Grupo
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Criar Grupo</DialogTitle>
+              </DialogHeader>
+              {renderGroupForm()}
+              <DialogFooter>
+                <Button onClick={handleCreate} disabled={!formData.name}>Criar</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
-      )}
+      }
+      controls={
+        <div className="py-2">
+          <ListControls
+            state={state}
+            onSearchChange={setSearch}
+            onViewChange={setView}
+            onClearFilters={reset}
+          >
+            <Select
+              value={state.filters.screenType}
+              onValueChange={(value) =>
+                setFilters({ ...state.filters, screenType: value as ScreenTypeFilter })
+              }
+            >
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Tipo de Tela" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                {SCREEN_TYPES.map((type) => (
+                  <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </ListControls>
+        </div>
+      }
+      footer={
+        <UniversalPagination
+          page={state.page}
+          pageSize={state.pageSize}
+          total={totalGroups}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
+      }
+    >
+      <ListViewport>
+        {isLoading ? (
+          <div className="flex h-full items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : totalGroups === 0 ? (
+          <Card className="col-span-full">
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Layers className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">Nenhum grupo encontrado</h3>
+              <p className="text-muted-foreground text-center">
+                {state.search
+                  ? "Nenhum grupo corresponde à sua busca."
+                  : "Crie seu primeiro grupo para organizar dispositivos."}
+              </p>
+              {!state.search && (
+                <Button className="mt-4" onClick={() => setIsCreateOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Criar Primeiro Grupo
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        ) : state.view === "list" ? (
+          renderListView()
+        ) : (
+          renderGridView()
+        )}
+      </ListViewport>
 
       {/* Edit Dialog */}
       <Dialog open={!!editingGroup} onOpenChange={(open) => !open && setEditingGroup(null)}>
@@ -312,66 +463,10 @@ const DeviceGroupsPage = () => {
           <DialogHeader>
             <DialogTitle>Editar Grupo</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Nome *</Label>
-              <Input
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Nome do grupo"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Descrição</Label>
-              <Textarea
-                value={formData.description || ""}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Descrição do grupo"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Tipo de Tela</Label>
-              <Select
-                value={formData.screen_type}
-                onValueChange={(v) => setFormData({ ...formData, screen_type: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SCREEN_TYPES.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Loja (opcional)</Label>
-              <Select
-                value={formData.store_id || "none"}
-                onValueChange={(v) => setFormData({ ...formData, store_id: v === "none" ? null : v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma loja" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nenhuma (grupo global)</SelectItem>
-                  {stores.map((store) => (
-                    <SelectItem key={store.id} value={store.id}>
-                      {store.name} ({store.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <DialogFooter>
-              <Button onClick={handleUpdate} disabled={!formData.name}>
-                Salvar
-              </Button>
-            </DialogFooter>
-          </div>
+          {renderGroupForm()}
+          <DialogFooter>
+            <Button onClick={handleUpdate} disabled={!formData.name}>Salvar</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -449,7 +544,7 @@ const DeviceGroupsPage = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageShell>
   );
 };
 
