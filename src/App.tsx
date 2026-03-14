@@ -51,6 +51,8 @@ import ApiIntegrationsList from "./pages/admin/api-integrations/ApiIntegrationsL
 import ApiIntegrationForm from "./pages/admin/api-integrations/ApiIntegrationForm";
 import ExampleListPage from "./pages/ExampleListPage";
 import AutoContentModulePage from "./pages/admin/AutoContentModulePage";
+import MotivationalQuotes from "./pages/admin/MotivationalQuotes";
+import MotivationalTV from "./pages/MotivationalTV";
 import Install from "./pages/Install";
  import Presentation from "./pages/Presentation";
 import AssaiPresentation from "./pages/AssaiPresentation";
@@ -141,6 +143,7 @@ function AppContent() {
            <Route path="/apresentacao" element={<Presentation />} />
           <Route path="/apresentacao-assai" element={<AssaiPresentation />} />
           <Route path="/mobile-demo" element={<MobileDemo />} />
+          <Route path="/motivational-tv" element={<MotivationalTV />} />
           {/* Canva OAuth callback - must be outside ProtectedRoute to handle redirect properly */}
           <Route path="/admin/canva/callback" element={<CanvaCallback />} />
           
@@ -185,6 +188,7 @@ function AppContent() {
                         <Route path="analytics" element={<Analytics />} />
                         <Route path="settings" element={<Settings />} />
                         <Route path="auto-content/news" element={<NewsModule />} />
+                        <Route path="auto-content/quote" element={<MotivationalQuotes />} />
                         <Route path="auto-content/:moduleType" element={<AutoContentModulePage />} />
                         <Route path="camera" element={<Camera />} />
                         <Route path="monitoring" element={<LiveMonitoring />} />
