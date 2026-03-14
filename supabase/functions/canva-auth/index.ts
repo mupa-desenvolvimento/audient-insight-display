@@ -470,7 +470,7 @@ Deno.serve(async (req) => {
        const exportResponse = await fetch(`${CANVA_API_BASE}/exports`, {
          method: 'POST',
          headers: {
-           'Authorization': `Bearer ${connection.access_token}`,
+           'Authorization': `Bearer ${accessToken}`,
            'Content-Type': 'application/json',
          },
          body: JSON.stringify({
