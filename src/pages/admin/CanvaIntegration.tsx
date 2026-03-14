@@ -9,7 +9,7 @@
 import { 
   Link2, Link2Off, Loader2, Download, FolderOpen, 
   Image, RefreshCw, CheckCircle2, ExternalLink, CheckSquare, Square,
-  ChevronRight, Home
+  ChevronRight, Home, Paintbrush
 } from 'lucide-react';
 import { useCanvaIntegration } from '@/hooks/useCanvaIntegration';
 import { Checkbox } from '@/components/ui/checkbox';
