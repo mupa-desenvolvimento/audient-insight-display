@@ -522,18 +522,10 @@ Deno.serve(async (req) => {
      }
      
      // Action: Disconnect
-     if (action === 'disconnect') {
-       const body = await req.json();
-       const { user_id } = body;
-       
-       if (!user_id) {
-         return new Response(
-           JSON.stringify({ error: 'user_id is required' }),
-           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-         );
-       }
-       
-       await supabase.from('canva_connections').delete().eq('user_id', user_id);
+    if (action === 'disconnect') {
+        const user_id = authedUser.id; // Use verified JWT user
+        
+        await supabase.from('canva_connections').delete().eq('user_id', user_id);
        
        return new Response(
          JSON.stringify({ success: true }),
