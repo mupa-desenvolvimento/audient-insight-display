@@ -51,6 +51,8 @@ import ApiIntegrationsList from "./pages/admin/api-integrations/ApiIntegrationsL
 import ApiIntegrationForm from "./pages/admin/api-integrations/ApiIntegrationForm";
 import ExampleListPage from "./pages/ExampleListPage";
 import AutoContentModulePage from "./pages/admin/AutoContentModulePage";
+import MotivationalQuotes from "./pages/admin/MotivationalQuotes";
+import MotivationalTV from "./pages/MotivationalTV";
 import Install from "./pages/Install";
  import Presentation from "./pages/Presentation";
 import AssaiPresentation from "./pages/AssaiPresentation";
