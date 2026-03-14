@@ -26,10 +26,11 @@ function filterByPeriod(people: BirthdayPerson[], period: BirthdayPeriod): Birth
     const startOfWeek = new Date(today);
     const diff = todayDay === 0 ? 6 : todayDay - 1;
     startOfWeek.setDate(todayDate - diff);
+    startOfWeek.setHours(0, 0, 0, 0);
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
 
-    // Compare month/day within this week range
     const thisYear = today.getFullYear();
     const bdThisYear = new Date(thisYear, bdMonth, bdDate);
     return bdThisYear >= startOfWeek && bdThisYear <= endOfWeek;
@@ -47,7 +48,7 @@ export function useBirthdayPeople() {
   const { data: allPeople = [], isLoading, error } = useQuery({
     queryKey: ["birthday-people"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("birthday_people")
         .select("*")
         .eq("is_active", true)
@@ -81,13 +82,13 @@ export function useBirthdayPeople() {
       if (!user) throw new Error("Não autenticado");
 
       const { data: mapping } = await supabase
-        .from("user_tenant_mappings" as any)
+        .from("user_tenant_mappings")
         .select("tenant_id")
         .eq("user_id", user.id)
         .limit(1)
         .single();
 
-      const tenantId = (mapping as any)?.tenant_id;
+      const tenantId = mapping?.tenant_id;
       if (!tenantId) throw new Error("Tenant não encontrado");
 
       const rows: any[] = [];
@@ -123,7 +124,7 @@ export function useBirthdayPeople() {
 
       if (rows.length === 0) throw new Error("Nenhum registro válido encontrado");
 
-      const { error } = await supabase.from("birthday_people").insert(rows);
+      const { error } = await (supabase as any).from("birthday_people").insert(rows);
       if (error) throw error;
 
       return rows.length;
@@ -139,7 +140,7 @@ export function useBirthdayPeople() {
 
   const deletePerson = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("birthday_people").delete().eq("id", id);
+      const { error } = await (supabase as any).from("birthday_people").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
