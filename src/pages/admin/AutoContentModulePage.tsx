@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { PageShell } from "@/components/layout/PageShell";
 import { ListControls } from "@/components/list/ListControls";
@@ -12,6 +12,9 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAutoContent, AutoContentType, AutoContentItem } from "@/hooks/useAutoContent";
+import { useBirthdayPeople } from "@/hooks/useBirthdayPeople";
+import { BirthdayContainer } from "@/components/birthday-layouts/BirthdayContainer";
+import { BirthdayPeriod, BirthdayLayoutType } from "@/components/birthday-layouts/types";
 
 type StatusFilter = "all" | "active" | "inactive";
 
