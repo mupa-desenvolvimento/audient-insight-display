@@ -338,18 +338,22 @@ interface FolderBreadcrumb {
       formData.append('type', blob.type.startsWith('image/') ? 'image' : 'video');
       formData.append('fileType', blob.type);
       
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
-      
-      const uploadResponse = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-media`,
-        {
+      const uploadRequest = async (accessToken: string) => {
+        return fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-media`, {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${session.access_token}` },
+          headers: { Authorization: `Bearer ${accessToken}` },
           body: formData,
-        }
-      );
-      
+        });
+      };
+
+      let session = await getValidSession();
+      let uploadResponse = await uploadRequest(session.access_token);
+
+      if (uploadResponse.status === 401) {
+        session = await getValidSession(true);
+        uploadResponse = await uploadRequest(session.access_token);
+      }
+
       const uploadResult = await uploadResponse.json();
       
       if (uploadResponse.ok) {
