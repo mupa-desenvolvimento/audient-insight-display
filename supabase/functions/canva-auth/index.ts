@@ -202,16 +202,10 @@ Deno.serve(async (req) => {
      }
      
      // Action: List designs
-     if (action === 'list_designs') {
-       const body = await req.json();
-       const { user_id, continuation, folder_id } = body;
-       
-       if (!user_id) {
-         return new Response(
-           JSON.stringify({ error: 'user_id is required' }),
-           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-         );
-       }
+    if (action === 'list_designs') {
+        const body = await req.json();
+        const { continuation, folder_id } = body;
+        const user_id = authedUser.id; // Use verified JWT user
        
        // Get access token
        const { data: connection, error: connError } = await supabase
