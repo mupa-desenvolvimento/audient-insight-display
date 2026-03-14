@@ -93,7 +93,7 @@ const isValidModuleType = (value: string | undefined): value is AutoContentType 
 };
 
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { List, LayoutGrid } from "lucide-react";
+import { List, LayoutGrid, Upload, Cake, CalendarDays, CalendarRange, Calendar, CreditCard, LayoutList, Grid3x3, Monitor } from "lucide-react";
 import { WeatherSettings } from "./weather/WeatherSettings";
 import { NewsModule } from "./news/NewsModule";
 import { useWeather } from "@/hooks/useWeather";
