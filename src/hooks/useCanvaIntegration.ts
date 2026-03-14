@@ -376,7 +376,7 @@ interface FolderBreadcrumb {
     } finally {
       setIsExporting(prev => prev.filter(id => id !== designId));
     }
-  }, [callCanvaApi, toast]);
+  }, [callCanvaApi, getValidSession, toast]);
  
   const exportSelectedDesigns = useCallback(async (format: 'png' | 'jpg' | 'pdf' = 'png') => {
     const designsToExport = designs.filter(d => selectedDesigns.has(d.id));
