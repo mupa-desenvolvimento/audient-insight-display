@@ -444,4 +444,17 @@ const GenericAutoContentModule = ({ moduleType }: { moduleType: AutoContentType 
   );
 };
 
+const AutoContentModulePage = () => {
+  const params = useParams<{ moduleType: string }>();
+  const moduleType: AutoContentType = isValidModuleType(params.moduleType)
+    ? params.moduleType
+    : "weather";
+
+  if (moduleType === "birthday") {
+    return <BirthdayModulePage />;
+  }
+
+  return <GenericAutoContentModule moduleType={moduleType} />;
+};
+
 export default AutoContentModulePage;
