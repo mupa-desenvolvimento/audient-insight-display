@@ -210,9 +210,16 @@ function BirthdayModulePage() {
   }
 
   return (
-    <PageShell header={header} controls={controls} footer={null}>
-      <ListViewport>{content}</ListViewport>
-    </PageShell>
+    <>
+      <PageShell header={header} controls={controls} footer={null}>
+        <ListViewport>{content}</ListViewport>
+      </PageShell>
+      <BirthdaySlideDialog
+        open={slideDialogOpen}
+        onOpenChange={setSlideDialogOpen}
+        onSelect={(selectedLayout) => setLayout(selectedLayout)}
+      />
+    </>
   );
 }
 
