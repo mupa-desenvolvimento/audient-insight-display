@@ -400,15 +400,16 @@ Deno.serve(async (req) => {
       }
      
      // Action: Export design
-     if (action === 'export_design') {
-       const body = await req.json();
-       const { user_id, design_id, format = 'png' } = body;
-       
-       if (!user_id || !design_id) {
-         return new Response(
-           JSON.stringify({ error: 'user_id and design_id are required' }),
-           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-         );
+    if (action === 'export_design') {
+        const body = await req.json();
+        const { design_id, format = 'png' } = body;
+        const user_id = authedUser.id; // Use verified JWT user
+        
+        if (!design_id) {
+          return new Response(
+            JSON.stringify({ error: 'design_id is required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
        }
        
        const { data: connection } = await supabase
