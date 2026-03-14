@@ -51,6 +51,7 @@ const BIRTHDAY_LAYOUTS: { value: BirthdayLayoutType; label: string; icon: typeof
   { value: "list", label: "Lista", icon: LayoutList },
   { value: "grid", label: "Grid", icon: Grid3x3 },
   { value: "banner", label: "Banner TV", icon: Monitor },
+  { value: "celebration", label: "Celebração", icon: PartyPopper },
 ];
 
 const BIRTHDAY_PERIODS: { value: BirthdayPeriod; label: string; icon: typeof Calendar }[] = [
