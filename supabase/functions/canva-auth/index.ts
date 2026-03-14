@@ -501,7 +501,7 @@ Deno.serve(async (req) => {
          await new Promise(r => setTimeout(r, 2000));
          
          const statusResponse = await fetch(`${CANVA_API_BASE}/exports/${jobId}`, {
-           headers: { 'Authorization': `Bearer ${connection.access_token}` },
+           headers: { 'Authorization': `Bearer ${accessToken}` },
          });
          
          if (!statusResponse.ok) {
