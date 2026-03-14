@@ -52,7 +52,7 @@ export default function CanvaCallback() {
        }
  
         // Retry getting a valid session for up to 5 seconds
-        let session = null;
+        let session: Session | null = null;
         let attempts = 0;
         const maxAttempts = 10;
 
@@ -89,41 +89,42 @@ export default function CanvaCallback() {
           console.log(`[Canva Callback] Waiting for valid session... attempt ${attempts}/${maxAttempts}`);
           await new Promise(r => setTimeout(r, 500));
         }
- 
-       if (!session) {
-         console.error('[Canva Callback] No session found after retries');
-         setStatus('error');
-         setErrorMessage('Sessão expirada. Por favor, faça login novamente.');
-         return;
-       }
- 
-       hasProcessed.current = true;
-       setStatus('processing');
- 
-       try {
-        // Exchange the code for tokens
-        // Use window.location.origin to match the redirect URI used in get_auth_url
-        const redirectUri = `${window.location.origin}/admin/canva/callback`;
-        
-        console.log('[Canva Callback] Exchanging code for tokens with redirect_uri:', redirectUri);
-        
-        const exchangeRequest = async (accessToken: string) => {
-          return fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/canva-auth?action=exchange_code`, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              code,
-              state,
-              redirect_uri: redirectUri,
-              user_id: session.user.id,
-            }),
-          });
-        };
 
-        let response = await exchangeRequest(session.access_token);
+        if (!session) {
+          console.error('[Canva Callback] No session found after retries');
+          setStatus('error');
+          setErrorMessage('Sessão expirada. Por favor, faça login novamente.');
+          return;
+        }
+
+        const activeSession = session;
+        hasProcessed.current = true;
+        setStatus('processing');
+
+        try {
+          // Exchange the code for tokens
+          // Use window.location.origin to match the redirect URI used in get_auth_url
+          const redirectUri = `${window.location.origin}/admin/canva/callback`;
+
+          console.log('[Canva Callback] Exchanging code for tokens with redirect_uri:', redirectUri);
+
+          const exchangeRequest = async (accessToken: string) => {
+            return fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/canva-auth?action=exchange_code`, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                code,
+                state,
+                redirect_uri: redirectUri,
+                user_id: activeSession.user.id,
+              }),
+            });
+          };
+
+          let response = await exchangeRequest(activeSession.access_token);
         let result = await response.json();
 
         if (response.status === 401) {
