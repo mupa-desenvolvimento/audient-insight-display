@@ -172,7 +172,7 @@ Deno.serve(async (req) => {
         );
       }
       
-      const scopes = 'design:meta:read design:content:read folder:read asset:read profile:read offline_access';
+      const scopes = 'design:meta:read design:content:read folder:read asset:read profile:read';
       
       const authUrl = `${CANVA_AUTH_URL}?` +
         `client_id=${encodeURIComponent(clientId)}&` +
