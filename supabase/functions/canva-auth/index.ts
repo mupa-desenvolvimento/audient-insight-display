@@ -24,7 +24,72 @@
    const base64 = btoa(String.fromCharCode(...new Uint8Array(digest)));
    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
  }
- 
+
+ // FIX #2 & #3 & #6: Extracted token refresh helper — eliminates 3x duplication,
+ // checks for null refresh_token, and provides a single place for future locking logic.
+ async function getValidCanvaToken(
+   supabase: ReturnType<typeof createClient>,
+   userId: string,
+   clientId: string,
+   clientSecret: string,
+ ): Promise<{ accessToken: string } | { error: string; status: number }> {
+   const { data: connection, error: connError } = await supabase
+     .from('canva_connections')
+     .select('access_token, refresh_token, expires_at')
+     .eq('user_id', userId)
+     .single();
+
+   if (connError || !connection) {
+     return { error: 'Not connected to Canva', status: 401 };
+   }
+
+   let accessToken = connection.access_token;
+
+   // Check if token needs refresh (with 60s buffer to avoid edge-case expiry)
+   const expiresAt = new Date(connection.expires_at);
+   if (expiresAt.getTime() <= Date.now() + 60_000) {
+     // FIX #3: Check for null refresh_token before attempting refresh
+     if (!connection.refresh_token) {
+       console.error('[Canva Auth] No refresh token available for user:', userId);
+       await supabase.from('canva_connections').delete().eq('user_id', userId);
+       return { error: 'Refresh token missing, please reconnect', status: 401 };
+     }
+
+     console.log('[Canva Auth] Token expired, refreshing for user:', userId);
+
+     const refreshResponse = await fetch(CANVA_TOKEN_URL, {
+       method: 'POST',
+       headers: {
+         'Content-Type': 'application/x-www-form-urlencoded',
+         'Authorization': `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
+       },
+       body: new URLSearchParams({
+         grant_type: 'refresh_token',
+         refresh_token: connection.refresh_token,
+       }).toString(),
+     });
+
+     const refreshData = await refreshResponse.json();
+
+     if (!refreshResponse.ok) {
+       console.error('[Canva Auth] Token refresh failed:', refreshData);
+       await supabase.from('canva_connections').delete().eq('user_id', userId);
+       return { error: 'Token expired, please reconnect', status: 401 };
+     }
+
+     accessToken = refreshData.access_token;
+     const newExpiresAt = new Date(Date.now() + (refreshData.expires_in || 3600) * 1000).toISOString();
+
+     await supabase.from('canva_connections').update({
+       access_token: accessToken,
+       refresh_token: refreshData.refresh_token || connection.refresh_token,
+       expires_at: newExpiresAt,
+     }).eq('user_id', userId);
+   }
+
+   return { accessToken };
+ }
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -75,7 +140,7 @@ Deno.serve(async (req) => {
     if (action === 'get_auth_url') {
         const body = await req.json();
         const { redirect_uri } = body;
-        const user_id = authedUser.id; // Use verified JWT user
+        const user_id = authedUser.id;
         
         if (!redirect_uri) {
           return new Response(
@@ -91,14 +156,22 @@ Deno.serve(async (req) => {
        // Store verifier and state temporarily (expires in 10 min)
        const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
        
-       await supabase.from('canva_auth_states').upsert({
+       // FIX #5: Check upsert result — if it fails, don't generate a broken auth URL
+       const { error: upsertError } = await supabase.from('canva_auth_states').upsert({
         user_id,
         state,
         code_verifier: codeVerifier,
         expires_at: expiresAt,
       });
+
+      if (upsertError) {
+        console.error('[Canva Auth] Failed to store auth state:', upsertError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to initialize auth flow' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
       
-      // Scopes updated to include offline_access (for refresh tokens) and profile:read
       const scopes = 'design:meta:read design:content:read folder:read asset:read profile:read offline_access';
       
       const authUrl = `${CANVA_AUTH_URL}?` +
@@ -122,7 +195,7 @@ Deno.serve(async (req) => {
     if (action === 'exchange_code') {
         const body = await req.json();
         const { code, state, redirect_uri } = body;
-        const user_id = authedUser.id; // Use verified JWT user
+        const user_id = authedUser.id;
         
         if (!code || !state || !redirect_uri) {
           return new Response(
@@ -205,60 +278,17 @@ Deno.serve(async (req) => {
     if (action === 'list_designs') {
         const body = await req.json();
         const { continuation, folder_id } = body;
-        const user_id = authedUser.id; // Use verified JWT user
+        const user_id = authedUser.id;
        
-       // Get access token
-       const { data: connection, error: connError } = await supabase
-         .from('canva_connections')
-         .select('access_token, refresh_token, expires_at')
-         .eq('user_id', user_id)
-         .single();
-       
-       if (connError || !connection) {
+       // FIX #2: Use extracted helper instead of duplicated logic
+       const tokenResult = await getValidCanvaToken(supabase, user_id, clientId, clientSecret);
+       if ('error' in tokenResult) {
          return new Response(
-           JSON.stringify({ error: 'Not connected to Canva', connected: false }),
-           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+           JSON.stringify({ error: tokenResult.error, connected: false }),
+           { status: tokenResult.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
          );
        }
-       
-       let accessToken = connection.access_token;
-       
-       // Check if token needs refresh
-       if (new Date(connection.expires_at) <= new Date()) {
-         console.log('[Canva Auth] Token expired, refreshing...');
-         
-         const refreshResponse = await fetch(CANVA_TOKEN_URL, {
-           method: 'POST',
-        headers: { 
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
-        },
-           body: new URLSearchParams({
-             grant_type: 'refresh_token',
-             refresh_token: connection.refresh_token,
-           }).toString(),
-         });
-         
-         const refreshData = await refreshResponse.json();
-         
-         if (!refreshResponse.ok) {
-           console.error('[Canva Auth] Token refresh failed:', refreshData);
-           await supabase.from('canva_connections').delete().eq('user_id', user_id);
-           return new Response(
-             JSON.stringify({ error: 'Token expired, please reconnect', connected: false }),
-             { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-           );
-         }
-         
-         accessToken = refreshData.access_token;
-         const newExpiresAt = new Date(Date.now() + (refreshData.expires_in || 3600) * 1000).toISOString();
-         
-         await supabase.from('canva_connections').update({
-           access_token: accessToken,
-           refresh_token: refreshData.refresh_token || connection.refresh_token,
-           expires_at: newExpiresAt,
-         }).eq('user_id', user_id);
-       }
+       const { accessToken } = tokenResult;
        
        // Fetch designs from Canva
        let designsUrl = `${CANVA_API_BASE}/designs?limit=20`;
@@ -299,60 +329,17 @@ Deno.serve(async (req) => {
       if (action === 'list_folder_items') {
          const body = await req.json();
          const { folder_id = 'root', continuation } = body;
-         const user_id = authedUser.id; // Use verified JWT user
+         const user_id = authedUser.id;
         
-        // Get access token with refresh handling
-        const { data: connection } = await supabase
-          .from('canva_connections')
-          .select('access_token, refresh_token, expires_at')
-          .eq('user_id', user_id)
-          .single();
-        
-        if (!connection) {
+        // FIX #2: Use extracted helper instead of duplicated logic
+        const tokenResult = await getValidCanvaToken(supabase, user_id, clientId, clientSecret);
+        if ('error' in tokenResult) {
           return new Response(
-            JSON.stringify({ error: 'Not connected to Canva', connected: false }),
-            { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            JSON.stringify({ error: tokenResult.error, connected: false }),
+            { status: tokenResult.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
-        
-        let accessToken = connection.access_token;
-        
-        // Check if token needs refresh
-        if (new Date(connection.expires_at) <= new Date()) {
-          console.log('[Canva Auth] Token expired, refreshing...');
-          
-          const refreshResponse = await fetch(CANVA_TOKEN_URL, {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'Authorization': `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
-            },
-            body: new URLSearchParams({
-              grant_type: 'refresh_token',
-              refresh_token: connection.refresh_token,
-            }).toString(),
-          });
-          
-          const refreshData = await refreshResponse.json();
-          
-          if (!refreshResponse.ok) {
-            console.error('[Canva Auth] Token refresh failed:', refreshData);
-            await supabase.from('canva_connections').delete().eq('user_id', user_id);
-            return new Response(
-              JSON.stringify({ error: 'Token expired, please reconnect', connected: false }),
-              { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-          }
-          
-          accessToken = refreshData.access_token;
-          const newExpiresAt = new Date(Date.now() + (refreshData.expires_in || 3600) * 1000).toISOString();
-          
-          await supabase.from('canva_connections').update({
-            access_token: accessToken,
-            refresh_token: refreshData.refresh_token || connection.refresh_token,
-            expires_at: newExpiresAt,
-          }).eq('user_id', user_id);
-        }
+        const { accessToken } = tokenResult;
         
         let itemsUrl = `${CANVA_API_BASE}/folders/${folder_id}/items?limit=50`;
         if (continuation) {
@@ -412,57 +399,15 @@ Deno.serve(async (req) => {
           );
        }
        
-       const { data: connection } = await supabase
-         .from('canva_connections')
-         .select('access_token, refresh_token, expires_at')
-         .eq('user_id', user_id)
-         .single();
-       
-       if (!connection) {
+       // FIX #2: Use extracted helper instead of duplicated logic
+       const tokenResult = await getValidCanvaToken(supabase, user_id, clientId, clientSecret);
+       if ('error' in tokenResult) {
          return new Response(
-           JSON.stringify({ error: 'Not connected to Canva' }),
-           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+           JSON.stringify({ error: tokenResult.error, connected: false }),
+           { status: tokenResult.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
          );
        }
-       
-       let accessToken = connection.access_token;
-       
-       // Check if token needs refresh
-       if (new Date(connection.expires_at) <= new Date()) {
-         console.log('[Canva Auth] Token expired for export, refreshing...');
-         
-         const refreshResponse = await fetch(CANVA_TOKEN_URL, {
-           method: 'POST',
-           headers: { 
-             'Content-Type': 'application/x-www-form-urlencoded',
-             'Authorization': `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
-           },
-           body: new URLSearchParams({
-             grant_type: 'refresh_token',
-             refresh_token: connection.refresh_token,
-           }).toString(),
-         });
-         
-         const refreshData = await refreshResponse.json();
-         
-         if (!refreshResponse.ok) {
-           console.error('[Canva Auth] Token refresh failed:', refreshData);
-           await supabase.from('canva_connections').delete().eq('user_id', user_id);
-           return new Response(
-             JSON.stringify({ error: 'Token expired, please reconnect', connected: false }),
-             { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-           );
-         }
-         
-         accessToken = refreshData.access_token;
-         const newExpiresAt = new Date(Date.now() + (refreshData.expires_in || 3600) * 1000).toISOString();
-         
-         await supabase.from('canva_connections').update({
-           access_token: accessToken,
-           refresh_token: refreshData.refresh_token || connection.refresh_token,
-           expires_at: newExpiresAt,
-         }).eq('user_id', user_id);
-       }
+       const { accessToken } = tokenResult;
        
        // Create export job
        console.log('[Canva API] Creating export job for design:', design_id);
@@ -526,7 +471,7 @@ Deno.serve(async (req) => {
          
          if (statusData.status === 'failed' || statusData.job?.status === 'failed') {
            return new Response(
-             JSON.stringify({ error: 'Export failed', details: statusData }),
+             JSON.stringify({ error: 'Export failed' }),
              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
            );
          }
@@ -535,14 +480,14 @@ Deno.serve(async (req) => {
        }
        
        return new Response(
-         JSON.stringify({ error: 'Export timeout', job_id: jobId }),
+         JSON.stringify({ error: 'Export timeout' }),
          { status: 408, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
        );
      }
      
      // Action: Get connection status
     if (action === 'status') {
-        const user_id = authedUser.id; // Use verified JWT user
+        const user_id = authedUser.id;
         
         const { data: connection } = await supabase
           .from('canva_connections')
@@ -562,7 +507,7 @@ Deno.serve(async (req) => {
      
      // Action: Disconnect
     if (action === 'disconnect') {
-        const user_id = authedUser.id; // Use verified JWT user
+        const user_id = authedUser.id;
         
         await supabase.from('canva_connections').delete().eq('user_id', user_id);
        
@@ -578,10 +523,10 @@ Deno.serve(async (req) => {
      );
      
    } catch (error: unknown) {
+     // FIX #1: Don't expose internal error details to client
      console.error('[Canva Auth] Error:', error);
-     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
      return new Response(
-       JSON.stringify({ error: 'Internal server error', details: errorMessage }),
+       JSON.stringify({ error: 'Internal server error' }),
        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
      );
    }

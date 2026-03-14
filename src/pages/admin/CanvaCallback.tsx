@@ -119,7 +119,6 @@ export default function CanvaCallback() {
                 code,
                 state,
                 redirect_uri: redirectUri,
-                user_id: activeSession.user.id,
               }),
             });
           };
