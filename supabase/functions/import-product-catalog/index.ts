@@ -238,6 +238,38 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Verify authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ success: false, error: "Não autorizado" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Validate the caller's token
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+    const { data: { user }, error: authError } = await userClient.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ success: false, error: "Token inválido" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Check if user is admin
+    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+    const { data: isAdmin } = await adminClient.rpc('is_tenant_admin', { check_user_id: user.id });
+    if (!isAdmin) {
+      return new Response(JSON.stringify({ success: false, error: "Permissão negada" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const MUPA_TOKEN = Deno.env.get("MUPA_API_TOKEN");
     if (!MUPA_TOKEN) {
       return new Response(JSON.stringify({ success: false, error: "MUPA_API_TOKEN not configured" }), {
@@ -245,10 +277,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const supabase = adminClient;
 
     // Fetch all products first
     const products = await fetchAllProducts(MUPA_TOKEN);
