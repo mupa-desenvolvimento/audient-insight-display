@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useMemo, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { PageShell } from "@/components/layout/PageShell";
 import { ListControls } from "@/components/list/ListControls";
@@ -11,10 +11,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAutoContent, AutoContentType, AutoContentItem } from "@/hooks/useAutoContent";
 import { useBirthdayPeople } from "@/hooks/useBirthdayPeople";
 import { BirthdayContainer } from "@/components/birthday-layouts/BirthdayContainer";
 import { BirthdayPeriod, BirthdayLayoutType } from "@/components/birthday-layouts/types";
+import {
+  Upload, Cake, CalendarDays, CalendarRange, Calendar,
+  CreditCard, LayoutList, Grid3x3, Monitor,
+} from "lucide-react";
+import { WeatherSettings } from "./weather/WeatherSettings";
+import { NewsModule } from "./news/NewsModule";
+import { useWeather } from "@/hooks/useWeather";
 
 type StatusFilter = "all" | "active" | "inactive";
 
@@ -23,128 +31,19 @@ interface AutoContentFilters {
 }
 
 const AUTO_CONTENT_TYPES: AutoContentType[] = [
-  "weather",
-  "news",
-  "quote",
-  "curiosity",
-  "birthday",
-  "nutrition",
-  "instagram",
-  "qr_campaign",
+  "weather", "news", "quote", "curiosity", "birthday", "nutrition", "instagram", "qr_campaign",
 ];
 
-const MODULE_CONFIG: Record<
-  AutoContentType,
-  {
-    title: string;
-    description: string;
-  }
-> = {
-  weather: {
-    title: "Clima",
-    description:
-      "Exibe cards de clima atual e previsão rápida para a loja selecionada.",
-  },
-  news: {
-    title: "Notícias",
-    description:
-      "Lista manchetes e chamadas rápidas de notícias para compor o canal.",
-  },
-  quote: {
-    title: "Frases Motivacionais",
-    description:
-      "Mostra frases curtas para motivar clientes e equipe durante o dia.",
-  },
-  curiosity: {
-    title: "Curiosidades",
-    description:
-      "Apresenta curiosidades rápidas para manter a programação dinâmica.",
-  },
-  birthday: {
-    title: "Aniversariantes",
-    description:
-      "Utiliza a base de aniversariantes para gerar mensagens personalizadas.",
-  },
-  nutrition: {
-    title: "Dicas de Nutrição",
-    description:
-      "Exibe dicas de alimentação e bem-estar alinhadas à operação da loja.",
-  },
-  instagram: {
-    title: "Instagram Feed",
-    description:
-      "Traz posts selecionados do Instagram como cards visuais na TV.",
-  },
-  qr_campaign: {
-    title: "QR Code de Campanhas",
-    description:
-      "Gera cards com QR Code para campanhas, formulários e landing pages.",
-  },
+const MODULE_CONFIG: Record<AutoContentType, { title: string; description: string }> = {
+  weather: { title: "Clima", description: "Exibe cards de clima atual e previsão rápida para a loja selecionada." },
+  news: { title: "Notícias", description: "Lista manchetes e chamadas rápidas de notícias para compor o canal." },
+  quote: { title: "Frases Motivacionais", description: "Mostra frases curtas para motivar clientes e equipe durante o dia." },
+  curiosity: { title: "Curiosidades", description: "Apresenta curiosidades rápidas para manter a programação dinâmica." },
+  birthday: { title: "Aniversariantes", description: "Gerencie a base de aniversariantes e visualize os layouts para exibição nas TVs." },
+  nutrition: { title: "Dicas de Nutrição", description: "Exibe dicas de alimentação e bem-estar alinhadas à operação da loja." },
+  instagram: { title: "Instagram Feed", description: "Traz posts selecionados do Instagram como cards visuais na TV." },
+  qr_campaign: { title: "QR Code de Campanhas", description: "Gera cards com QR Code para campanhas, formulários e landing pages." },
 };
-
-const formatDate = (iso: string) => {
-  const date = new Date(iso);
-  return date.toLocaleDateString("pt-BR");
-};
-
-const isValidModuleType = (value: string | undefined): value is AutoContentType => {
-  if (!value) return false;
-  return AUTO_CONTENT_TYPES.includes(value as AutoContentType);
-};
-
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { List, LayoutGrid, Upload, Cake, CalendarDays, CalendarRange, Calendar, CreditCard, LayoutList, Grid3x3, Monitor } from "lucide-react";
-import { WeatherSettings } from "./weather/WeatherSettings";
-import { NewsModule } from "./news/NewsModule";
-import { useWeather } from "@/hooks/useWeather";
-
-const AutoContentModulePage = () => {
-  const params = useParams<{ moduleType: string }>();
-
-  const moduleType: AutoContentType = isValidModuleType(params.moduleType)
-    ? params.moduleType
-    : "weather";
-
-  const config = MODULE_CONFIG[moduleType];
-
-  const { locations: weatherLocations, isLoading: isLoadingWeather } = useWeather();
-
-  const weatherItems = useMemo(() => {
-    if (moduleType !== "weather" || !weatherLocations) return [];
-
-    return weatherLocations.map((loc) => ({
-      id: loc.id,
-      tenant_id: "", // Not strictly needed for display
-      type: "weather",
-      category: loc.city,
-      title: `${loc.current_temp ? Math.round(loc.current_temp) + "°C" : "--"} - ${loc.weather_description || "Sem dados"}`,
-      description: `Umidade: ${loc.humidity || "--"}% • Vento: ${loc.wind_speed || "--"} km/h`,
-      image_url: null,
-      payload_json: loc.raw_data,
-      source: "api",
-      status: loc.is_active ? "active" : "inactive",
-      created_at: loc.created_at || new Date().toISOString(),
-      updated_at: loc.last_updated_at || new Date().toISOString(),
-      expires_at: null,
-    } as AutoContentItem));
-  }, [weatherLocations, moduleType]);
-
-  const {
-    items: fetchedItems,
-    isLoadingItems,
-    itemsError,
-    settings,
-    isLoadingSettings,
-    settingsError,
-    toggleModule,
-    generateNow,
-    uploadBirthdays,
-  } = useAutoContent({
-    type: moduleType,
-    limit: 200,
-  });
-
-  const items = moduleType === "weather" ? weatherItems : fetchedItems;
 
 const BIRTHDAY_LAYOUTS: { value: BirthdayLayoutType; label: string; icon: typeof CreditCard }[] = [
   { value: "cards", label: "Cards", icon: CreditCard },
@@ -154,18 +53,24 @@ const BIRTHDAY_LAYOUTS: { value: BirthdayLayoutType; label: string; icon: typeof
 ];
 
 const BIRTHDAY_PERIODS: { value: BirthdayPeriod; label: string; icon: typeof Calendar }[] = [
-  { value: "day", label: "Hoje", icon: CalendarDays },
-  { value: "week", label: "Semana", icon: CalendarRange },
   { value: "month", label: "Mês", icon: Calendar },
+  { value: "week", label: "Semana", icon: CalendarRange },
+  { value: "day", label: "Hoje", icon: CalendarDays },
 ];
 
-function BirthdayModuleSection() {
+const formatDate = (iso: string) => new Date(iso).toLocaleDateString("pt-BR");
+
+const isValidModuleType = (value: string | undefined): value is AutoContentType =>
+  !!value && AUTO_CONTENT_TYPES.includes(value as AutoContentType);
+
+/* ─── Birthday Module (standalone) ─── */
+function BirthdayModulePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [period, setPeriod] = useState<BirthdayPeriod>("month");
   const [layout, setLayout] = useState<BirthdayLayoutType>("cards");
   const { allPeople, isLoading, filterByPeriod, uploadCsv } = useBirthdayPeople();
 
-  const filteredPeople = useMemo(() => filterByPeriod(period), [allPeople, period]);
+  const filteredPeople = useMemo(() => filterByPeriod(period), [allPeople, period, filterByPeriod]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -175,9 +80,18 @@ function BirthdayModuleSection() {
     e.target.value = "";
   };
 
-  return (
-    <div className="space-y-4 border-t pt-4">
-      {/* Import + Period + Layout controls */}
+  const header = (
+    <div className="px-4 pt-3 pb-2">
+      <h2 className="text-lg font-semibold">Aniversariantes</h2>
+      <p className="text-muted-foreground text-sm mt-1">
+        Gerencie a base de aniversariantes e visualize os layouts para exibição nas TVs.
+      </p>
+    </div>
+  );
+
+  const controls = (
+    <div className="px-4 pb-2 space-y-4">
+      {/* Top row: Import + Filters */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-2">
           <input
@@ -204,7 +118,12 @@ function BirthdayModuleSection() {
 
         <div className="flex items-center gap-3">
           {/* Period filter */}
-          <ToggleGroup type="single" value={period} onValueChange={(v) => v && setPeriod(v as BirthdayPeriod)} className="bg-muted rounded-md p-0.5">
+          <ToggleGroup
+            type="single"
+            value={period}
+            onValueChange={(v) => v && setPeriod(v as BirthdayPeriod)}
+            className="bg-muted rounded-md p-0.5"
+          >
             {BIRTHDAY_PERIODS.map((p) => (
               <ToggleGroupItem key={p.value} value={p.value} size="sm" className="gap-1 text-xs px-2.5">
                 <p.icon className="w-3.5 h-3.5" />
@@ -214,9 +133,14 @@ function BirthdayModuleSection() {
           </ToggleGroup>
 
           {/* Layout selector */}
-          <ToggleGroup type="single" value={layout} onValueChange={(v) => v && setLayout(v as BirthdayLayoutType)} className="bg-muted rounded-md p-0.5">
+          <ToggleGroup
+            type="single"
+            value={layout}
+            onValueChange={(v) => v && setLayout(v as BirthdayLayoutType)}
+            className="bg-muted rounded-md p-0.5"
+          >
             {BIRTHDAY_LAYOUTS.map((l) => (
-              <ToggleGroupItem key={l.value} value={l.value} size="sm" className="px-2">
+              <ToggleGroupItem key={l.value} value={l.value} size="sm" className="px-2" title={l.label}>
                 <l.icon className="w-3.5 h-3.5" />
               </ToggleGroupItem>
             ))}
@@ -228,112 +152,149 @@ function BirthdayModuleSection() {
       <div className="flex items-center gap-4 text-xs text-muted-foreground">
         <span className="flex items-center gap-1">
           <Cake className="w-3.5 h-3.5" />
-          {filteredPeople.length} aniversariante{filteredPeople.length !== 1 ? "s" : ""}
+          {filteredPeople.length} aniversariante{filteredPeople.length !== 1 ? "s" : ""}{" "}
+          {period === "day" ? "hoje" : period === "week" ? "esta semana" : "este mês"}
         </span>
         <span>Total cadastrados: {allPeople.length}</span>
       </div>
-
-      {/* Layout preview */}
-      {isLoading ? (
-        <div className="text-center text-muted-foreground py-8">Carregando aniversariantes...</div>
-      ) : (
-        <BirthdayContainer people={filteredPeople} period={period} layout={layout} />
-      )}
     </div>
+  );
+
+  let content: JSX.Element;
+  if (isLoading) {
+    content = (
+      <div className="flex h-full items-center justify-center text-muted-foreground">
+        Carregando aniversariantes...
+      </div>
+    );
+  } else if (allPeople.length === 0) {
+    content = (
+      <div className="flex h-full items-center justify-center">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>Nenhum aniversariante cadastrado</CardTitle>
+            <CardDescription>
+              Importe um arquivo CSV com os dados dos colaboradores para começar.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  } else if (filteredPeople.length === 0) {
+    content = (
+      <div className="space-y-6">
+        <div className="text-center py-6">
+          <p className="text-muted-foreground text-sm">
+            Nenhum aniversariante {period === "day" ? "hoje" : period === "week" ? "esta semana" : "este mês"}.
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Mostrando todos os {allPeople.length} cadastrados abaixo:
+          </p>
+        </div>
+        <BirthdayContainer people={allPeople} period={period} layout={layout} />
+      </div>
+    );
+  } else {
+    content = <BirthdayContainer people={filteredPeople} period={period} layout={layout} />;
+  }
+
+  return (
+    <PageShell header={header} controls={controls} footer={null}>
+      <ListViewport>{content}</ListViewport>
+    </PageShell>
   );
 }
 
+/* ─── Generic Auto-Content Module ─── */
+const AutoContentModulePage = () => {
+  const params = useParams<{ moduleType: string }>();
+  const moduleType: AutoContentType = isValidModuleType(params.moduleType)
+    ? params.moduleType
+    : "weather";
+
+  // Birthday has its own dedicated page
+  if (moduleType === "birthday") {
+    return <BirthdayModulePage />;
+  }
+
+  const config = MODULE_CONFIG[moduleType];
+
+  const { locations: weatherLocations, isLoading: isLoadingWeather } = useWeather();
+
+  const weatherItems = useMemo(() => {
+    if (moduleType !== "weather" || !weatherLocations) return [];
+    return weatherLocations.map((loc) => ({
+      id: loc.id,
+      tenant_id: "",
+      type: "weather",
+      category: loc.city,
+      title: `${loc.current_temp ? Math.round(loc.current_temp) + "°C" : "--"} - ${loc.weather_description || "Sem dados"}`,
+      description: `Umidade: ${loc.humidity || "--"}% • Vento: ${loc.wind_speed || "--"} km/h`,
+      image_url: null,
+      payload_json: loc.raw_data,
+      source: "api",
+      status: loc.is_active ? "active" : "inactive",
+      created_at: loc.created_at || new Date().toISOString(),
+      updated_at: loc.last_updated_at || new Date().toISOString(),
+      expires_at: null,
+    } as AutoContentItem));
+  }, [weatherLocations, moduleType]);
+
+  const {
+    items: fetchedItems,
+    isLoadingItems,
+    itemsError,
+    settings,
+    isLoadingSettings,
+    settingsError,
+    toggleModule,
+    generateNow,
+  } = useAutoContent({ type: moduleType, limit: 200 });
+
+  const items = moduleType === "weather" ? weatherItems : fetchedItems;
 
   const { state, setView, setPage, setPageSize, setSearch, setFilters, reset } =
     useListState<AutoContentFilters>({
-      initialFilters: {
-        status: "all",
-      },
+      initialFilters: { status: "all" },
       initialPageSize: 10,
       storageKeyOverride: `auto-content:${moduleType}`,
     });
 
-  const currentSetting = settings.find((setting) => setting.module_type === moduleType);
+  const currentSetting = settings.find((s) => s.module_type === moduleType);
 
   const filteredItems = useMemo(() => {
     const searchLower = state.search.toLowerCase();
-
     return items.filter((item) => {
-      const matchesStatus =
-        state.filters.status === "all" ? true : item.status === state.filters.status;
-
-      const titleMatch = item.title.toLowerCase().includes(searchLower);
-      const descriptionMatch =
-        item.description?.toLowerCase().includes(searchLower) ?? false;
-      const categoryMatch = item.category?.toLowerCase().includes(searchLower) ?? false;
-
+      const matchesStatus = state.filters.status === "all" || item.status === state.filters.status;
       const matchesSearch =
-        searchLower.length === 0 || titleMatch || descriptionMatch || categoryMatch;
-
+        searchLower.length === 0 ||
+        item.title.toLowerCase().includes(searchLower) ||
+        (item.description?.toLowerCase().includes(searchLower) ?? false) ||
+        (item.category?.toLowerCase().includes(searchLower) ?? false);
       return matchesStatus && matchesSearch;
     });
   }, [items, state.search, state.filters.status]);
 
   const { pageItems, total } = useMemo(() => {
-    const totalItems = filteredItems.length;
-    const startIndex = (state.page - 1) * state.pageSize;
-    const endIndex = startIndex + state.pageSize;
-    const itemsSlice = filteredItems.slice(startIndex, endIndex);
-
-    return {
-      pageItems: itemsSlice,
-      total: totalItems,
-    };
+    const start = (state.page - 1) * state.pageSize;
+    return { pageItems: filteredItems.slice(start, start + state.pageSize), total: filteredItems.length };
   }, [filteredItems, state.page, state.pageSize]);
-
-  const handleClearFilters = () => {
-    reset();
-  };
 
   const handleToggleModule = (enabled: boolean) => {
     const refreshInterval =
       currentSetting?.refresh_interval_minutes && currentSetting.refresh_interval_minutes > 0
         ? currentSetting.refresh_interval_minutes
-        : moduleType === "weather"
-          ? 60
-          : 30;
-
-    toggleModule.mutate({
-      moduleType,
-      enabled,
-      refreshIntervalMinutes: refreshInterval,
-    });
+        : moduleType === "weather" ? 60 : 30;
+    toggleModule.mutate({ moduleType, enabled, refreshIntervalMinutes: refreshInterval });
   };
 
   const handleChangeInterval = (minutes: number) => {
     if (!currentSetting) return;
-
-    toggleModule.mutate({
-      moduleType,
-      enabled: currentSetting.enabled,
-      refreshIntervalMinutes: minutes,
-    });
+    toggleModule.mutate({ moduleType, enabled: currentSetting.enabled, refreshIntervalMinutes: minutes });
   };
 
   const handleGenerateNow = () => {
-    generateNow.mutate({
-      moduleType,
-      refreshIntervalMinutes: currentSetting?.refresh_interval_minutes,
-    });
-  };
-
-  const handleUploadCsv = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const csv = await file.text();
-
-    uploadBirthdays.mutate({
-      csv,
-      fileName: file.name,
-    });
-
-    event.target.value = "";
+    generateNow.mutate({ moduleType, refreshIntervalMinutes: currentSetting?.refresh_interval_minutes });
   };
 
   const header = (moduleType === "weather" || moduleType === "news") ? null : (
@@ -347,16 +308,8 @@ function BirthdayModuleSection() {
     <div className="px-4 pb-2 space-y-6">
       <div className="flex justify-end items-center gap-3">
         <div className="flex items-center gap-3">
-          <Switch
-            checked={currentSetting?.enabled ?? false}
-            onCheckedChange={handleToggleModule}
-            disabled={isLoadingSettings || toggleModule.isPending}
-          />
-          <div className="flex flex-col">
-            <span className="text-sm font-medium">
-              {currentSetting?.enabled ? "Módulo ativado" : "Módulo desativado"}
-            </span>
-          </div>
+          <Switch checked={currentSetting?.enabled ?? false} onCheckedChange={handleToggleModule} disabled={isLoadingSettings || toggleModule.isPending} />
+          <span className="text-sm font-medium">{currentSetting?.enabled ? "Módulo ativado" : "Módulo desativado"}</span>
         </div>
       </div>
       <WeatherSettings />
@@ -365,41 +318,19 @@ function BirthdayModuleSection() {
     <div className="px-4 pb-2 space-y-6">
       <div className="flex justify-end items-center gap-3">
         <div className="flex items-center gap-3">
-          <Switch
-            checked={currentSetting?.enabled ?? false}
-            onCheckedChange={handleToggleModule}
-            disabled={isLoadingSettings || toggleModule.isPending}
-          />
-          <div className="flex flex-col">
-            <span className="text-sm font-medium">
-              {currentSetting?.enabled ? "Módulo ativado" : "Módulo desativado"}
-            </span>
-          </div>
+          <Switch checked={currentSetting?.enabled ?? false} onCheckedChange={handleToggleModule} disabled={isLoadingSettings || toggleModule.isPending} />
+          <span className="text-sm font-medium">{currentSetting?.enabled ? "Módulo ativado" : "Módulo desativado"}</span>
         </div>
       </div>
       <NewsModule />
     </div>
   ) : (
     <div className="px-4 pb-2 space-y-3">
-      <ListControls
-        state={state}
-        onSearchChange={setSearch}
-        onViewChange={setView}
-        onClearFilters={handleClearFilters}
-      >
+      <ListControls state={state} onSearchChange={setSearch} onViewChange={setView} onClearFilters={reset}>
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Status</span>
-          <Select
-            value={state.filters.status}
-            onValueChange={(value) =>
-              setFilters({
-                status: value as AutoContentFilters["status"],
-              })
-            }
-          >
-            <SelectTrigger className="h-9 w-[140px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
+          <Select value={state.filters.status} onValueChange={(v) => setFilters({ status: v as StatusFilter })}>
+            <SelectTrigger className="h-9 w-[140px]"><SelectValue placeholder="Status" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="active">Ativo</SelectItem>
@@ -411,32 +342,17 @@ function BirthdayModuleSection() {
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
-          <Switch
-            checked={currentSetting?.enabled ?? false}
-            onCheckedChange={handleToggleModule}
-            disabled={isLoadingSettings || toggleModule.isPending}
-          />
+          <Switch checked={currentSetting?.enabled ?? false} onCheckedChange={handleToggleModule} disabled={isLoadingSettings || toggleModule.isPending} />
           <div className="flex flex-col">
-            <span className="text-sm font-medium">
-              {currentSetting?.enabled ? "Módulo ativado" : "Módulo desativado"}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              Disponibiliza cards deste módulo para uso em playlists.
-            </span>
+            <span className="text-sm font-medium">{currentSetting?.enabled ? "Módulo ativado" : "Módulo desativado"}</span>
+            <span className="text-xs text-muted-foreground">Disponibiliza cards deste módulo para uso em playlists.</span>
           </div>
         </div>
-
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Frequência</span>
-            <Select
-              value={String(currentSetting?.refresh_interval_minutes ?? 30)}
-              onValueChange={(value) => handleChangeInterval(Number(value))}
-              disabled={!currentSetting || toggleModule.isPending}
-            >
-              <SelectTrigger className="h-9 w-[140px]">
-                <SelectValue placeholder="Intervalo" />
-              </SelectTrigger>
+            <Select value={String(currentSetting?.refresh_interval_minutes ?? 30)} onValueChange={(v) => handleChangeInterval(Number(v))} disabled={!currentSetting || toggleModule.isPending}>
+              <SelectTrigger className="h-9 w-[140px]"><SelectValue placeholder="Intervalo" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="15">15 minutos</SelectItem>
                 <SelectItem value="30">30 minutos</SelectItem>
@@ -445,84 +361,42 @@ function BirthdayModuleSection() {
               </SelectContent>
             </Select>
           </div>
-
-          <Button
-            size="sm"
-            onClick={handleGenerateNow}
-            disabled={!currentSetting?.enabled || generateNow.isPending}
-          >
+          <Button size="sm" onClick={handleGenerateNow} disabled={!currentSetting?.enabled || generateNow.isPending}>
             Gerar mock agora
           </Button>
         </div>
       </div>
-
-      {moduleType === "birthday" && (
-        <BirthdayModuleSection />
-      )}
     </div>
   );
 
   const footer = (moduleType === "weather" || moduleType === "news") ? null : (
-    <UniversalPagination
-      page={state.page}
-      pageSize={state.pageSize}
-      total={total}
-      onPageChange={setPage}
-      onPageSizeChange={setPageSize}
-    />
+    <UniversalPagination page={state.page} pageSize={state.pageSize} total={total} onPageChange={setPage} onPageSizeChange={setPageSize} />
   );
 
   const isLoading = moduleType === "weather" ? isLoadingWeather : isLoadingItems;
   const hasError = Boolean(itemsError || settingsError);
 
   let content: JSX.Element;
-
-  if (moduleType === "weather") {
-    content = <></>; // Content is handled by WeatherSettings in controls
-  } else if (moduleType === "news") {
-    content = <></>; // Content is handled by NewsModule in controls
+  if (moduleType === "weather" || moduleType === "news") {
+    content = <></>;
   } else if (isLoading) {
-    content = (
-      <div className="flex h-full items-center justify-center text-muted-foreground">
-        Carregando conteúdo automático...
-      </div>
-    );
+    content = <div className="flex h-full items-center justify-center text-muted-foreground">Carregando conteúdo automático...</div>;
   } else if (hasError) {
     content = (
       <div className="flex h-full items-center justify-center">
-        <Card className="max-w-md">
-          <CardHeader>
-            <CardTitle>Erro ao carregar conteúdo automático</CardTitle>
-            <CardDescription>
-              Verifique sua conexão e tente novamente em alguns instantes.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+        <Card className="max-w-md"><CardHeader><CardTitle>Erro ao carregar conteúdo automático</CardTitle><CardDescription>Verifique sua conexão e tente novamente.</CardDescription></CardHeader></Card>
       </div>
     );
   } else if (total === 0) {
     content = (
       <div className="flex h-full items-center justify-center">
-        <Card className="max-w-md">
-          <CardHeader>
-            <CardTitle>Nenhum conteúdo gerado ainda</CardTitle>
-            <CardDescription>
-              Ative o módulo e clique em &quot;Gerar mock agora&quot; para criar os primeiros
-              cards.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+        <Card className="max-w-md"><CardHeader><CardTitle>Nenhum conteúdo gerado ainda</CardTitle><CardDescription>Ative o módulo e clique em &quot;Gerar mock agora&quot; para criar os primeiros cards.</CardDescription></CardHeader></Card>
       </div>
     );
   } else if (state.view === "list") {
     content = (
       <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Conteúdos gerados</CardTitle>
-          <CardDescription>
-            Lista de cards disponíveis para uso nas playlists deste tenant.
-          </CardDescription>
-        </CardHeader>
+        <CardHeader><CardTitle>Conteúdos gerados</CardTitle><CardDescription>Lista de cards disponíveis para uso nas playlists deste tenant.</CardDescription></CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -538,19 +412,11 @@ function BirthdayModuleSection() {
             <TableBody>
               {pageItems.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell className="font-mono text-xs uppercase">
-                    {item.type}
-                  </TableCell>
+                  <TableCell className="font-mono text-xs uppercase">{item.type}</TableCell>
                   <TableCell>{item.category ?? "-"}</TableCell>
                   <TableCell className="font-medium">{item.title}</TableCell>
-                  <TableCell>
-                    <Badge variant={item.status === "active" ? "default" : "secondary"}>
-                      {item.status === "active" ? "Ativo" : "Inativo"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="capitalize text-xs text-muted-foreground">
-                    {item.source}
-                  </TableCell>
+                  <TableCell><Badge variant={item.status === "active" ? "default" : "secondary"}>{item.status === "active" ? "Ativo" : "Inativo"}</Badge></TableCell>
+                  <TableCell className="capitalize text-xs text-muted-foreground">{item.source}</TableCell>
                   <TableCell>{formatDate(item.created_at)}</TableCell>
                 </TableRow>
               ))}
@@ -561,26 +427,19 @@ function BirthdayModuleSection() {
     );
   } else {
     content = (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols 3 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {pageItems.map((item) => (
           <Card key={item.id} className="flex flex-col">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between gap-2">
                 <CardTitle className="text-base">{item.title}</CardTitle>
-                <Badge variant={item.status === "active" ? "default" : "secondary"}>
-                  {item.status === "active" ? "Ativo" : "Inativo"}
-                </Badge>
+                <Badge variant={item.status === "active" ? "default" : "secondary"}>{item.status === "active" ? "Ativo" : "Inativo"}</Badge>
               </div>
-              <CardDescription className="text-xs">
-                {item.category ? `${item.category} • ${item.type}` : item.type}
-              </CardDescription>
+              <CardDescription className="text-xs">{item.category ? `${item.category} • ${item.type}` : item.type}</CardDescription>
             </CardHeader>
             <CardContent className="mt-auto pt-0 text-xs text-muted-foreground space-y-1">
               {item.description && <p>{item.description}</p>}
-              <p className="flex justify-between">
-                <span>Fonte: {item.source}</span>
-                <span>{formatDate(item.created_at)}</span>
-              </p>
+              <p className="flex justify-between"><span>Fonte: {item.source}</span><span>{formatDate(item.created_at)}</span></p>
             </CardContent>
           </Card>
         ))}
@@ -596,4 +455,3 @@ function BirthdayModuleSection() {
 };
 
 export default AutoContentModulePage;
-
