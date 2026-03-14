@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from "react";
-import { Canvas, IText, Rect, Circle, Line, Triangle, FabricImage, FabricObject, ActiveSelection } from "fabric";
+import { Canvas, IText, Rect, Circle, Line, Triangle, Polygon, FabricImage, FabricObject, ActiveSelection, Shadow } from "fabric";
 
 export interface SelectedObjectProps {
   fill: string;
@@ -9,10 +9,42 @@ export interface SelectedObjectProps {
   fontSize?: number;
   fontFamily?: string;
   textAlign?: string;
+  fontWeight?: string;
+  fontStyle?: string;
+  underline?: boolean;
+  linethrough?: boolean;
+  lineHeight?: number;
+  charSpacing?: number;
+  shadowBlur?: number;
+  rx?: number;
+  left?: number;
+  top?: number;
+  angle?: number;
   type: string;
 }
 
 const MAX_HISTORY = 50;
+
+// Create a star polygon points
+function createStarPoints(spikes: number, outerR: number, innerR: number): { x: number; y: number }[] {
+  const pts: { x: number; y: number }[] = [];
+  const step = Math.PI / spikes;
+  for (let i = 0; i < 2 * spikes; i++) {
+    const r = i % 2 === 0 ? outerR : innerR;
+    const angle = i * step - Math.PI / 2;
+    pts.push({ x: Math.cos(angle) * r + outerR, y: Math.sin(angle) * r + outerR });
+  }
+  return pts;
+}
+
+function createPolygonPoints(sides: number, radius: number): { x: number; y: number }[] {
+  const pts: { x: number; y: number }[] = [];
+  for (let i = 0; i < sides; i++) {
+    const angle = (2 * Math.PI * i) / sides - Math.PI / 2;
+    pts.push({ x: Math.cos(angle) * radius + radius, y: Math.sin(angle) * radius + radius });
+  }
+  return pts;
+}
 
 export function useFabricCanvas() {
   const canvasRef = useRef<Canvas | null>(null);
@@ -20,6 +52,8 @@ export function useFabricCanvas() {
   const [selectedObject, setSelectedObject] = useState<SelectedObjectProps | null>(null);
   const [projectName, setProjectName] = useState("Projeto sem título");
   const [zoom, setZoom] = useState(1);
+  const [showGrid, setShowGrid] = useState(false);
+  const [canvasBgColor, setCanvasBgColor] = useState("#ffffff");
 
   // History
   const historyRef = useRef<string[]>([]);
@@ -51,7 +85,7 @@ export function useFabricCanvas() {
     canvas.on("selection:created", () => updateSelection(canvas));
     canvas.on("selection:updated", () => updateSelection(canvas));
     canvas.on("selection:cleared", () => setSelectedObject(null));
-    canvas.on("object:modified", () => saveHistory());
+    canvas.on("object:modified", () => { saveHistory(); updateSelection(canvas); });
     canvas.on("object:added", () => saveHistory());
     canvas.on("object:removed", () => saveHistory());
 
@@ -64,6 +98,10 @@ export function useFabricCanvas() {
       try {
         const data = JSON.parse(saved);
         if (data.name) setProjectName(data.name);
+        if (data.bgColor) {
+          setCanvasBgColor(data.bgColor);
+          canvas.backgroundColor = data.bgColor;
+        }
         if (data.canvas) {
           canvas.loadFromJSON(data.canvas).then(() => {
             canvas.renderAll();
@@ -79,18 +117,30 @@ export function useFabricCanvas() {
   const updateSelection = (canvas: Canvas) => {
     const obj = canvas.getActiveObject();
     if (!obj) { setSelectedObject(null); return; }
+    const shadow = obj.shadow as Shadow | null;
     const props: SelectedObjectProps = {
       fill: (obj.fill as string) || "transparent",
       stroke: (obj.stroke as string) || "transparent",
       strokeWidth: obj.strokeWidth || 0,
       opacity: obj.opacity ?? 1,
       type: obj.type || "object",
+      shadowBlur: shadow?.blur || 0,
+      rx: (obj as any).rx || 0,
+      left: obj.left || 0,
+      top: obj.top || 0,
+      angle: obj.angle || 0,
     };
     if (obj.type === "i-text" || obj.type === "text") {
       const t = obj as IText;
       props.fontSize = t.fontSize;
       props.fontFamily = t.fontFamily;
       props.textAlign = t.textAlign;
+      props.fontWeight = t.fontWeight as string;
+      props.fontStyle = t.fontStyle as string;
+      props.underline = t.underline;
+      props.linethrough = t.linethrough;
+      props.lineHeight = t.lineHeight;
+      props.charSpacing = t.charSpacing;
     }
     setSelectedObject(props);
   };
@@ -158,6 +208,32 @@ export function useFabricCanvas() {
     c.renderAll();
   }, []);
 
+  const addStar = useCallback(() => {
+    const c = canvasRef.current;
+    if (!c) return;
+    const pts = createStarPoints(5, 50, 20);
+    const star = new Polygon(pts, {
+      left: 200, top: 150,
+      fill: "#eab308", stroke: "#ca8a04", strokeWidth: 2,
+    });
+    c.add(star);
+    c.setActiveObject(star);
+    c.renderAll();
+  }, []);
+
+  const addPolygon = useCallback(() => {
+    const c = canvasRef.current;
+    if (!c) return;
+    const pts = createPolygonPoints(6, 50);
+    const poly = new Polygon(pts, {
+      left: 200, top: 200,
+      fill: "#8b5cf6", stroke: "#7c3aed", strokeWidth: 2,
+    });
+    c.add(poly);
+    c.setActiveObject(poly);
+    c.renderAll();
+  }, []);
+
   const addImage = useCallback((file: File) => {
     const c = canvasRef.current;
     if (!c) return;
@@ -167,13 +243,9 @@ export function useFabricCanvas() {
       const imgEl = new Image();
       imgEl.crossOrigin = "anonymous";
       imgEl.onload = () => {
-        const fImg = new FabricImage(imgEl, {
-          left: 50, top: 50,
-        });
+        const fImg = new FabricImage(imgEl, { left: 50, top: 50 });
         const maxW = 400;
-        if (fImg.width && fImg.width > maxW) {
-          fImg.scaleToWidth(maxW);
-        }
+        if (fImg.width && fImg.width > maxW) fImg.scaleToWidth(maxW);
         c.add(fImg);
         c.setActiveObject(fImg);
         c.renderAll();
@@ -244,11 +316,28 @@ export function useFabricCanvas() {
     if (!c) return;
     const active = c.getActiveObject();
     if (!active) return;
-    active.set(prop as keyof FabricObject, value);
+
+    if (prop === "shadow") {
+      active.set("shadow", value ? new Shadow(value) : null);
+    } else {
+      active.set(prop as keyof FabricObject, value);
+    }
     c.renderAll();
     updateSelection(c);
     saveHistory();
   }, [saveHistory]);
+
+  const changeCanvasBg = useCallback((color: string) => {
+    const c = canvasRef.current;
+    if (!c) return;
+    c.backgroundColor = color;
+    setCanvasBgColor(color);
+    c.renderAll();
+  }, []);
+
+  const toggleGrid = useCallback(() => {
+    setShowGrid((prev) => !prev);
+  }, []);
 
   // Undo / Redo
   const undo = useCallback(() => {
@@ -274,15 +363,20 @@ export function useFabricCanvas() {
   }, []);
 
   // Export
-  const exportPNG = useCallback(() => {
+  const getCanvasDataUrl = useCallback(() => {
     const c = canvasRef.current;
-    if (!c) return;
-    const dataUrl = c.toDataURL({ format: "png", quality: 1, multiplier: 2 });
+    if (!c) return null;
+    return c.toDataURL({ format: "png", quality: 1, multiplier: 2 });
+  }, []);
+
+  const exportPNG = useCallback(() => {
+    const dataUrl = getCanvasDataUrl();
+    if (!dataUrl) return;
     const a = document.createElement("a");
     a.href = dataUrl;
     a.download = `${projectName}.png`;
     a.click();
-  }, [projectName]);
+  }, [projectName, getCanvasDataUrl]);
 
   const exportSVG = useCallback(() => {
     const c = canvasRef.current;
@@ -298,9 +392,9 @@ export function useFabricCanvas() {
   const saveProject = useCallback(() => {
     const c = canvasRef.current;
     if (!c) return;
-    const data = { name: projectName, canvas: c.toJSON() };
+    const data = { name: projectName, canvas: c.toJSON(), bgColor: canvasBgColor };
     localStorage.setItem("graphic-editor-project", JSON.stringify(data));
-  }, [projectName]);
+  }, [projectName, canvasBgColor]);
 
   // Zoom
   const handleZoom = useCallback((delta: number) => {
@@ -331,10 +425,12 @@ export function useFabricCanvas() {
   return {
     canvasRef, canvasElRef, initCanvas,
     selectedObject, projectName, setProjectName, zoom,
-    addText, addRect, addCircle, addLine, addTriangle,
+    showGrid, toggleGrid, canvasBgColor, changeCanvasBg,
+    addText, addRect, addCircle, addLine, addTriangle, addStar, addPolygon,
     addImage, addImageFromUrl,
     deleteSelected, duplicateSelected, bringToFront, sendToBack,
     updateObjectProp,
     undo, redo, exportPNG, exportSVG, saveProject, handleZoom,
+    getCanvasDataUrl,
   };
 }
