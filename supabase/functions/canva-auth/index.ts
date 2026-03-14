@@ -297,15 +297,9 @@ Deno.serve(async (req) => {
      
       // Action: List folder items (use folder_id='root' for root folder)
       if (action === 'list_folder_items') {
-        const body = await req.json();
-        const { user_id, folder_id = 'root', continuation } = body;
-        
-        if (!user_id) {
-          return new Response(
-            JSON.stringify({ error: 'user_id is required' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
+         const body = await req.json();
+         const { folder_id = 'root', continuation } = body;
+         const user_id = authedUser.id; // Use verified JWT user
         
         // Get access token with refresh handling
         const { data: connection } = await supabase
