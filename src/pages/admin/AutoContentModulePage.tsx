@@ -15,11 +15,11 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAutoContent, AutoContentType, AutoContentItem } from "@/hooks/useAutoContent";
 import { useBirthdayPeople } from "@/hooks/useBirthdayPeople";
 import { BirthdayContainer } from "@/components/birthday-layouts/BirthdayContainer";
-import { BirthdaySlideDialog } from "@/components/birthday-layouts/BirthdaySlideDialog";
+import { BirthdaySlideDialog, BirthdaySlidePeriod } from "@/components/birthday-layouts/BirthdaySlideDialog";
 import { BirthdayPeriod, BirthdayLayoutType } from "@/components/birthday-layouts/types";
 import {
   Upload, Cake, CalendarDays, CalendarRange, Calendar,
-  CreditCard, LayoutList, Grid3x3, Monitor, PartyPopper, Plus,
+  CreditCard, LayoutList, Grid3x3, Monitor, PartyPopper, Plus, Pencil, Layers,
 } from "lucide-react";
 import { WeatherSettings } from "./weather/WeatherSettings";
 import { NewsModule } from "./news/NewsModule";
