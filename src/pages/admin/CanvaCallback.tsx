@@ -1,4 +1,5 @@
- import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import type { Session } from '@supabase/supabase-js';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
@@ -50,57 +51,89 @@ export default function CanvaCallback() {
          return;
        }
  
-       // Retry getting session for up to 5 seconds
-       let session = null;
-       let attempts = 0;
-       const maxAttempts = 10;
- 
-       while (!session && attempts < maxAttempts) {
-         const { data } = await supabase.auth.getSession();
-         session = data.session;
-         
-         if (!session) {
-           attempts++;
-           console.log(`[Canva Callback] Waiting for session... attempt ${attempts}/${maxAttempts}`);
-           await new Promise(r => setTimeout(r, 500));
-         }
-       }
- 
-       if (!session) {
-         console.error('[Canva Callback] No session found after retries');
-         setStatus('error');
-         setErrorMessage('Sessão expirada. Por favor, faça login novamente.');
-         return;
-       }
- 
-       hasProcessed.current = true;
-       setStatus('processing');
- 
-       try {
-        // Exchange the code for tokens
-        // Use window.location.origin to match the redirect URI used in get_auth_url
-        const redirectUri = `${window.location.origin}/admin/canva/callback`;
-        
-        console.log('[Canva Callback] Exchanging code for tokens with redirect_uri:', redirectUri);
-        
-        const response = await fetch(
-           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/canva-auth?action=exchange_code`,
-           {
-             method: 'POST',
-             headers: {
-               'Authorization': `Bearer ${session.access_token}`,
-               'Content-Type': 'application/json',
-             },
-             body: JSON.stringify({
-               code,
-               state,
-               redirect_uri: redirectUri,
-               user_id: session.user.id,
-             }),
-           }
-         );
- 
-         const result = await response.json();
+        // Retry getting a valid session for up to 5 seconds
+        let session: Session | null = null;
+        let attempts = 0;
+        const maxAttempts = 10;
+
+        while (!session && attempts < maxAttempts) {
+          const { data } = await supabase.auth.getSession();
+          let currentSession = data.session;
+
+          if (currentSession?.expires_at && currentSession.expires_at * 1000 <= Date.now() + 60_000) {
+            const { data: refreshedData } = await supabase.auth.refreshSession();
+            currentSession = refreshedData.session;
+          }
+
+          if (currentSession) {
+            const { data: userData, error: userError } = await supabase.auth.getUser();
+
+            if (!userError && userData.user) {
+              session = currentSession;
+              break;
+            }
+
+            const { data: refreshedData } = await supabase.auth.refreshSession();
+            currentSession = refreshedData.session;
+
+            if (currentSession) {
+              const { data: refreshedUserData, error: refreshedUserError } = await supabase.auth.getUser();
+              if (!refreshedUserError && refreshedUserData.user) {
+                session = currentSession;
+                break;
+              }
+            }
+          }
+
+          attempts++;
+          console.log(`[Canva Callback] Waiting for valid session... attempt ${attempts}/${maxAttempts}`);
+          await new Promise(r => setTimeout(r, 500));
+        }
+
+        if (!session) {
+          console.error('[Canva Callback] No session found after retries');
+          setStatus('error');
+          setErrorMessage('Sessão expirada. Por favor, faça login novamente.');
+          return;
+        }
+
+        const activeSession = session;
+        hasProcessed.current = true;
+        setStatus('processing');
+
+        try {
+          // Exchange the code for tokens
+          // Use window.location.origin to match the redirect URI used in get_auth_url
+          const redirectUri = `${window.location.origin}/admin/canva/callback`;
+
+          console.log('[Canva Callback] Exchanging code for tokens with redirect_uri:', redirectUri);
+
+          const exchangeRequest = async (accessToken: string) => {
+            return fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/canva-auth?action=exchange_code`, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                code,
+                state,
+                redirect_uri: redirectUri,
+                user_id: activeSession.user.id,
+              }),
+            });
+          };
+
+          let response = await exchangeRequest(activeSession.access_token);
+        let result = await response.json();
+
+        if (response.status === 401) {
+          const { data: refreshedSessionData, error: refreshError } = await supabase.auth.refreshSession();
+          if (!refreshError && refreshedSessionData.session) {
+            response = await exchangeRequest(refreshedSessionData.session.access_token);
+            result = await response.json();
+          }
+        }
  
          if (result.success) {
            console.log('[Canva Callback] Token exchange successful');

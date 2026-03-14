@@ -1,6 +1,7 @@
- import { useState, useEffect, useCallback } from 'react';
- import { supabase } from '@/integrations/supabase/client';
- import { useToast } from '@/hooks/use-toast';
+import { useState, useEffect, useCallback } from 'react';
+import type { Session } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
  
 interface CanvaDesign {
   id: string;
@@ -60,24 +61,87 @@ interface FolderBreadcrumb {
     setSelectedDesigns(new Set());
   }, []);
  
-   const callCanvaApi = useCallback(async (action: string, body: Record<string, unknown>) => {
-     const { data: { session } } = await supabase.auth.getSession();
-     if (!session) throw new Error('Not authenticated');
- 
-     const response = await fetch(
-       `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/canva-auth?action=${action}`,
-       {
-         method: 'POST',
-         headers: {
-           'Authorization': `Bearer ${session.access_token}`,
-           'Content-Type': 'application/json',
-         },
-         body: JSON.stringify({ ...body, user_id: session.user.id }),
-       }
-     );
- 
-     return response.json();
-   }, []);
+  const getValidSession = useCallback(async (forceRefresh = false): Promise<Session> => {
+    let session: Session | null = null;
+
+    if (forceRefresh) {
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error || !data.session) {
+        throw new Error('Sessão expirada. Faça login novamente.');
+      }
+      session = data.session;
+    } else {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        throw new Error('Sessão inválida. Faça login novamente.');
+      }
+      session = data.session;
+    }
+
+    if (!session) {
+      throw new Error('Not authenticated');
+    }
+
+    const expiresAtMs = (session.expires_at ?? 0) * 1000;
+    if (expiresAtMs > 0 && expiresAtMs <= Date.now() + 60_000) {
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error || !data.session) {
+        throw new Error('Sessão expirada. Faça login novamente.');
+      }
+      session = data.session;
+    }
+
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData.user) {
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error || !data.session) {
+        throw new Error('Sessão expirada. Faça login novamente.');
+      }
+      session = data.session;
+    }
+
+    return session;
+  }, []);
+
+  const callCanvaApi = useCallback(async (action: string, body: Record<string, unknown>) => {
+    const parseJsonSafe = async (response: Response) => {
+      try {
+        return await response.json();
+      } catch {
+        return {};
+      }
+    };
+
+    const request = async (accessToken: string) => {
+      return fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/canva-auth?action=${action}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+    };
+
+    let session = await getValidSession();
+    let response = await request(session.access_token);
+    let result = await parseJsonSafe(response);
+
+    if (response.status === 401) {
+      session = await getValidSession(true);
+      response = await request(session.access_token);
+      result = await parseJsonSafe(response);
+    }
+
+    if (!response.ok) {
+      const message = typeof (result as { error?: unknown })?.error === 'string'
+        ? (result as { error: string }).error
+        : `Falha na integração do Canva (${response.status})`;
+      throw new Error(message);
+    }
+
+    return result;
+  }, [getValidSession]);
  
    const checkConnection = useCallback(async () => {
      try {
@@ -89,12 +153,15 @@ interface FolderBreadcrumb {
        }
        const result = await callCanvaApi('status', {});
        setIsConnected(result.connected);
-     } catch (error) {
-       if (error instanceof Error && error.message === "Not authenticated") {
-         setIsConnected(false);
-         return;
-       }
-       console.error('Error checking Canva connection:', error);
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          (error.message === 'Not authenticated' || error.message.toLowerCase().includes('sessão expirada'))
+        ) {
+          setIsConnected(false);
+          return;
+        }
+        console.error('Error checking Canva connection:', error);
        setIsConnected(false);
      } finally {
        setIsLoading(false);
@@ -271,18 +338,22 @@ interface FolderBreadcrumb {
       formData.append('type', blob.type.startsWith('image/') ? 'image' : 'video');
       formData.append('fileType', blob.type);
       
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
-      
-      const uploadResponse = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-media`,
-        {
+      const uploadRequest = async (accessToken: string) => {
+        return fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-media`, {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${session.access_token}` },
+          headers: { Authorization: `Bearer ${accessToken}` },
           body: formData,
-        }
-      );
-      
+        });
+      };
+
+      let session = await getValidSession();
+      let uploadResponse = await uploadRequest(session.access_token);
+
+      if (uploadResponse.status === 401) {
+        session = await getValidSession(true);
+        uploadResponse = await uploadRequest(session.access_token);
+      }
+
       const uploadResult = await uploadResponse.json();
       
       if (uploadResponse.ok) {
@@ -305,7 +376,7 @@ interface FolderBreadcrumb {
     } finally {
       setIsExporting(prev => prev.filter(id => id !== designId));
     }
-  }, [callCanvaApi, toast]);
+  }, [callCanvaApi, getValidSession, toast]);
  
   const exportSelectedDesigns = useCallback(async (format: 'png' | 'jpg' | 'pdf' = 'png') => {
     const designsToExport = designs.filter(d => selectedDesigns.has(d.id));
