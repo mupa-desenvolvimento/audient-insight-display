@@ -810,7 +810,7 @@ export function useFabricCanvas() {
     if (!c) return;
     const data = {
       name: projectName,
-      canvas: c.toJSON(["data"]),
+      canvas: (c as any).toJSON(["data"]),
       bgColor: canvasBgColor,
       width: canvasWidth,
       height: canvasHeight,
