@@ -185,7 +185,7 @@ export function useFabricCanvas() {
 
   const saveHistory = useCallback(() => {
     if (isRestoringRef.current || !canvasRef.current) return;
-    const json = JSON.stringify(canvasRef.current.toJSON(["data"]));
+    const json = JSON.stringify((canvasRef.current as any).toJSON(["data"]));
     const idx = historyIndexRef.current;
     historyRef.current = historyRef.current.slice(0, idx + 1);
     historyRef.current.push(json);
@@ -292,7 +292,7 @@ export function useFabricCanvas() {
     if (!c) return null;
     return {
       name: projectName,
-      canvas: c.toJSON(["data"]),
+      canvas: (c as any).toJSON(["data"]),
       bgColor: canvasBgColor,
       width: canvasWidth,
       height: canvasHeight,
@@ -810,7 +810,7 @@ export function useFabricCanvas() {
     if (!c) return;
     const data = {
       name: projectName,
-      canvas: c.toJSON(["data"]),
+      canvas: (c as any).toJSON(["data"]),
       bgColor: canvasBgColor,
       width: canvasWidth,
       height: canvasHeight,

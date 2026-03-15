@@ -181,12 +181,13 @@ export function EditorProperties({
 
   useEffect(() => {
     let cancelled = false;
-    supabase
-      .from("media_items")
-      .select("id,name,file_url,metadata,created_at")
-      .eq("type", "font")
-      .order("created_at", { ascending: false })
-      .then(({ data, error }) => {
+    Promise.resolve(
+      supabase
+        .from("media_items")
+        .select("id,name,file_url,metadata,created_at")
+        .eq("type", "font")
+        .order("created_at", { ascending: false })
+    ).then(({ data, error }) => {
         if (cancelled) return;
         if (error) {
           toast.error("Falha ao carregar fontes do sistema");
@@ -216,8 +217,7 @@ export function EditorProperties({
           .filter(Boolean) as SystemFont[];
 
         setSystemFonts(next);
-      })
-      .catch(() => {
+      }).catch(() => {
         if (cancelled) return;
         toast.error("Falha ao carregar fontes do sistema");
         setSystemFonts([]);
