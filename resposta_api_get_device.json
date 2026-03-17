@@ -1,0 +1,181 @@
+//endpoint request
+https://bgcnvyoseexfmrynqbfb.supabase.co/functions/v1/device-api/content?device_code=YKT648TJ
+
+//Resposta da request
+
+{
+  "version": 1,
+  "generated_at": "2026-03-17T00:44:50.604Z",
+  "device": {
+    "id": "83930984-9ee7-40b9-9747-396ce7aee5d7",
+    "device_code": "YKT648TJ",
+    "name": "X96 teste",
+    "store_id": "8c7ae80c-e1eb-46ed-85f3-130f912ceb3a",
+    "company_id": "a7794ee1-4bf7-47e9-aa2b-b685ab4533e9",
+    "company_slug": "mupa-testes",
+    "store_code": "8",
+    "camera_enabled": false,
+    "is_blocked": false,
+    "blocked_message": "Dispositivo bloqueado pelo administrador",
+    "last_sync_requested_at": null
+  },
+  "override_media": null,
+  "playlists": [
+    {
+      "id": "edd145ce-8f9a-4a6b-9847-82a6c31dfe19",
+      "name": "demoplaylist",
+      "description": null,
+      "is_active": true,
+      "has_channels": true,
+      "start_date": null,
+      "end_date": null,
+      "days_of_week": [0, 1, 2, 3, 4, 5, 6],
+      "start_time": "00:00:00",
+      "end_time": "23:59:59",
+      "priority": 5,
+      "content_scale": "cover",
+      "items": [
+        {
+          "id": "21a57c91-a35a-444f-92d2-951270b79c3c",
+          "media_id": "f436ca61-7f49-4fbb-bfae-83fdbdd27619",
+          "position": 0,
+          "duration_override": 8,
+          "start_date": null,
+          "end_date": null,
+          "start_time": null,
+          "end_time": null,
+          "days_of_week": null,
+          "media": {
+            "id": "f436ca61-7f49-4fbb-bfae-83fdbdd27619",
+            "name": "ChatGPT Image 28 de ago. de 2025, 02_46_32.webp",
+            "type": "image",
+            "file_url": "https://pub-0e15cc358ba84ff2a24226b12278433b.r2.dev/media/1771633219165-ChatGPT_Image_28_de_ago._de_2025__02_46_32.webp",
+            "duration": 10,
+            "metadata": {
+              "r2_key": "media/1771633219165-ChatGPT_Image_28_de_ago._de_2025__02_46_32.webp",
+              "uploaded_by": "adrianosantunes@hotmail.com",
+              "content_type": "image/webp",
+              "validated_at": "2026-02-21T00:20:20.542Z",
+              "thumbnail_key": "thumbnails/1771633219165-ChatGPT_Image_28_de_ago._de_2025__02_46_32.jpg",
+              "thumbnail_size": {
+                "width": 1280,
+                "height": 720
+              },
+              "original_signed_url": "https://9460d46cf0ba64ddc494dc5648868c00.r2.cloudflarestorage.com/mupa-midias/media/1771633219165-ChatGPT_Image_28_de_ago._de_2025__02_46_32.webp",
+              "thumbnail_generated": true
+            }
+          }
+        }
+      ],
+      "channels": [
+        {
+          "id": "a99a96c9-0506-40dc-9192-72eb7da6fe2f",
+          "name": "Ofertas do final de semana",
+          "is_active": true,
+          "is_fallback": true,
+          "position": 1,
+          "start_date": "2026-02-21",
+          "end_date": null,
+          "start_time": "08:00:00",
+          "end_time": "18:00:00",
+          "days_of_week": [0, 1, 2, 3, 4, 5, 6],
+          "items": [
+            {
+              "id": "a15b1e19-bc4d-4ba8-b821-84a77fda5900",
+              "media_id": "79799f0a-da15-41d0-82ed-592dfcacead5",
+              "position": 1,
+              "duration_override": 10,
+              "start_date": null,
+              "end_date": null,
+              "start_time": null,
+              "end_time": null,
+              "days_of_week": null,
+              "media": {
+                "id": "79799f0a-da15-41d0-82ed-592dfcacead5",
+                "name": "Melancia 2.png",
+                "type": "image",
+                "file_url": "https://pub-0e15cc358ba84ff2a24226b12278433b.r2.dev/media/1773531019929-Melancia_2.png",
+                "duration": 10,
+                "metadata": {
+                  "r2_key": "media/1773531019929-Melancia_2.png",
+                  "uploaded_by": "adrianosantunes@hotmail.com",
+                  "content_type": "image/png",
+                  "validated_at": "2026-03-14T23:30:20.891Z",
+                  "thumbnail_key": "thumbnails/1773531019929-Melancia_2.jpg",
+                  "thumbnail_size": {
+                    "width": 1280,
+                    "height": 720
+                  },
+                  "original_signed_url": "https://9460d46cf0ba64ddc494dc5648868c00.r2.cloudflarestorage.com/mupa-midias/media/1773531019929-Melancia_2.png",
+                  "thumbnail_generated": true
+                }
+              }
+            },
+            {
+              "id": "a234c5ed-03c0-4dab-b9a4-bc115f3f327f",
+              "media_id": "98874eb0-c74b-4371-b011-56f05f8758da",
+              "position": 1,
+              "duration_override": 8,
+              "start_date": null,
+              "end_date": null,
+              "start_time": null,
+              "end_time": null,
+              "days_of_week": null,
+              "media": {
+                "id": "98874eb0-c74b-4371-b011-56f05f8758da",
+                "name": "152830-804130714_medium.mp4",
+                "type": "video",
+                "file_url": "https://pub-0e15cc358ba84ff2a24226b12278433b.r2.dev/media/1771633836169-152830-804130714_medium.mp4",
+                "duration": 10,
+                "metadata": {
+                  "r2_key": "media/1771633836169-152830-804130714_medium.mp4",
+                  "uploaded_by": "adrianosantunes@hotmail.com",
+                  "content_type": "video/mp4",
+                  "validated_at": "2026-02-21T00:30:38.361Z",
+                  "thumbnail_key": "thumbnails/1771633836169-152830-804130714_medium.jpg",
+                  "thumbnail_size": {
+                    "width": 1280,
+                    "height": 720
+                  },
+                  "original_signed_url": "https://9460d46cf0ba64ddc494dc5648868c00.r2.cloudflarestorage.com/mupa-midias/media/1771633836169-152830-804130714_medium.mp4",
+                  "thumbnail_generated": false
+                }
+              }
+            },
+            {
+              "id": "4cc8fa39-e389-461c-8d9a-732130030e31",
+              "media_id": "0941b09a-ac1e-4a48-9f49-0ea114ad60cc",
+              "position": 1,
+              "duration_override": 8,
+              "start_date": null,
+              "end_date": null,
+              "start_time": null,
+              "end_time": null,
+              "days_of_week": null,
+              "media": {
+                "id": "0941b09a-ac1e-4a48-9f49-0ea114ad60cc",
+                "name": "11632-231581056_medium.mp4",
+                "type": "video",
+                "file_url": "https://pub-0e15cc358ba84ff2a24226b12278433b.r2.dev/media/1771633832883-11632-231581056_medium.mp4",
+                "duration": 10,
+                "metadata": {
+                  "r2_key": "media/1771633832883-11632-231581056_medium.mp4",
+                  "uploaded_by": "adrianosantunes@hotmail.com",
+                  "content_type": "video/mp4",
+                  "validated_at": "2026-02-21T00:30:34.068Z",
+                  "thumbnail_key": "thumbnails/1771633832883-11632-231581056_medium.jpg",
+                  "thumbnail_size": {
+                    "width": 1280,
+                    "height": 720
+                  },
+                  "original_signed_url": "https://9460d46cf0ba64ddc494dc5648868c00.r2.cloudflarestorage.com/mupa-midias/media/1771633832883-11632-231581056_medium.mp4",
+                  "thumbnail_generated": false
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

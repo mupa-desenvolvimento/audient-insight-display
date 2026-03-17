@@ -1,4 +1,4 @@
-package com.getcapacitor.myapp;
+package io.audient.display;
 
 import static org.junit.Assert.*;
 
