@@ -20,6 +20,7 @@ import { ListViewport } from "@/components/list/ListViewport";
 import { ListControls } from "@/components/list/ListControls";
 import { UniversalPagination } from "@/components/list/UniversalPagination";
 import { useListState } from "@/hooks/useListState";
+import { useToast } from "@/hooks/use-toast";
 
 const SCREEN_TYPES = [
   { value: "tv", label: "TV", icon: Tv },
@@ -46,6 +47,7 @@ const DeviceGroupsPage = () => {
   const { channels } = useChannels();
   const { stores } = useStores();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<DeviceGroupWithDetails | null>(null);
@@ -114,6 +116,10 @@ const DeviceGroupsPage = () => {
       : filteredGroups.slice(startIndex, startIndex + state.pageSize);
 
   const handleCreate = () => {
+    if (!formData.name || !formData.store_id) {
+      toast({ title: "Erro", description: "Preencha todos os campos obrigatórios (*)", variant: "destructive" });
+      return;
+    }
     createDeviceGroup.mutate(formData, {
       onSuccess: () => {
         setIsCreateOpen(false);
@@ -123,7 +129,10 @@ const DeviceGroupsPage = () => {
   };
 
   const handleUpdate = () => {
-    if (!editingGroup) return;
+    if (!editingGroup || !formData.name || !formData.store_id) {
+      toast({ title: "Erro", description: "Preencha todos os campos obrigatórios (*)", variant: "destructive" });
+      return;
+    }
     updateDeviceGroup.mutate(
       { id: editingGroup.id, ...formData },
       {
@@ -224,14 +233,13 @@ const DeviceGroupsPage = () => {
         </Select>
       </div>
       <div className="space-y-2">
-        <Label>Loja (opcional)</Label>
+        <Label>Loja *</Label>
         <Select
-          value={formData.store_id || "none"}
-          onValueChange={(v) => setFormData({ ...formData, store_id: v === "none" ? null : v })}
+          value={formData.store_id || ""}
+          onValueChange={(v) => setFormData({ ...formData, store_id: v })}
         >
           <SelectTrigger><SelectValue placeholder="Selecione uma loja" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="none">Nenhuma (grupo global)</SelectItem>
             {stores.map((store) => (
               <SelectItem key={store.id} value={store.id}>
                 {store.name} ({store.code})
