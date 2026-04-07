@@ -12,7 +12,7 @@ import { toast } from "sonner";
 interface TreeNode {
   id: string;
   name: string;
-  type: "company" | "state" | "region" | "city" | "store" | "sector" | "group" | "zone" | "device_type" | "device";
+  type: "region" | "store" | "group" | "device";
   children?: TreeNode[];
   status?: string;
   deviceCount?: number;
@@ -20,28 +20,16 @@ interface TreeNode {
 }
 
 const typeIcons: Record<string, any> = {
-  company: Building2,
-  state: MapPin,
   region: MapIcon,
-  city: Landmark,
   store: Store,
-  sector: Layers,
   group: Layers,
-  zone: Box,
-  device_type: Monitor,
   device: Monitor,
 };
 
 const typeLabels: Record<string, string> = {
-  company: "Empresa",
-  state: "Estado",
   region: "Região",
-  city: "Cidade",
   store: "Loja",
-  sector: "Setor",
   group: "Grupo",
-  zone: "Zona",
-  device_type: "Tipo de Dispositivo",
   device: "Dispositivo",
 };
 
@@ -167,36 +155,31 @@ export const HierarchyTree = ({ onSelect, search }: HierarchyTreeProps) => {
     setLoading(true);
     try {
       // Load all data in parallel
-      const [companiesRes, statesRes, regionsRes, citiesRes, storesRes, sectorsRes, groupsRes, zonesRes, deviceTypesRes, devicesRes] = await Promise.all([
-        supabase.from("companies").select("id, name, slug").eq("tenant_id", tenantId!),
-        supabase.from("states").select("id, name, code, region_id"),
-        supabase.from("regions").select("id, name, code, country_id"),
+      const [regionsRes, statesRes, citiesRes, storesRes, groupsRes, devicesRes] = await Promise.all([
+        supabase.from("regions").select("id, name, code, country_id").eq("tenant_id", tenantId!),
+        supabase.from("states").select("id, name, region_id"),
         supabase.from("cities").select("id, name, state_id"),
         supabase.from("stores").select("id, name, code, city_id, is_active").eq("tenant_id", tenantId!),
-        supabase.from("sectors").select("id, name, store_id").eq("tenant_id", tenantId!),
         supabase.from("device_groups").select("id, name, store_id, tenant_id").eq("tenant_id", tenantId!),
-        supabase.from("zones").select("id, name, sector_id").eq("tenant_id", tenantId!),
-        supabase.from("device_types").select("id, name, code").eq("tenant_id", tenantId!),
-        supabase.from("devices").select("id, name, device_code, store_id, sector_id, zone_id, device_type_id, status, company_id"),
+        supabase.from("devices").select("id, name, device_code, store_id, status, company_id"),
       ]);
 
-      const companies = companiesRes.data || [];
-      const states = statesRes.data || [];
       const regions = regionsRes.data || [];
+      const states = statesRes.data || [];
       const cities = citiesRes.data || [];
       const stores = storesRes.data || [];
-      const sectors = sectorsRes.data || [];
       const groups = groupsRes.data || [];
-      const zones = zonesRes.data || [];
-      const deviceTypes = deviceTypesRes.data || [];
       const devices = devicesRes.data || [];
-      const deviceTypeById = new Map(deviceTypes.map((t: any) => [t.id, t]));
+
+      // Group devices by group_id (many-to-many)
       const groupIds = groups.map((g: any) => g.id).filter(Boolean);
       const groupMembersRes = groupIds.length
         ? await supabase.from("device_group_members").select("device_id, group_id").in("group_id", groupIds)
         : { data: [], error: null as any };
+      
       if (groupMembersRes.error) throw groupMembersRes.error;
       const groupMembers = groupMembersRes.data || [];
+      
       const groupDeviceIds = new Map<string, Set<string>>();
       const deviceGroupIds = new Map<string, Set<string>>();
       for (const m of groupMembers) {
@@ -209,209 +192,73 @@ export const HierarchyTree = ({ onSelect, search }: HierarchyTreeProps) => {
         deviceGroupIds.set(m.device_id, byDevice);
       }
 
-      // Build tree: Company > Region > State > City > Store > (Sectors | Groups) > Zone > (Device Type) > Device
-      const treeNodes: TreeNode[] = companies.map((company) => {
-        const companyDevices = devices.filter((d) => d.company_id === company.id);
-        const companyStores = stores.filter((s) => {
-          const storeDevices = companyDevices.filter((d) => d.store_id === s.id);
-          return storeDevices.length > 0 || true; // Show all stores
+      // Maps for quick lookup
+      const cityToStateId = new Map(cities.map(c => [c.id, c.state_id]));
+      const stateToRegionId = new Map(states.map(s => [s.id, s.region_id]));
+
+      // Build tree: Region > Store > Group > Device
+      const treeNodes: TreeNode[] = regions.map((region) => {
+        // Find stores for this region by traversing city > state > region
+        const regionStores = stores.filter(store => {
+          const stateId = cityToStateId.get(store.city_id);
+          const regionId = stateId ? stateToRegionId.get(stateId) : null;
+          return regionId === region.id;
         });
 
-        // Group stores by city > state
-        const storesByCityId = new globalThis.Map() as Map<string, any[]>;
-        for (const store of companyStores) {
-          if (!store.city_id) continue;
-          if (!storesByCityId.has(store.city_id)) storesByCityId.set(store.city_id, []);
-          storesByCityId.get(store.city_id)!.push(store);
-        }
+        const storeNodes: TreeNode[] = regionStores.map((store) => {
+          const storeGroups = groups.filter((g) => g.store_id === store.id);
+          const storeDevices = devices.filter((d) => d.store_id === store.id);
 
-        const relevantCityIds = [...storesByCityId.keys()];
-        const relevantCities = cities.filter((c) => relevantCityIds.includes(c.id));
-        const relevantStateIds = [...new Set(relevantCities.map((c) => c.state_id))];
-        const relevantStates = states.filter((s) => relevantStateIds.includes(s.id));
-
-        const buildStateNode = (state: any): TreeNode => {
-          const stateCities = relevantCities.filter((c) => c.state_id === state.id);
-
-          const cityNodes: TreeNode[] = stateCities.map((city) => {
-            const cityStores = storesByCityId.get(city.id) || [];
-
-            const storeNodes: TreeNode[] = cityStores.map((store) => {
-              const storeSectors = sectors.filter((s) => s.store_id === store.id);
-              const storeGroups = groups.filter((g) => g.store_id === store.id);
-              const storeDevices = companyDevices.filter((d) => d.store_id === store.id);
-
-              const sectorNodes: TreeNode[] = storeSectors.map((sector) => {
-                const sectorZones = zones.filter((z) => z.sector_id === sector.id);
-                const sectorDevices = storeDevices.filter((d) => d.sector_id === sector.id);
-
-                const zoneNodes: TreeNode[] = sectorZones.map((zone) => {
-                  const zoneDevices = storeDevices.filter((d) => d.zone_id === zone.id);
-
-                  const typedByTypeId = new Map<string, any[]>();
-                  const untypedDevices: any[] = [];
-                  for (const d of zoneDevices) {
-                    if (d.device_type_id) {
-                      const list = typedByTypeId.get(d.device_type_id) || [];
-                      list.push(d);
-                      typedByTypeId.set(d.device_type_id, list);
-                    } else {
-                      untypedDevices.push(d);
-                    }
-                  }
-
-                  const deviceTypeNodes: TreeNode[] = [...typedByTypeId.entries()].map(([typeId, list]) => ({
-                    id: typeId,
-                    name: deviceTypeById.get(typeId)?.name || "Tipo de Dispositivo",
-                    type: "device_type" as const,
-                    deviceCount: list.length,
-                    children: list.map((d: any) => ({
-                      id: d.id,
-                      name: d.name || d.device_code,
-                      type: "device" as const,
-                      status: d.status,
-                    })),
-                  }));
-
-                  return {
-                    id: zone.id,
-                    name: zone.name,
-                    type: "zone" as const,
-                    deviceCount: zoneDevices.length,
-                    meta: { sector_id: sector.id, store_id: store.id },
-                    children: [
-                      ...deviceTypeNodes,
-                      ...untypedDevices.map((d) => ({
-                        id: d.id,
-                        name: d.name || d.device_code,
-                        type: "device" as const,
-                        status: d.status,
-                      })),
-                    ],
-                  };
-                });
-
-                // Devices directly in sector (no zone)
-                const unzonedDevices = sectorDevices.filter((d) => !d.zone_id);
-
-                return {
-                  id: sector.id,
-                  name: sector.name,
-                  type: "sector" as const,
-                  deviceCount: sectorDevices.length,
-                  meta: { store_id: store.id },
-                  children: [
-                    ...zoneNodes,
-                    ...unzonedDevices.map((d) => ({
-                      id: d.id,
-                      name: d.name || d.device_code,
-                      type: "device" as const,
-                      status: d.status,
-                    })),
-                  ],
-                };
-              });
-
-              const groupNodes: TreeNode[] = storeGroups.map((group) => {
-                const memberDeviceIds = groupDeviceIds.get(group.id);
-                const groupDevices = memberDeviceIds ? storeDevices.filter((d) => memberDeviceIds.has(d.id)) : [];
-                return {
-                  id: group.id,
-                  name: group.name,
-                  type: "group" as const,
-                  deviceCount: groupDevices.length,
-                  meta: { store_id: store.id },
-                  children: groupDevices.map((d) => ({
-                    id: d.id,
-                    name: d.name || d.device_code,
-                    type: "device" as const,
-                    status: d.status,
-                  })),
-                };
-              });
-
-              // Devices directly in store (no sector/group)
-              const unsectoredDevices = storeDevices.filter((d) => !d.sector_id && !deviceGroupIds.has(d.id) && !d.zone_id);
-
-              return {
-                id: store.id,
-                name: store.name,
-                type: "store" as const,
-                deviceCount: storeDevices.length,
-                meta: { code: store.code },
-                children: [
-                  ...sectorNodes,
-                  ...groupNodes,
-                  ...unsectoredDevices.map((d) => ({
-                    id: d.id,
-                    name: d.name || d.device_code,
-                    type: "device" as const,
-                    status: d.status,
-                  })),
-                ],
-              };
-            });
-
+          const groupNodes: TreeNode[] = storeGroups.map((group) => {
+            const memberDeviceIds = groupDeviceIds.get(group.id);
+            const groupDevices = memberDeviceIds ? storeDevices.filter((d) => memberDeviceIds.has(d.id)) : [];
+            
             return {
-              id: city.id,
-              name: city.name,
-              type: "city" as const,
-              deviceCount: cityStores.reduce((sum, s) => sum + companyDevices.filter((d) => d.store_id === s.id).length, 0),
-              children: storeNodes,
+              id: group.id,
+              name: group.name,
+              type: "group" as const,
+              deviceCount: groupDevices.length,
+              meta: { store_id: store.id },
+              children: groupDevices.map((d) => ({
+                id: d.id,
+                name: d.name || d.device_code,
+                type: "device" as const,
+                status: d.status,
+              })),
             };
           });
 
+          // Devices in store but NOT in any group
+          const ungroupedDevices = storeDevices.filter((d) => !deviceGroupIds.has(d.id));
+
           return {
-            id: state.id,
-            name: state.name,
-            type: "state" as const,
-            deviceCount: stateCities.reduce((sum, c) => {
-              const cs = storesByCityId.get(c.id) || [];
-              return sum + cs.reduce((s2, store) => s2 + companyDevices.filter((d) => d.store_id === store.id).length, 0);
-            }, 0),
-            children: cityNodes,
-          };
-        };
-
-        const regionIdToStates = new Map<string, any[]>();
-        const statesWithoutRegion: any[] = [];
-        for (const s of relevantStates) {
-          if (!s.region_id) {
-            statesWithoutRegion.push(s);
-            continue;
-          }
-          const list = regionIdToStates.get(s.region_id) || [];
-          list.push(s);
-          regionIdToStates.set(s.region_id, list);
-        }
-
-        const relevantRegionIds = [...new Set(relevantStates.map((s: any) => s.region_id).filter(Boolean))];
-        const relevantRegions = regions.filter((r) => relevantRegionIds.includes(r.id));
-
-        const regionNodes: TreeNode[] = relevantRegions.map((region) => {
-          const regionStates = regionIdToStates.get(region.id) || [];
-          const stateNodes = regionStates.map(buildStateNode);
-          const deviceCount = stateNodes.reduce((sum, n) => sum + (n.deviceCount || 0), 0);
-          return {
-            id: region.id,
-            name: region.name,
-            type: "region" as const,
-            deviceCount,
-            children: stateNodes,
+            id: store.id,
+            name: store.name,
+            type: "store" as const,
+            deviceCount: storeDevices.length,
+            meta: { code: store.code },
+            children: [
+              ...groupNodes,
+              ...ungroupedDevices.map((d) => ({
+                id: d.id,
+                name: d.name || d.device_code,
+                type: "device" as const,
+                status: d.status,
+              })),
+            ],
           };
         });
 
-        const unassignedStateNodes = statesWithoutRegion.map(buildStateNode);
-
         return {
-          id: company.id,
-          name: company.name,
-          type: "company" as const,
-          deviceCount: companyDevices.length,
-          children: [...regionNodes, ...unassignedStateNodes],
+          id: region.id,
+          name: region.name,
+          type: "region" as const,
+          deviceCount: storeNodes.reduce((sum, n) => sum + (n.deviceCount || 0), 0),
+          children: storeNodes,
         };
       });
 
+      // Filter out empty regions if necessary, but here we show all
       setTree(treeNodes);
     } catch (err) {
       console.error("Error loading tree:", err);
@@ -439,19 +286,12 @@ export const HierarchyTree = ({ onSelect, search }: HierarchyTreeProps) => {
     if (overMeta?.virtual) return;
 
     try {
-      if (activeType === "state" && overType === "region") {
-        const { error } = await supabase.from("states").update({ region_id: overId }).eq("id", activeId);
-        if (error) throw error;
-        toast.success("Estado movido para a região");
-        await loadTreeData();
-        return;
-      }
       if (activeType === "device" && overType === "group") {
         const storeId = overMeta?.store_id;
         const { error: delError } = await supabase.from("device_group_members").delete().eq("device_id", activeId);
         if (delError) throw delError;
         if (storeId) {
-          const { error: updError } = await supabase.from("devices").update({ store_id: storeId, sector_id: null, zone_id: null }).eq("id", activeId);
+          const { error: updError } = await supabase.from("devices").update({ store_id: storeId }).eq("id", activeId);
           if (updError) throw updError;
         }
         const { error } = await supabase.from("device_group_members").insert({ device_id: activeId, group_id: overId });
@@ -460,42 +300,12 @@ export const HierarchyTree = ({ onSelect, search }: HierarchyTreeProps) => {
         await loadTreeData();
         return;
       }
-      if (activeType === "device" && overType === "sector") {
-        const storeId = overMeta?.store_id;
-        const { error: delError } = await supabase.from("device_group_members").delete().eq("device_id", activeId);
-        if (delError) throw delError;
-        const { error } = await supabase.from("devices").update({ store_id: storeId || undefined, sector_id: overId, zone_id: null }).eq("id", activeId);
-        if (error) throw error;
-        toast.success("Dispositivo movido para o setor");
-        await loadTreeData();
-        return;
-      }
-      if (activeType === "device" && overType === "zone") {
-        const storeId = overMeta?.store_id;
-        const sectorId = overMeta?.sector_id;
-        const { error: delError } = await supabase.from("device_group_members").delete().eq("device_id", activeId);
-        if (delError) throw delError;
-        const update: any = { zone_id: overId, sector_id: sectorId || null };
-        if (storeId) update.store_id = storeId;
-        const { error } = await supabase.from("devices").update(update).eq("id", activeId);
-        if (error) throw error;
-        toast.success("Dispositivo movido para a zona");
-        await loadTreeData();
-        return;
-      }
       if (activeType === "device" && overType === "store") {
         const { error: delError } = await supabase.from("device_group_members").delete().eq("device_id", activeId);
         if (delError) throw delError;
-        const { error } = await supabase.from("devices").update({ store_id: overId, sector_id: null, zone_id: null }).eq("id", activeId);
+        const { error } = await supabase.from("devices").update({ store_id: overId }).eq("id", activeId);
         if (error) throw error;
         toast.success("Dispositivo movido para a loja");
-        await loadTreeData();
-        return;
-      }
-      if (activeType === "device" && overType === "device_type") {
-        const { error } = await supabase.from("devices").update({ device_type_id: overId }).eq("id", activeId);
-        if (error) throw error;
-        toast.success("Tipo de dispositivo atualizado");
         await loadTreeData();
         return;
       }
@@ -506,32 +316,11 @@ export const HierarchyTree = ({ onSelect, search }: HierarchyTreeProps) => {
         await loadTreeData();
         return;
       }
-      if (activeType === "sector" && overType === "store") {
-        const { error } = await supabase.from("sectors").update({ store_id: overId }).eq("id", activeId);
-        if (error) throw error;
-        toast.success("Setor movido para a loja");
-        await loadTreeData();
-        return;
-      }
-      if (activeType === "zone" && overType === "sector") {
-        const { error } = await supabase.from("zones").update({ sector_id: overId }).eq("id", activeId);
-        if (error) throw error;
-        toast.success("Zona movida para o setor");
-        await loadTreeData();
-        return;
-      }
-      if (activeType === "store" && overType === "city") {
-        const { error } = await supabase.from("stores").update({ city_id: overId }).eq("id", activeId);
-        if (error) throw error;
-        toast.success("Loja movida para a cidade");
-        await loadTreeData();
-        return;
-      }
-      if (activeType === "city" && overType === "state") {
-        const { error } = await supabase.from("cities").update({ state_id: overId }).eq("id", activeId);
-        if (error) throw error;
-        toast.success("Cidade movida para o estado");
-        await loadTreeData();
+      if (activeType === "store" && overType === "region") {
+        // This is tricky because stores link to cities, not regions.
+        // We'd need to find a city in that region to move it to, 
+        // or add region_id to stores.
+        toast.error("Movimentação de loja entre regiões não suportada diretamente.");
         return;
       }
     } catch (e: any) {

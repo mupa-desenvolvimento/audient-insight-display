@@ -150,129 +150,6 @@ const TagsSection = () => {
   );
 };
 
-// ─── SECTORS CRUD ───
-const SectorsSection = () => {
-  const { tenantId } = useUserTenant();
-  const queryClient = useQueryClient();
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<any>(null);
-  const [form, setForm] = useState({ name: "", code: "", store_id: "", description: "" });
-
-  const { data: sectors = [] } = useQuery({
-    queryKey: ["enterprise-sectors", tenantId],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("sectors").select("*, stores!sectors_store_id_fkey(name, code)").eq("tenant_id", tenantId!).order("name");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!tenantId,
-  });
-
-  const { data: stores = [] } = useQuery({
-    queryKey: ["stores-for-sectors", tenantId],
-    queryFn: async () => {
-      const { data } = await supabase.from("stores").select("id, name, code").eq("tenant_id", tenantId!).order("name");
-      return data || [];
-    },
-    enabled: !!tenantId,
-  });
-
-  const saveMutation = useMutation({
-    mutationFn: async (values: typeof form) => {
-      const payload = { name: values.name, code: values.code || null, store_id: values.store_id, description: values.description || null, tenant_id: tenantId! };
-      if (editingItem) {
-        const { error } = await supabase.from("sectors").update(payload).eq("id", editingItem.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("sectors").insert(payload);
-        if (error) throw error;
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["enterprise-sectors"] });
-      setDialogOpen(false);
-      toast.success(editingItem ? "Setor atualizado!" : "Setor criado!");
-    },
-    onError: (e: any) => toast.error(e.message),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("sectors").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["enterprise-sectors"] });
-      toast.success("Setor removido!");
-    },
-  });
-
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">Setores ({sectors.length})</h3>
-        <Button size="sm" onClick={() => { setEditingItem(null); setForm({ name: "", code: "", store_id: "", description: "" }); setDialogOpen(true); }}>
-          <Plus className="w-4 h-4 mr-1" /> Novo Setor
-        </Button>
-      </div>
-
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Nome</TableHead>
-            <TableHead>Código</TableHead>
-            <TableHead>Loja</TableHead>
-            <TableHead className="w-24">Ações</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {sectors.map((sector: any) => (
-            <TableRow key={sector.id}>
-              <TableCell className="font-medium">{sector.name}</TableCell>
-              <TableCell>{sector.code || "-"}</TableCell>
-              <TableCell>{(sector.stores as any)?.name || "-"}</TableCell>
-              <TableCell>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingItem(sector); setForm({ name: sector.name, code: sector.code || "", store_id: sector.store_id, description: sector.description || "" }); setDialogOpen(true); }}>
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteMutation.mutate(sector.id)}>
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{editingItem ? "Editar Setor" : "Novo Setor"}</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div><Label>Loja</Label>
-              <Select value={form.store_id} onValueChange={(v) => setForm({ ...form, store_id: v })}>
-                <SelectTrigger><SelectValue placeholder="Selecione a loja" /></SelectTrigger>
-                <SelectContent>{stores.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name} ({s.code})</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><Label>Nome</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-              <div><Label>Código</Label><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} /></div>
-            </div>
-            <div><Label>Descrição</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
-          </div>
-          <DialogFooter>
-            <Button onClick={() => saveMutation.mutate(form)} disabled={!form.name || !form.store_id}>
-              {editingItem ? "Salvar" : "Criar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-};
-
 // ─── ADVERTISERS CRUD ───
 const AdvertisersSection = () => {
   const { tenantId } = useUserTenant();
@@ -572,19 +449,17 @@ const EnterpriseCRUD = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Enterprise</h1>
-        <p className="text-sm text-muted-foreground">Gerenciamento de Tags, Setores, Anunciantes e Campanhas</p>
+        <p className="text-sm text-muted-foreground">Gerenciamento de Tags, Anunciantes e Campanhas</p>
       </div>
       <Tabs defaultValue="campaigns" className="space-y-4">
         <TabsList>
           <TabsTrigger value="campaigns" className="gap-1.5"><Megaphone className="w-4 h-4" /> Campanhas</TabsTrigger>
           <TabsTrigger value="advertisers" className="gap-1.5"><Users className="w-4 h-4" /> Anunciantes</TabsTrigger>
           <TabsTrigger value="tags" className="gap-1.5"><Tag className="w-4 h-4" /> Tags</TabsTrigger>
-          <TabsTrigger value="sectors" className="gap-1.5"><Layers className="w-4 h-4" /> Setores</TabsTrigger>
         </TabsList>
         <TabsContent value="campaigns"><CampaignsSection /></TabsContent>
         <TabsContent value="advertisers"><AdvertisersSection /></TabsContent>
         <TabsContent value="tags"><TagsSection /></TabsContent>
-        <TabsContent value="sectors"><SectorsSection /></TabsContent>
       </Tabs>
     </div>
   );

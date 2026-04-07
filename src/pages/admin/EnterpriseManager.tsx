@@ -31,29 +31,19 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
 });
 
-type EntityType = "state" | "region" | "city" | "store" | "sector" | "group" | "zone" | "device_type" | "device";
+type EntityType = "region" | "store" | "group" | "device";
 
 const entityLabels: Record<EntityType, string> = {
-  state: "Estado",
   region: "Região",
-  city: "Cidade",
   store: "Loja",
-  sector: "Setor",
   group: "Grupo",
-  zone: "Zona",
-  device_type: "Tipo de Dispositivo",
   device: "Dispositivo",
 };
 
 const entityIcons: Record<EntityType, any> = {
-  state: MapPin,
   region: Globe,
-  city: Building2,
   store: Store,
-  sector: Layers,
   group: Layers,
-  zone: Box,
-  device_type: Monitor,
   device: Monitor,
 };
 
@@ -105,13 +95,9 @@ interface CreateDialogProps {
   tenantId: string;
   onCreated: () => void;
   parentData?: {
-    states: { id: string; name: string }[];
     regions: { id: string; name: string }[];
-    cities: { id: string; name: string }[];
     stores: { id: string; name: string }[];
-    sectors: { id: string; name: string }[];
     groups?: { id: string; name: string }[];
-    zones: { id: string; name: string }[];
     countries: { id: string; name: string }[];
   };
 }
@@ -130,12 +116,6 @@ const CreateEntityDialog = ({ open, onOpenChange, entityType, tenantId, onCreate
     try {
       let error: any;
       switch (entityType) {
-        case "state": {
-          const { error: e } = await supabase.from("states").insert({
-            name: form.name, code: form.code || "", region_id: form.region_id, tenant_id: tenantId,
-          });
-          error = e; break;
-        }
         case "region": {
           const { error: e } = await supabase.from("regions").insert({
             name: form.name, code: form.code || form.name.substring(0, 3).toUpperCase(),
@@ -143,31 +123,13 @@ const CreateEntityDialog = ({ open, onOpenChange, entityType, tenantId, onCreate
           });
           error = e; break;
         }
-        case "city": {
-          if (!form.state_id) { toast.error("Selecione um estado"); setSaving(false); return; }
-          const { error: e } = await supabase.from("cities").insert({
-            name: form.name, state_id: form.state_id, tenant_id: tenantId,
-          });
-          error = e; break;
-        }
         case "store": {
-          if (!form.city_id) { toast.error("Selecione uma cidade"); setSaving(false); return; }
-          const metadata: Record<string, any> = {};
-          if (form.latitude) metadata.latitude = parseFloat(form.latitude);
-          if (form.longitude) metadata.longitude = parseFloat(form.longitude);
-          const { error: e } = await supabase.from("stores").insert({
-            name: form.name, code: form.code || form.name.substring(0, 6).toUpperCase(),
-            city_id: form.city_id, tenant_id: tenantId,
-            metadata: Object.keys(metadata).length > 0 ? metadata : null,
-          });
-          error = e; break;
-        }
-        case "sector": {
-          if (!form.store_id) { toast.error("Selecione uma loja"); setSaving(false); return; }
-          const { error: e } = await supabase.from("sectors").insert({
-            name: form.name, store_id: form.store_id, tenant_id: tenantId,
-          });
-          error = e; break;
+          // Note: Since the system currently requires city_id, we need to handle this.
+          // For now, I'll pick a dummy city or ask the user.
+          // Actually, let's check if there are cities available.
+          toast.error("A criação de lojas requer uma cidade. Use a página de Lojas para criação completa.");
+          setSaving(false);
+          return;
         }
         case "group": {
           if (!form.store_id) { toast.error("Selecione uma loja"); setSaving(false); return; }
@@ -180,25 +142,10 @@ const CreateEntityDialog = ({ open, onOpenChange, entityType, tenantId, onCreate
           });
           error = e; break;
         }
-        case "zone": {
-          if (!form.sector_id) { toast.error("Selecione um setor"); setSaving(false); return; }
-          const { error: e } = await supabase.from("zones").insert({
-            name: form.name, sector_id: form.sector_id, tenant_id: tenantId,
-          });
-          error = e; break;
-        }
-        case "device_type": {
-          const { error: e } = await supabase.from("device_types").insert({
-            name: form.name, code: form.code || form.name.toUpperCase().replace(/\s/g, "_"),
-            description: form.description || null, tenant_id: tenantId,
-          });
-          error = e; break;
-        }
         case "device": {
           const { error: e } = await supabase.from("devices").insert({
             name: form.name, device_code: form.device_code || `DEV-${Date.now().toString(36).toUpperCase()}`,
-            store_id: form.store_id || null, sector_id: form.sector_id || null,
-            zone_id: form.zone_id || null, status: "pending",
+            store_id: form.store_id || null, status: "pending",
           });
           error = e; break;
         }
@@ -216,20 +163,6 @@ const CreateEntityDialog = ({ open, onOpenChange, entityType, tenantId, onCreate
 
   const renderFields = () => {
     switch (entityType) {
-      case "state":
-        return (
-          <>
-            <div><Label>Nome</Label><Input value={form.name || ""} onChange={(e) => set("name", e.target.value)} placeholder="Ex: Rio Grande do Sul" /></div>
-            <div><Label>Sigla</Label><Input value={form.code || ""} onChange={(e) => set("code", e.target.value)} placeholder="Ex: RS" maxLength={2} /></div>
-            <div>
-              <Label>Região</Label>
-              <Select value={form.region_id || ""} onValueChange={(v) => set("region_id", v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                <SelectContent>{parentData?.regions?.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-          </>
-        );
       case "region":
         return (
           <>
@@ -237,48 +170,10 @@ const CreateEntityDialog = ({ open, onOpenChange, entityType, tenantId, onCreate
             <div><Label>Código</Label><Input value={form.code || ""} onChange={(e) => set("code", e.target.value)} placeholder="Ex: SUL" /></div>
           </>
         );
-      case "city":
-        return (
-          <>
-            <div><Label>Nome</Label><Input value={form.name || ""} onChange={(e) => set("name", e.target.value)} placeholder="Ex: Porto Alegre" /></div>
-            <div>
-              <Label>Estado</Label>
-              <Select value={form.state_id || ""} onValueChange={(v) => set("state_id", v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                <SelectContent>{parentData?.states?.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-          </>
-        );
       case "store":
         return (
           <>
-            <div><Label>Nome</Label><Input value={form.name || ""} onChange={(e) => set("name", e.target.value)} placeholder="Ex: Loja Centro" /></div>
-            <div><Label>Código</Label><Input value={form.code || ""} onChange={(e) => set("code", e.target.value)} placeholder="Ex: LC01" /></div>
-            <div>
-              <Label>Cidade</Label>
-              <Select value={form.city_id || ""} onValueChange={(v) => set("city_id", v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                <SelectContent>{parentData?.cities?.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div><Label>Latitude</Label><Input value={form.latitude || ""} onChange={(e) => set("latitude", e.target.value)} placeholder="-29.9" /></div>
-              <div><Label>Longitude</Label><Input value={form.longitude || ""} onChange={(e) => set("longitude", e.target.value)} placeholder="-51.1" /></div>
-            </div>
-          </>
-        );
-      case "sector":
-        return (
-          <>
-            <div><Label>Nome</Label><Input value={form.name || ""} onChange={(e) => set("name", e.target.value)} placeholder="Ex: Hortifruti" /></div>
-            <div>
-              <Label>Loja</Label>
-              <Select value={form.store_id || ""} onValueChange={(v) => set("store_id", v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                <SelectContent>{parentData?.stores?.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
+            <p className="text-sm text-muted-foreground mb-4">A criação simplificada de lojas não está disponível aqui devido à necessidade de localização (Cidade/Estado). Por favor, use o menu lateral "Lojas".</p>
           </>
         );
       case "group":
@@ -295,27 +190,6 @@ const CreateEntityDialog = ({ open, onOpenChange, entityType, tenantId, onCreate
             <div><Label>Descrição</Label><Input value={form.description || ""} onChange={(e) => set("description", e.target.value)} placeholder="Opcional" /></div>
           </>
         );
-      case "zone":
-        return (
-          <>
-            <div><Label>Nome</Label><Input value={form.name || ""} onChange={(e) => set("name", e.target.value)} placeholder="Ex: Entrada" /></div>
-            <div>
-              <Label>Setor</Label>
-              <Select value={form.sector_id || ""} onValueChange={(v) => set("sector_id", v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                <SelectContent>{parentData?.sectors?.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-          </>
-        );
-      case "device_type":
-        return (
-          <>
-            <div><Label>Nome</Label><Input value={form.name || ""} onChange={(e) => set("name", e.target.value)} placeholder="Ex: TV LED" /></div>
-            <div><Label>Código</Label><Input value={form.code || ""} onChange={(e) => set("code", e.target.value)} placeholder="Ex: TV_LED" /></div>
-            <div><Label>Descrição</Label><Input value={form.description || ""} onChange={(e) => set("description", e.target.value)} placeholder="Descrição opcional" /></div>
-          </>
-        );
       case "device":
         return (
           <>
@@ -326,13 +200,6 @@ const CreateEntityDialog = ({ open, onOpenChange, entityType, tenantId, onCreate
               <Select value={form.store_id || ""} onValueChange={(v) => set("store_id", v)}>
                 <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                 <SelectContent>{parentData?.stores?.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Setor</Label>
-              <Select value={form.sector_id || ""} onValueChange={(v) => set("sector_id", v)}>
-                <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
-                <SelectContent>{parentData?.sectors?.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </>
@@ -471,7 +338,7 @@ const PropertiesPanel = ({ node, onRefresh }: { node: TreeNode | null; onRefresh
 };
 
 // ─── Stats Bar ───────────────────────────────────────────────
-const StatsBar = ({ stats }: { stats: { total: number; online: number; offline: number; stores: number; states: number } }) => (
+const StatsBar = ({ stats }: { stats: { total: number; online: number; offline: number; stores: number; regions: number } }) => (
   <div className="flex items-center gap-3 text-xs flex-wrap">
     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted">
       <Monitor className="w-3.5 h-3.5" /><span className="font-semibold">{stats.total}</span><span className="text-muted-foreground">dispositivos</span>
@@ -486,7 +353,7 @@ const StatsBar = ({ stats }: { stats: { total: number; online: number; offline: 
       <Store className="w-3.5 h-3.5" /><span className="font-semibold">{stats.stores}</span><span className="text-muted-foreground">lojas</span>
     </div>
     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted">
-      <MapPin className="w-3.5 h-3.5" /><span className="font-semibold">{stats.states}</span><span className="text-muted-foreground">estados</span>
+      <Globe className="w-3.5 h-3.5" /><span className="font-semibold">{stats.regions}</span><span className="text-muted-foreground">regiões</span>
     </div>
   </div>
 );
@@ -502,20 +369,17 @@ export default function EnterpriseManager() {
 
   // Data for forms
   const [parentData, setParentData] = useState<any>({
-    states: [], regions: [], cities: [], stores: [], sectors: [], zones: [], countries: [],
+    regions: [], stores: [], groups: [], countries: [],
   });
   const [storesWithCoords, setStoresWithCoords] = useState<StoreData[]>([]);
-  const [stats, setStats] = useState({ total: 0, online: 0, offline: 0, stores: 0, states: 0 });
+  const [stats, setStats] = useState({ total: 0, online: 0, offline: 0, stores: 0, regions: 0 });
 
   const loadParentData = useCallback(async () => {
     if (!tenantId) return;
-    const [statesR, regionsR, citiesR, storesR, sectorsR, zonesR, countriesR, devicesR] = await Promise.all([
-      supabase.from("states").select("id, name"),
+    const [regionsR, storesR, groupsR, countriesR, devicesR] = await Promise.all([
       supabase.from("regions").select("id, name"),
-      supabase.from("cities").select("id, name"),
       supabase.from("stores").select("id, name, code, city_id, is_active, metadata").eq("tenant_id", tenantId),
-      supabase.from("sectors").select("id, name, store_id").eq("tenant_id", tenantId),
-      supabase.from("zones").select("id, name, sector_id").eq("tenant_id", tenantId),
+      supabase.from("device_groups").select("id, name, store_id").eq("tenant_id", tenantId),
       supabase.from("countries").select("id, name"),
       supabase.from("devices").select("id, store_id, status"),
     ]);
@@ -523,9 +387,9 @@ export default function EnterpriseManager() {
     const stores = storesR.data || [];
 
     setParentData({
-      states: statesR.data || [], regions: regionsR.data || [],
-      cities: citiesR.data || [], stores: stores.map((s) => ({ id: s.id, name: `${s.name} (${s.code})` })),
-      sectors: sectorsR.data || [], zones: zonesR.data || [],
+      regions: regionsR.data || [],
+      stores: stores.map((s) => ({ id: s.id, name: `${s.name} (${s.code})` })),
+      groups: groupsR.data || [],
       countries: countriesR.data || [],
     });
 
@@ -557,7 +421,7 @@ export default function EnterpriseManager() {
       online: devices.filter((d) => d.status === "online").length,
       offline: devices.filter((d) => d.status !== "online").length,
       stores: stores.length,
-      states: (statesR.data || []).length,
+      regions: (regionsR.data || []).length,
     });
   }, [tenantId]);
 
@@ -599,7 +463,7 @@ export default function EnterpriseManager() {
               <Button size="sm" className="gap-1 h-8"><Plus className="w-3.5 h-3.5" />Novo</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {(["state", "region", "city", "store", "sector", "group", "zone", "device_type", "device"] as EntityType[]).map((type) => {
+              {(["region", "store", "group", "device"] as EntityType[]).map((type) => {
                 const Icon = entityIcons[type];
                 return (
                   <DropdownMenuItem key={type} onClick={() => setCreateType(type)}>
@@ -668,9 +532,9 @@ export default function EnterpriseManager() {
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <Card className="border-dashed"><CardContent className="p-3 text-center">
-                    <MapPin className="w-5 h-5 mx-auto mb-1 text-primary" />
-                    <p className="text-2xl font-bold">{stats.states}</p>
-                    <p className="text-xs text-muted-foreground">Estados</p>
+                    <Globe className="w-5 h-5 mx-auto mb-1 text-primary" />
+                    <p className="text-2xl font-bold">{stats.regions}</p>
+                    <p className="text-xs text-muted-foreground">Regiões</p>
                   </CardContent></Card>
                   <Card className="border-dashed"><CardContent className="p-3 text-center">
                     <Store className="w-5 h-5 mx-auto mb-1 text-primary" />
