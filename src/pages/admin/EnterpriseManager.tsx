@@ -307,7 +307,7 @@ const PropertiesPanel = ({ node, onRefresh }: { node: TreeNode | null; onRefresh
             </CardContent></Card>
             <Card><CardContent className="p-3 text-center">
               <Wifi className="w-4 h-4 mx-auto mb-1 text-green-500" />
-              <p className="text-lg font-bold">-</p>
+              <p className="text-lg font-bold">{node.onlineCount || 0}</p>
               <p className="text-[10px] text-muted-foreground">Online</p>
             </CardContent></Card>
           </div>
@@ -381,9 +381,18 @@ export default function EnterpriseManager() {
       supabase.from("stores").select("id, name, code, city_id, is_active, metadata").eq("tenant_id", tenantId),
       supabase.from("device_groups").select("id, name, store_id").eq("tenant_id", tenantId),
       supabase.from("countries").select("id, name"),
-      supabase.from("devices").select("id, store_id, status"),
+      supabase.from("devices").select("id, store_id, status, company_id"),
     ]);
-    const devices = devicesR.data || [];
+
+    // Get all company IDs for the tenant to filter devices properly if not super admin
+    const { data: companies } = await supabase.from("companies").select("id").eq("tenant_id", tenantId);
+    const tenantCompanyIds = (companies || []).map(c => c.id);
+
+    let devices = devicesR.data || [];
+    if (tenantCompanyIds.length > 0) {
+      devices = devices.filter(d => tenantCompanyIds.includes(d.company_id));
+    }
+
     const stores = storesR.data || [];
 
     setParentData({

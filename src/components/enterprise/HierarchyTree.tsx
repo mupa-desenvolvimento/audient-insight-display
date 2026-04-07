@@ -16,6 +16,7 @@ interface TreeNode {
   children?: TreeNode[];
   status?: string;
   deviceCount?: number;
+  onlineCount?: number;
   meta?: Record<string, any>;
 }
 
@@ -93,7 +94,12 @@ const TreeItem = ({ node, level, onSelect, selectedId, searchActive }: TreeItemP
           )
         )}
         {node.deviceCount !== undefined && node.deviceCount > 0 && node.type !== "device" && (
-          <Badge variant="secondary" className="text-[10px] h-4 px-1">{node.deviceCount}</Badge>
+          <Badge variant="secondary" className="text-[10px] h-4 px-1 gap-1">
+            {node.onlineCount !== undefined && node.onlineCount > 0 && (
+              <span className="text-green-600 font-bold">{node.onlineCount}/</span>
+            )}
+            <span>{node.deviceCount}</span>
+          </Badge>
         )}
       </button>
       {expanded && hasChildren && (
@@ -155,13 +161,14 @@ export const HierarchyTree = ({ onSelect, search }: HierarchyTreeProps) => {
     setLoading(true);
     try {
       // Load all data in parallel
-      const [regionsRes, statesRes, citiesRes, storesRes, groupsRes, devicesRes] = await Promise.all([
+      const [regionsRes, statesRes, citiesRes, storesRes, groupsRes, devicesRes, companiesRes] = await Promise.all([
         supabase.from("regions").select("id, name, code, country_id").eq("tenant_id", tenantId!),
         supabase.from("states").select("id, name, region_id"),
         supabase.from("cities").select("id, name, state_id"),
         supabase.from("stores").select("id, name, code, city_id, is_active").eq("tenant_id", tenantId!),
         supabase.from("device_groups").select("id, name, store_id, tenant_id").eq("tenant_id", tenantId!),
         supabase.from("devices").select("id, name, device_code, store_id, status, company_id"),
+        supabase.from("companies").select("id").eq("tenant_id", tenantId!),
       ]);
 
       const regions = regionsRes.data || [];
@@ -169,7 +176,12 @@ export const HierarchyTree = ({ onSelect, search }: HierarchyTreeProps) => {
       const cities = citiesRes.data || [];
       const stores = storesRes.data || [];
       const groups = groupsRes.data || [];
-      const devices = devicesRes.data || [];
+      const tenantCompanyIds = (companiesRes.data || []).map(c => c.id);
+      
+      let devices = devicesRes.data || [];
+      if (tenantCompanyIds.length > 0) {
+        devices = devices.filter(d => tenantCompanyIds.includes(d.company_id));
+      }
 
       // Group devices by group_id (many-to-many)
       const groupIds = groups.map((g: any) => g.id).filter(Boolean);
@@ -218,6 +230,7 @@ export const HierarchyTree = ({ onSelect, search }: HierarchyTreeProps) => {
               name: group.name,
               type: "group" as const,
               deviceCount: groupDevices.length,
+              onlineCount: groupDevices.filter(d => d.status === "online").length,
               meta: { store_id: store.id },
               children: groupDevices.map((d) => ({
                 id: d.id,
@@ -236,6 +249,7 @@ export const HierarchyTree = ({ onSelect, search }: HierarchyTreeProps) => {
             name: store.name,
             type: "store" as const,
             deviceCount: storeDevices.length,
+            onlineCount: storeDevices.filter(d => d.status === "online").length,
             meta: { code: store.code },
             children: [
               ...groupNodes,
@@ -254,6 +268,7 @@ export const HierarchyTree = ({ onSelect, search }: HierarchyTreeProps) => {
           name: region.name,
           type: "region" as const,
           deviceCount: storeNodes.reduce((sum, n) => sum + (n.deviceCount || 0), 0),
+          onlineCount: storeNodes.reduce((sum, n) => sum + (n.onlineCount || 0), 0),
           children: storeNodes,
         };
       });
