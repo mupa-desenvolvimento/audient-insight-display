@@ -21,17 +21,25 @@ interface TreeNode {
 }
 
 const typeIcons: Record<string, any> = {
-  region: MapIcon,
+  state: MapPin,
+  region: Globe,
+  city: Building2,
   store: Store,
   group: Layers,
   device: Monitor,
+  sector: Layers,
+  zone: Box,
 };
 
 const typeLabels: Record<string, string> = {
+  state: "Estado",
   region: "Região",
+  city: "Cidade",
   store: "Loja",
   group: "Grupo",
   device: "Dispositivo",
+  sector: "Setor",
+  zone: "Zona",
 };
 
 interface TreeItemProps {

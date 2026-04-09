@@ -40,7 +40,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  Plus, Minus, Search, Pencil, Trash2, Monitor, Store, MapPin, Tag, Users, Info, Image, Target, Eye, Layers, Calendar, CheckCircle2, Settings2, FolderPlus, Download, Hand, Copy, Printer, RefreshCw, Play, GripVertical, Network, ChevronDown, ChevronRight, ListFilter, AlertCircle
+  Plus, Minus, Search, Pencil, Trash2, Monitor, Store, MapPin, Globe, Building2, Tag, Users, Info, Image, Target, Eye, Layers, Calendar, CheckCircle2, Settings2, FolderPlus, Download, Hand, Copy, Printer, RefreshCw, Play, GripVertical, Network, ChevronDown, ChevronRight, ListFilter, AlertCircle
 } from "lucide-react";
 import { MediaThumbnail } from "@/components/media/MediaThumbnail";
 import { db } from "@/services/firebase";
@@ -1082,10 +1082,12 @@ const ScheduleTimeline = () => {
   };
 
   const HierarchyRowIcon = ({ type }: { type: HierarchyNodeType }) => {
-    if (type === "state" || type === "region" || type === "city") return <MapPin className="h-3.5 w-3.5 text-muted-foreground" />;
+    if (type === "state") return <MapPin className="h-3.5 w-3.5 text-muted-foreground" />;
+    if (type === "region") return <Globe className="h-3.5 w-3.5 text-muted-foreground" />;
+    if (type === "city") return <Building2 className="h-3.5 w-3.5 text-muted-foreground" />;
     if (type === "store") return <Store className="h-3.5 w-3.5 text-muted-foreground" />;
     if (type === "sector") return <Layers className="h-3.5 w-3.5 text-muted-foreground" />;
-    if (type === "device_group") return <Users className="h-3.5 w-3.5 text-muted-foreground" />;
+    if (type === "device_group") return <Layers className="h-3.5 w-3.5 text-muted-foreground" />;
     return <Monitor className="h-3.5 w-3.5 text-muted-foreground" />;
   };
 

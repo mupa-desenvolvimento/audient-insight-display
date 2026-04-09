@@ -31,17 +31,21 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
 });
 
-type EntityType = "region" | "store" | "group" | "device";
+type EntityType = "state" | "region" | "city" | "store" | "group" | "device";
 
 const entityLabels: Record<EntityType, string> = {
+  state: "Estado",
   region: "Região",
+  city: "Cidade",
   store: "Loja",
   group: "Grupo",
   device: "Dispositivo",
 };
 
 const entityIcons: Record<EntityType, any> = {
+  state: MapPin,
   region: Globe,
+  city: Building2,
   store: Store,
   group: Layers,
   device: Monitor,
@@ -116,10 +120,25 @@ const CreateEntityDialog = ({ open, onOpenChange, entityType, tenantId, onCreate
     try {
       let error: any;
       switch (entityType) {
+        case "state": {
+          if (!form.region_id) { toast.error("Selecione uma região"); setSaving(false); return; }
+          const { error: e } = await supabase.from("states").insert({
+            name: form.name, code: form.code || form.name.substring(0, 2).toUpperCase(),
+            region_id: form.region_id, tenant_id: tenantId,
+          });
+          error = e; break;
+        }
         case "region": {
           const { error: e } = await supabase.from("regions").insert({
             name: form.name, code: form.code || form.name.substring(0, 3).toUpperCase(),
             country_id: form.country_id || parentData?.countries?.[0]?.id, tenant_id: tenantId,
+          });
+          error = e; break;
+        }
+        case "city": {
+          if (!form.state_id) { toast.error("Selecione um estado"); setSaving(false); return; }
+          const { error: e } = await supabase.from("cities").insert({
+            name: form.name, state_id: form.state_id, tenant_id: tenantId,
           });
           error = e; break;
         }
@@ -163,11 +182,38 @@ const CreateEntityDialog = ({ open, onOpenChange, entityType, tenantId, onCreate
 
   const renderFields = () => {
     switch (entityType) {
+      case "state":
+        return (
+          <>
+            <div><Label>Nome</Label><Input value={form.name || ""} onChange={(e) => set("name", e.target.value)} placeholder="Ex: Rio Grande do Sul" /></div>
+            <div><Label>Código (UF)</Label><Input value={form.code || ""} onChange={(e) => set("code", e.target.value)} placeholder="Ex: RS" /></div>
+            <div>
+              <Label>Região</Label>
+              <Select value={form.region_id || ""} onValueChange={(v) => set("region_id", v)}>
+                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectContent>{parentData?.regions?.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </>
+        );
       case "region":
         return (
           <>
             <div><Label>Nome</Label><Input value={form.name || ""} onChange={(e) => set("name", e.target.value)} placeholder="Ex: Sul" /></div>
             <div><Label>Código</Label><Input value={form.code || ""} onChange={(e) => set("code", e.target.value)} placeholder="Ex: SUL" /></div>
+          </>
+        );
+      case "city":
+        return (
+          <>
+            <div><Label>Nome</Label><Input value={form.name || ""} onChange={(e) => set("name", e.target.value)} placeholder="Ex: Porto Alegre" /></div>
+            <div>
+              <Label>Estado</Label>
+              <Select value={form.state_id || ""} onValueChange={(v) => set("state_id", v)}>
+                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectContent>{parentData?.states?.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
           </>
         );
       case "store":
@@ -369,7 +415,7 @@ export default function EnterpriseManager() {
 
   // Data for forms
   const [parentData, setParentData] = useState<any>({
-    regions: [], stores: [], groups: [], countries: [],
+    regions: [], states: [], stores: [], groups: [], countries: [],
   });
   const [storesWithCoords, setStoresWithCoords] = useState<StoreData[]>([]);
   const [stats, setStats] = useState({ total: 0, online: 0, offline: 0, stores: 0, regions: 0 });
@@ -379,6 +425,7 @@ export default function EnterpriseManager() {
     
     // Build queries
     let regionsQuery = supabase.from("regions").select("id, name");
+    let statesQuery = supabase.from("states").select("id, name");
     let storesQuery = supabase.from("stores").select("id, name, code, city_id, is_active, metadata");
     let groupsQuery = supabase.from("device_groups").select("id, name, store_id");
     let countriesQuery = supabase.from("countries").select("id, name");
@@ -387,13 +434,15 @@ export default function EnterpriseManager() {
     // Filter by tenant if not super admin
     if (!isSuperAdmin && tenantId) {
       regionsQuery = regionsQuery.eq("tenant_id", tenantId);
+      statesQuery = statesQuery.eq("tenant_id", tenantId);
       storesQuery = storesQuery.eq("tenant_id", tenantId);
       groupsQuery = groupsQuery.eq("tenant_id", tenantId);
       // devices query will be filtered later using company IDs if needed
     }
 
-    const [regionsR, storesR, groupsR, countriesR, devicesR] = await Promise.all([
+    const [regionsR, statesR, storesR, groupsR, countriesR, devicesR] = await Promise.all([
       regionsQuery,
+      statesQuery,
       storesQuery,
       groupsQuery,
       countriesQuery,
@@ -416,6 +465,7 @@ export default function EnterpriseManager() {
 
     setParentData({
       regions: regionsR.data || [],
+      states: statesR.data || [],
       stores: stores.map((s) => ({ id: s.id, name: `${s.name} (${s.code})` })),
       groups: groupsR.data || [],
       countries: countriesR.data || [],
@@ -491,7 +541,7 @@ export default function EnterpriseManager() {
               <Button size="sm" className="gap-1 h-8"><Plus className="w-3.5 h-3.5" />Novo</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {(["region", "store", "group", "device"] as EntityType[]).map((type) => {
+              {(["state", "region", "city", "store", "group", "device"] as EntityType[]).map((type) => {
                 const Icon = entityIcons[type];
                 return (
                   <DropdownMenuItem key={type} onClick={() => setCreateType(type)}>

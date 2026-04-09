@@ -2,7 +2,7 @@ import { useState } from "react";
 import { HierarchyTree, TreeNode } from "./HierarchyTree";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Monitor, Wifi, WifiOff, Play, Calendar, Tag } from "lucide-react";
+import { Monitor, Wifi, WifiOff, Play, Calendar, Tag, Globe, Store, Layers, Box, Building2, MapPin } from "lucide-react";
 
 const typeLabels: Record<string, string> = {
   company: "Empresa",
@@ -13,6 +13,17 @@ const typeLabels: Record<string, string> = {
   sector: "Setor",
   zone: "Zona",
   device: "Dispositivo",
+};
+
+const typeIcons: Record<string, any> = {
+  state: MapPin,
+  region: Globe,
+  city: Building2,
+  store: Store,
+  group: Layers,
+  device: Monitor,
+  sector: Layers,
+  zone: Box,
 };
 
 export const HierarchyExplorer = () => {
@@ -89,20 +100,23 @@ export const HierarchyExplorer = () => {
                 <div>
                   <h3 className="text-sm font-semibold mb-3">Itens ({selectedNode.children.length})</h3>
                   <div className="grid gap-2">
-                    {selectedNode.children.slice(0, 20).map((child) => (
-                      <div key={child.id} className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/30 transition-colors">
-                        <Monitor className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm font-medium flex-1">{child.name}</span>
-                        {child.type === "device" && (
-                          <Badge variant={child.status === "online" ? "default" : "secondary"} className="text-[10px]">
-                            {child.status || "offline"}
-                          </Badge>
-                        )}
-                        {child.deviceCount !== undefined && child.deviceCount > 0 && (
-                          <Badge variant="outline" className="text-[10px]">{child.deviceCount} devices</Badge>
-                        )}
-                      </div>
-                    ))}
+                    {selectedNode.children.slice(0, 20).map((child) => {
+                      const Icon = typeIcons[child.type] || Monitor;
+                      return (
+                        <div key={child.id} className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/30 transition-colors">
+                          <Icon className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm font-medium flex-1">{child.name}</span>
+                          {child.type === "device" && (
+                            <Badge variant={child.status === "online" ? "default" : "secondary"} className="text-[10px]">
+                              {child.status || "offline"}
+                            </Badge>
+                          )}
+                          {child.deviceCount !== undefined && child.deviceCount > 0 && (
+                            <Badge variant="outline" className="text-[10px]">{child.deviceCount} devices</Badge>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
