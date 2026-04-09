@@ -615,88 +615,101 @@ const ScheduleTimeline = () => {
       deviceIdToGroupIds.get(m.device_id)!.push(m.group_id);
     });
 
-    const roots: HierarchyNode[] = statesData
+    const roots: HierarchyNode[] = regions
       .slice()
-      .sort((a: any, b: any) => (a.code || a.name || "").localeCompare(b.code || b.name || ""))
-      .map((state: any) => {
-        const stateKey = `state:${state.id}`;
-        const stateLabel = state.code || state.name;
-        index.set(stateKey, { type: "state", id: state.id, label: stateLabel });
-        const region = state.region_id ? regionsById.get(state.region_id) : null;
-        const regionNodes: HierarchyNode[] = region
-          ? [{
-            key: `region:${state.id}:${region.id}`,
-            id: region.id,
-            type: "region" as const,
-            label: region.name,
-            children: [],
-          }]
-          : [];
-        if (region) index.set(`region:${state.id}:${region.id}`, { type: "region", id: region.id, label: region.name });
+      .sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""))
+      .map((region: any) => {
+        const regionKey = `region:${region.id}`;
+        index.set(regionKey, { type: "region", id: region.id, label: region.name });
 
-        const targetParent = regionNodes.length > 0 ? regionNodes[0] : null;
-        const stateCities = (citiesByState.get(state.id) || []).slice().sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
-        const cityNodes = stateCities.map((city: any) => {
-          const cityKey = `city:${city.id}`;
-          index.set(cityKey, { type: "city", id: city.id, label: city.name });
-          const cityStores = (storesByCity.get(city.id) || []).slice().sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
-          const storeNodes = cityStores.map((store: any) => {
-            const storeKey = `store:${store.id}`;
-            index.set(storeKey, { type: "store", id: store.id, label: store.name });
-            const storeDevices = (devicesByStore.get(store.id) || []).slice().sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
-            const sectorIds = [...new Set(storeDevices.map((d: any) => d.sector_id).filter(Boolean))] as string[];
-            const sectorNodes = sectorIds
-              .map((sid) => sectorsById.get(sid) ? ({ id: sid, name: sectorsById.get(sid)!.name }) : ({ id: sid, name: `Setor ${sid.slice(0, 6)}` }))
-              .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
-              .map((sec) => {
-                const sectorKey = `sector:${store.id}:${sec.id}`;
-                index.set(sectorKey, { type: "sector", id: sec.id, label: sec.name });
-                const devicesInSector = storeDevices.filter((d: any) => d.sector_id === sec.id);
-                const groupIds = [...new Set(devicesInSector.flatMap((d: any) => deviceIdToGroupIds.get(d.id) || []))] as string[];
-                const groupNodes: HierarchyNode[] = groupIds
-                  .map((gid) => groupById.get(gid) ? ({ id: gid, name: groupById.get(gid)!.name }) : ({ id: gid, name: `Grupo ${gid.slice(0, 6)}` }))
-                  .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
-                  .map((g) => {
-                    const groupKey = `device_group:${store.id}:${sec.id}:${g.id}`;
-                    const groupDeviceIds = devicesInSector.filter((d: any) => (deviceIdToGroupIds.get(d.id) || []).includes(g.id)).map((d: any) => d.id);
-                    index.set(groupKey, { type: "device_group", id: g.id, label: g.name, deviceIds: groupDeviceIds });
-                    const deviceNodes: HierarchyNode[] = groupDeviceIds
-                      .map((did) => storeDevices.find((d: any) => d.id === did))
-                      .filter(Boolean)
+        const regionStates = statesData
+          .filter((s: any) => s.region_id === region.id)
+          .sort((a: any, b: any) => (a.code || a.name || "").localeCompare(b.code || b.name || ""));
+
+        const stateNodes: HierarchyNode[] = regionStates.map((state: any) => {
+          const stateKey = `state:${state.id}`;
+          const stateLabel = state.code || state.name;
+          index.set(stateKey, { type: "state", id: state.id, label: stateLabel });
+
+          const stateCities = (citiesByState.get(state.id) || [])
+            .slice()
+            .sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
+
+          const cityNodes: HierarchyNode[] = stateCities.map((city: any) => {
+            const cityKey = `city:${city.id}`;
+            index.set(cityKey, { type: "city", id: city.id, label: city.name });
+
+            const cityStores = (storesByCity.get(city.id) || [])
+              .slice()
+              .sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
+
+            const storeNodes: HierarchyNode[] = cityStores.map((store: any) => {
+              const storeKey = `store:${store.id}`;
+              index.set(storeKey, { type: "store", id: store.id, label: store.name });
+
+              const storeDevices = (devicesByStore.get(store.id) || [])
+                .slice()
+                .sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
+
+              const sectorIds = [...new Set(storeDevices.map((d: any) => d.sector_id).filter(Boolean))] as string[];
+              const sectorNodes: HierarchyNode[] = sectorIds
+                .map((sid) => sectorsById.get(sid) ? ({ id: sid, name: sectorsById.get(sid)!.name }) : ({ id: sid, name: `Setor ${sid.slice(0, 6)}` }))
+                .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+                .map((sec) => {
+                  const sectorKey = `sector:${store.id}:${sec.id}`;
+                  index.set(sectorKey, { type: "sector", id: sec.id, label: sec.name });
+
+                  const devicesInSector = storeDevices.filter((d: any) => d.sector_id === sec.id);
+                  const groupIds = [...new Set(devicesInSector.flatMap((d: any) => deviceIdToGroupIds.get(d.id) || []))] as string[];
+                  
+                  const groupNodes: HierarchyNode[] = groupIds
+                    .map((gid) => groupById.get(gid) ? ({ id: gid, name: groupById.get(gid)!.name }) : ({ id: gid, name: `Grupo ${gid.slice(0, 6)}` }))
+                    .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+                    .map((g) => {
+                      const groupKey = `device_group:${store.id}:${sec.id}:${g.id}`;
+                      const groupDeviceIds = devicesInSector.filter((d: any) => (deviceIdToGroupIds.get(d.id) || []).includes(g.id)).map((d: any) => d.id);
+                      index.set(groupKey, { type: "device_group", id: g.id, label: g.name, deviceIds: groupDeviceIds });
+
+                      const deviceNodes: HierarchyNode[] = groupDeviceIds
+                        .map((did) => storeDevices.find((d: any) => d.id === did))
+                        .filter(Boolean)
+                        .sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""))
+                        .map((d: any) => {
+                          const deviceKey = `device:${d.id}`;
+                          index.set(deviceKey, { type: "device", id: d.id, label: d.name || d.device_code || d.id });
+                          return { key: deviceKey, id: d.id, type: "device" as const, label: d.name || d.device_code || d.id };
+                        });
+
+                      return { key: groupKey, id: g.id, type: "device_group" as const, label: g.name, children: deviceNodes };
+                    });
+
+                  const ungrouped = devicesInSector.filter((d: any) => (deviceIdToGroupIds.get(d.id) || []).length === 0);
+                  if (ungrouped.length > 0) {
+                    const unKey = `device_group:${store.id}:${sec.id}:__ungrouped__`;
+                    index.set(unKey, { type: "device_group", id: "__ungrouped__", label: "Sem grupo", deviceIds: ungrouped.map((d: any) => d.id) });
+                    const deviceNodes: HierarchyNode[] = ungrouped
                       .sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""))
                       .map((d: any) => {
                         const deviceKey = `device:${d.id}`;
                         index.set(deviceKey, { type: "device", id: d.id, label: d.name || d.device_code || d.id });
                         return { key: deviceKey, id: d.id, type: "device" as const, label: d.name || d.device_code || d.id };
                       });
-                    return { key: groupKey, id: g.id, type: "device_group" as const, label: g.name, children: deviceNodes };
-                  });
+                    groupNodes.push({ key: unKey, id: "__ungrouped__", type: "device_group" as const, label: "Sem grupo", children: deviceNodes });
+                  }
 
-                const ungrouped = devicesInSector.filter((d: any) => (deviceIdToGroupIds.get(d.id) || []).length === 0);
-                if (ungrouped.length > 0) {
-                  const unKey = `device_group:${store.id}:${sec.id}:__ungrouped__`;
-                  index.set(unKey, { type: "device_group", id: "__ungrouped__", label: "Sem grupo", deviceIds: ungrouped.map((d: any) => d.id) });
-                  const deviceNodes: HierarchyNode[] = ungrouped
-                    .sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""))
-                    .map((d: any) => {
-                      const deviceKey = `device:${d.id}`;
-                      index.set(deviceKey, { type: "device", id: d.id, label: d.name || d.device_code || d.id });
-                      return { key: deviceKey, id: d.id, type: "device" as const, label: d.name || d.device_code || d.id };
-                    });
-                  groupNodes.push({ key: unKey, id: "__ungrouped__", type: "device_group" as const, label: "Sem grupo", children: deviceNodes });
-                }
+                  return { key: sectorKey, id: sec.id, type: "sector" as const, label: sec.name, children: groupNodes };
+                });
 
-                return { key: sectorKey, id: sec.id, type: "sector" as const, label: sec.name, children: groupNodes };
-              });
+              return { key: storeKey, id: store.id, type: "store" as const, label: store.name, children: sectorNodes };
+            });
 
-            return { key: storeKey, id: store.id, type: "store" as const, label: store.name, children: sectorNodes };
+            return { key: cityKey, id: city.id, type: "city" as const, label: city.name, children: storeNodes };
           });
-          return { key: cityKey, id: city.id, type: "city" as const, label: city.name, children: storeNodes };
+
+          return { key: stateKey, id: state.id, type: "state" as const, label: stateLabel, children: cityNodes };
         });
 
-        if (targetParent) targetParent.children = cityNodes;
-        const children = targetParent ? regionNodes : cityNodes;
-        return { key: stateKey, id: state.id, type: "state" as const, label: stateLabel, children };
+        return { key: regionKey, id: region.id, type: "region" as const, label: region.name, children: stateNodes };
       });
 
     return { roots, index, statesById };

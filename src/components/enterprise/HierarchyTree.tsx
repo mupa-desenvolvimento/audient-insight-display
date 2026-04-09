@@ -12,7 +12,7 @@ import { toast } from "sonner";
 interface TreeNode {
   id: string;
   name: string;
-  type: "region" | "store" | "group" | "device";
+  type: "state" | "region" | "city" | "store" | "group" | "device" | "sector" | "zone";
   children?: TreeNode[];
   status?: string;
   deviceCount?: number;
@@ -230,58 +230,79 @@ export const HierarchyTree = ({ onSelect, search }: HierarchyTreeProps) => {
       const cityToStateId = new Map(cities.map(c => [c.id, c.state_id]));
       const stateToRegionId = new Map(states.map(s => [s.id, s.region_id]));
 
-      // Build tree: Region > Store > Group > Device
+      // Build tree: Region > State > City > Store > Group > Device
       const treeNodes: TreeNode[] = regions.map((region) => {
-        // Find stores for this region by traversing city > state > region
-        const regionStores = stores.filter(store => {
-          const stateId = cityToStateId.get(store.city_id);
-          const regionId = stateId ? stateToRegionId.get(stateId) : null;
-          return regionId === region.id;
-        });
-
-        const storeNodes: TreeNode[] = regionStores.map((store) => {
-          const storeGroups = groups.filter((g) => g.store_id === store.id);
-          const storeDevices = devices.filter((d) => d.store_id === store.id);
-
-          const groupNodes: TreeNode[] = storeGroups.map((group) => {
-            const memberDeviceIds = groupDeviceIds.get(group.id);
-            const groupDevices = memberDeviceIds ? storeDevices.filter((d) => memberDeviceIds.has(d.id)) : [];
+        const regionStates = states.filter(s => s.region_id === region.id);
+        
+        const stateNodes: TreeNode[] = regionStates.map((state) => {
+          const stateCities = cities.filter(c => c.state_id === state.id);
+          
+          const cityNodes: TreeNode[] = stateCities.map((city) => {
+            const cityStores = stores.filter(s => s.city_id === city.id);
             
+            const storeNodes: TreeNode[] = cityStores.map((store) => {
+              const storeGroups = groups.filter((g) => g.store_id === store.id);
+              const storeDevices = devices.filter((d) => d.store_id === store.id);
+
+              const groupNodes: TreeNode[] = storeGroups.map((group) => {
+                const memberDeviceIds = groupDeviceIds.get(group.id);
+                const groupDevices = memberDeviceIds ? storeDevices.filter((d) => memberDeviceIds.has(d.id)) : [];
+                
+                return {
+                  id: group.id,
+                  name: group.name,
+                  type: "group" as const,
+                  deviceCount: groupDevices.length,
+                  onlineCount: groupDevices.filter(d => d.status === "online").length,
+                  meta: { store_id: store.id },
+                  children: groupDevices.map((d) => ({
+                    id: d.id,
+                    name: d.name || d.device_code,
+                    type: "device" as const,
+                    status: d.status,
+                  })),
+                };
+              });
+
+              // Devices in store but NOT in any group
+              const ungroupedDevices = storeDevices.filter((d) => !deviceGroupIds.has(d.id));
+
+              return {
+                id: store.id,
+                name: store.name,
+                type: "store" as const,
+                deviceCount: storeDevices.length,
+                onlineCount: storeDevices.filter(d => d.status === "online").length,
+                meta: { code: store.code },
+                children: [
+                  ...groupNodes,
+                  ...ungroupedDevices.map((d) => ({
+                    id: d.id,
+                    name: d.name || d.device_code,
+                    type: "device" as const,
+                    status: d.status,
+                  })),
+                ],
+              };
+            });
+
             return {
-              id: group.id,
-              name: group.name,
-              type: "group" as const,
-              deviceCount: groupDevices.length,
-              onlineCount: groupDevices.filter(d => d.status === "online").length,
-              meta: { store_id: store.id },
-              children: groupDevices.map((d) => ({
-                id: d.id,
-                name: d.name || d.device_code,
-                type: "device" as const,
-                status: d.status,
-              })),
+              id: city.id,
+              name: city.name,
+              type: "city" as const,
+              deviceCount: storeNodes.reduce((sum, n) => sum + (n.deviceCount || 0), 0),
+              onlineCount: storeNodes.reduce((sum, n) => sum + (n.onlineCount || 0), 0),
+              children: storeNodes,
             };
           });
 
-          // Devices in store but NOT in any group
-          const ungroupedDevices = storeDevices.filter((d) => !deviceGroupIds.has(d.id));
-
           return {
-            id: store.id,
-            name: store.name,
-            type: "store" as const,
-            deviceCount: storeDevices.length,
-            onlineCount: storeDevices.filter(d => d.status === "online").length,
-            meta: { code: store.code },
-            children: [
-              ...groupNodes,
-              ...ungroupedDevices.map((d) => ({
-                id: d.id,
-                name: d.name || d.device_code,
-                type: "device" as const,
-                status: d.status,
-              })),
-            ],
+            id: state.id,
+            name: state.name,
+            type: "state" as const,
+            deviceCount: cityNodes.reduce((sum, n) => sum + (n.deviceCount || 0), 0),
+            onlineCount: cityNodes.reduce((sum, n) => sum + (n.onlineCount || 0), 0),
+            children: cityNodes,
           };
         });
 
@@ -289,9 +310,9 @@ export const HierarchyTree = ({ onSelect, search }: HierarchyTreeProps) => {
           id: region.id,
           name: region.name,
           type: "region" as const,
-          deviceCount: storeNodes.reduce((sum, n) => sum + (n.deviceCount || 0), 0),
-          onlineCount: storeNodes.reduce((sum, n) => sum + (n.onlineCount || 0), 0),
-          children: storeNodes,
+          deviceCount: stateNodes.reduce((sum, n) => sum + (n.deviceCount || 0), 0),
+          onlineCount: stateNodes.reduce((sum, n) => sum + (n.onlineCount || 0), 0),
+          children: stateNodes,
         };
       });
 
