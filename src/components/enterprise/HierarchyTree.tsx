@@ -129,13 +129,13 @@ export const HierarchyTree = ({ onSelect, search }: HierarchyTreeProps) => {
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const { tenantId } = useUserTenant();
+  const { tenantId, isSuperAdmin, isLoading: tenantLoading } = useUserTenant();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   useEffect(() => {
-    if (!tenantId) return;
+    if (tenantLoading) return;
     loadTreeData();
-  }, [tenantId]);
+  }, [tenantId, isSuperAdmin, tenantLoading]);
 
   const searchActive = Boolean(search && search.trim().length > 0);
   const filteredTree = (() => {
@@ -160,15 +160,29 @@ export const HierarchyTree = ({ onSelect, search }: HierarchyTreeProps) => {
   const loadTreeData = async () => {
     setLoading(true);
     try {
+      // Build queries
+      let regionsQuery = supabase.from("regions").select("id, name, code, country_id");
+      let storesQuery = supabase.from("stores").select("id, name, code, city_id, is_active");
+      let groupsQuery = supabase.from("device_groups").select("id, name, store_id, tenant_id");
+      let companiesQuery = supabase.from("companies").select("id");
+
+      // Filter by tenant if not super admin
+      if (!isSuperAdmin && tenantId) {
+        regionsQuery = regionsQuery.eq("tenant_id", tenantId);
+        storesQuery = storesQuery.eq("tenant_id", tenantId);
+        groupsQuery = groupsQuery.eq("tenant_id", tenantId);
+        companiesQuery = companiesQuery.eq("tenant_id", tenantId);
+      }
+
       // Load all data in parallel
       const [regionsRes, statesRes, citiesRes, storesRes, groupsRes, devicesRes, companiesRes] = await Promise.all([
-        supabase.from("regions").select("id, name, code, country_id").eq("tenant_id", tenantId!),
+        regionsQuery,
         supabase.from("states").select("id, name, region_id"),
         supabase.from("cities").select("id, name, state_id"),
-        supabase.from("stores").select("id, name, code, city_id, is_active").eq("tenant_id", tenantId!),
-        supabase.from("device_groups").select("id, name, store_id, tenant_id").eq("tenant_id", tenantId!),
+        storesQuery,
+        groupsQuery,
         supabase.from("devices").select("id, name, device_code, store_id, status, company_id"),
-        supabase.from("companies").select("id").eq("tenant_id", tenantId!),
+        companiesQuery,
       ]);
 
       const regions = regionsRes.data || [];
@@ -357,7 +371,7 @@ export const HierarchyTree = ({ onSelect, search }: HierarchyTreeProps) => {
     return (
       <div className="flex flex-col items-center justify-center p-6 text-center text-muted-foreground">
         <AlertCircle className="w-8 h-8 mb-2" />
-        <p className="text-sm">Nenhuma empresa encontrada</p>
+        <p className="text-sm">Nenhuma região encontrada</p>
       </div>
     );
   }

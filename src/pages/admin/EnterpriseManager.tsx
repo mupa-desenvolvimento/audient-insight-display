@@ -360,7 +360,7 @@ const StatsBar = ({ stats }: { stats: { total: number; online: number; offline: 
 
 // ─── Main Component ──────────────────────────────────────────
 export default function EnterpriseManager() {
-  const { tenantId } = useUserTenant();
+  const { tenantId, isSuperAdmin, isLoading: tenantLoading } = useUserTenant();
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
   const [viewMode, setViewMode] = useState<"tree" | "map">("tree");
   const [createType, setCreateType] = useState<EntityType | null>(null);
@@ -375,21 +375,40 @@ export default function EnterpriseManager() {
   const [stats, setStats] = useState({ total: 0, online: 0, offline: 0, stores: 0, regions: 0 });
 
   const loadParentData = useCallback(async () => {
-    if (!tenantId) return;
+    if (tenantLoading) return;
+    
+    // Build queries
+    let regionsQuery = supabase.from("regions").select("id, name");
+    let storesQuery = supabase.from("stores").select("id, name, code, city_id, is_active, metadata");
+    let groupsQuery = supabase.from("device_groups").select("id, name, store_id");
+    let countriesQuery = supabase.from("countries").select("id, name");
+    let devicesQuery = supabase.from("devices").select("id, store_id, status, company_id");
+
+    // Filter by tenant if not super admin
+    if (!isSuperAdmin && tenantId) {
+      regionsQuery = regionsQuery.eq("tenant_id", tenantId);
+      storesQuery = storesQuery.eq("tenant_id", tenantId);
+      groupsQuery = groupsQuery.eq("tenant_id", tenantId);
+      // devices query will be filtered later using company IDs if needed
+    }
+
     const [regionsR, storesR, groupsR, countriesR, devicesR] = await Promise.all([
-      supabase.from("regions").select("id, name"),
-      supabase.from("stores").select("id, name, code, city_id, is_active, metadata").eq("tenant_id", tenantId),
-      supabase.from("device_groups").select("id, name, store_id").eq("tenant_id", tenantId),
-      supabase.from("countries").select("id, name"),
-      supabase.from("devices").select("id, store_id, status, company_id"),
+      regionsQuery,
+      storesQuery,
+      groupsQuery,
+      countriesQuery,
+      devicesQuery,
     ]);
 
     // Get all company IDs for the tenant to filter devices properly if not super admin
-    const { data: companies } = await supabase.from("companies").select("id").eq("tenant_id", tenantId);
-    const tenantCompanyIds = (companies || []).map(c => c.id);
+    let tenantCompanyIds: string[] = [];
+    if (!isSuperAdmin && tenantId) {
+      const { data: companies } = await supabase.from("companies").select("id").eq("tenant_id", tenantId);
+      tenantCompanyIds = (companies || []).map(c => c.id);
+    }
 
     let devices = devicesR.data || [];
-    if (tenantCompanyIds.length > 0) {
+    if (!isSuperAdmin && tenantCompanyIds.length > 0) {
       devices = devices.filter(d => tenantCompanyIds.includes(d.company_id));
     }
 
@@ -432,7 +451,7 @@ export default function EnterpriseManager() {
       stores: stores.length,
       regions: (regionsR.data || []).length,
     });
-  }, [tenantId]);
+  }, [tenantId, isSuperAdmin, tenantLoading]);
 
   useEffect(() => { loadParentData(); }, [loadParentData]);
 
